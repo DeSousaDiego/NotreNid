@@ -44,13 +44,31 @@ Aucune. Le schéma Prisma ne contient encore aucun modèle (prévu Phase 2).
 | `npx expo export --platform web` (apps/mobile) | ✅ succès — bundle Metro généré (823 modules), 3 routes statiques |
 | `npx expo-doctor` (apps/mobile) | ✅ succès — 20/20 vérifications passées |
 | `pnpm run format:check` puis `pnpm run format` | ⚠️ 19 fichiers non conformes détectés puis corrigés automatiquement ; `format:check` repasse au vert ensuite |
-| `docker --version` / `docker compose version` | ❌ Docker introuvable dans la session shell d'implémentation (voir « Problèmes connus ») |
+| `docker --version` / `docker compose version` (1ère vérification) | ❌ Docker introuvable dans la session shell d'implémentation |
+| `docker --version` / `docker compose version` (2e vérification, nouvelle session) | ✅ CLI détecté (`docker 29.6.2`, `docker compose v5.3.1`) |
+| `docker compose up -d` (1ère tentative) | ❌ échec : `failed to connect to the docker API at npipe:////./pipe/docker_engine` — le moteur ne répond pas |
+| `wsl --status` (1ère vérification) | ❌ « Le Sous-système Windows pour Linux n'est pas installé » |
+| `wsl --status` (après `wsl --install` + redémarrage par le propriétaire du dépôt) | ✅ WSL2 installé et actif |
+| `docker compose up -d` (après relance de Docker Desktop) | ✅ succès — images `postgres:16-alpine` et `axllent/mailpit:latest` tirées, conteneurs créés et démarrés |
+| `docker compose ps` | ✅ `notre-nid-postgres-1` et `notre-nid-mailpit-1` tous deux `Up ... (healthy)` |
+| `docker compose exec postgres pg_isready -U notre_nid -d notre_nid` | ✅ `accepting connections` |
+| `curl http://localhost:8025/` (Mailpit web UI) | ✅ 200 |
+| Connexion Prisma réelle à la base (script ad hoc avec `@prisma/adapter-pg` + `pg`, retiré ensuite) | ✅ `SELECT 1` exécuté avec succès contre la base Dockerisée — voir « Découverte importante » ci-dessous |
 
-## Problèmes connus
+## Problèmes connus (résolus)
 
-- **Docker non détecté** : bien que le propriétaire du dépôt ait indiqué avoir installé Docker Desktop en cours de session, ni `docker` ni `docker compose` ne sont reconnus dans le shell (Bash ou PowerShell) utilisé pour l'implémentation. `docker compose up -d` n'a donc pas pu être exécuté ni validé. Cause probable : le terminal a été ouvert avant la fin de l'installation, ou le PATH n'a pas été rafraîchi. **Action à vérifier par le propriétaire** : ouvrir un nouveau terminal / une nouvelle session et exécuter `docker compose up -d`, puis confirmer que PostgreSQL et Mailpit démarrent correctement.
-- Aucune connexion réelle à PostgreSQL n'a donc pu être testée (hors périmètre Phase 1 de toute façon : aucun modèle Prisma n'existe encore).
-- Le générateur Prisma choisi est `prisma-client-js` (classique, CommonJS), et non le nouveau générateur `prisma-client` par défaut de Prisma 7 (qui émet du TypeScript ESM avec `import.meta`, incompatible avec le NestJS CommonJS/décorateurs de ce dépôt). Décision documentée pour rester cohérent avec la stack imposée par le PRD.
+- ~~Moteur Docker indisponible~~ **Résolu.** Cause : machine en **Windows 11 Home** sans **WSL2** installé (Hyper-V indisponible sur cette édition, seul backend possible pour Docker Desktop). Le propriétaire du dépôt a exécuté `wsl --install` puis redémarré la machine ; Docker Desktop a ensuite été relancé et le moteur a démarré normalement. `docker compose up -d` validé avec succès (voir tableau ci-dessus).
+
+## Découverte importante pour la Phase 2
+
+- **Prisma 7 (`prisma-client-js`) exige un adaptateur de driver explicite.** `new PrismaClient()` seul échoue désormais avec `PrismaClientInitializationError: ... A driver adapter is required to connect to your database.` (testé en conditions réelles contre le PostgreSQL Dockerisé). Il faudra donc, en Phase 2, ajouter `pg` et `@prisma/adapter-pg` comme dépendances de `apps/api` et instancier le `PrismaService` avec :
+  ```ts
+  import { PrismaPg } from '@prisma/adapter-pg';
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+  const prisma = new PrismaClient({ adapter });
+  ```
+  Ces paquets ont été testés puis **retirés** de `apps/api/package.json` à la fin de cette vérification : ils ne sont pas utilisés par du code applicatif en Phase 1 (aucun `PrismaModule`/`PrismaService` n'existe encore), et les ajouter sans usage réel aurait été une dépendance inutile pour cette phase.
+- Le générateur Prisma choisi reste `prisma-client-js` (classique, CommonJS) plutôt que le nouveau générateur `prisma-client` (qui émet du TypeScript ESM avec `import.meta`, incompatible avec le NestJS CommonJS/décorateurs de ce dépôt).
 - TypeScript est fixé à `6.0.3` (et non la dernière version `7.0.2`) car `@typescript-eslint` ne supporte que `<6.1.0` à ce jour.
 
 ## Décisions prises
@@ -64,8 +82,7 @@ Aucune. Le schéma Prisma ne contient encore aucun modèle (prévu Phase 2).
 
 ## Actions manuelles restantes
 
-- Confirmer que Docker Desktop est bien opérationnel dans un terminal frais, puis exécuter `docker compose up -d` et vérifier que PostgreSQL (`5432`) et Mailpit (`8025`) répondent.
-- Aucune autre action externe n'est requise pour la Phase 1 (aucun compte tiers, aucun secret de production nécessaire à ce stade).
+- Aucune. `docker compose up -d` est validé (PostgreSQL et Mailpit tous deux `healthy`) ; aucun compte tiers ni secret de production n'est requis pour la Phase 1.
 
 ## Prochaine étape recommandée
 

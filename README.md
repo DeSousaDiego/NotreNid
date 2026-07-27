@@ -4,7 +4,7 @@ Application mobile de gestion de collection partagée pour un couple (livres, CD
 
 ## Statut du projet
 
-**Phase 1 — Fondation** est terminée et validée (lint, typecheck, tests, builds). Aucune fonctionnalité métier (authentification, households, items, ...) n'est encore implémentée : voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) pour les phases suivantes et [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail de l'état actuel.
+**Phase 1 — Fondation** est terminée et validée (lint, typecheck, tests, builds, et `docker compose up -d` avec PostgreSQL + Mailpit healthy). Aucune fonctionnalité métier (authentification, households, items, ...) n'est encore implémentée : voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) pour les phases suivantes et [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail de l'état actuel.
 
 Ce qui existe aujourd'hui :
 
@@ -136,7 +136,7 @@ Non applicable à ce stade (Phase 5, voir `docs/BACKUP_AND_RESTORE.md` à venir)
 - Aucune authentification, aucune gestion de households, d'items ou d'images.
 - Aucun test métier, aucune CI, aucun packaging mobile installable.
 - Le thème visuel complet (tokens de couleur, typographie) et la navigation à cinq destinations ne sont pas encore implémentés côté mobile.
-- `docker compose up -d` n'a pas pu être exécuté dans l'environnement d'implémentation (Docker non détecté dans la session shell) : à valider par le propriétaire du dépôt.
+- Prisma 7 (`prisma-client-js`) exige désormais un adaptateur de driver explicite (`@prisma/adapter-pg` + `pg`) pour se connecter à PostgreSQL — à ajouter lors de l'implémentation du `PrismaService` en Phase 2 (voir `docs/PHASE_STATUS.md`).
 
 ## Roadmap
 
