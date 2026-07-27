@@ -1,0 +1,9 @@
+{
+  "name": "@notre-nid/config",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "files": [
+    "tsconfig.base.json"
+  ]
+}

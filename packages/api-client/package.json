@@ -1,0 +1,23 @@
+{
+  "name": "@notre-nid/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@notre-nid/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@notre-nid/config": "workspace:*",
+    "@notre-nid/eslint-config": "workspace:*",
+    "eslint": "10.8.0",
+    "typescript": "6.0.3"
+  }
+}

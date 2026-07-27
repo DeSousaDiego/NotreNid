@@ -1,0 +1,23 @@
+{
+  "name": "@notre-nid/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "base.js",
+  "exports": {
+    ".": "./base.js",
+    "./node": "./node.js",
+    "./react-native": "./react-native.js"
+  },
+  "dependencies": {
+    "@eslint/js": "9.39.5",
+    "eslint-config-expo": "57.0.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-import": "2.32.0",
+    "globals": "17.8.0",
+    "typescript-eslint": "8.65.0"
+  },
+  "peerDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

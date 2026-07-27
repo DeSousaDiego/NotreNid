@@ -1,0 +1,41 @@
+{
+  "name": "notre-nid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Notre Nid — application de gestion de collection partagée pour un couple.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=22 <23",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "dev:api": "pnpm --filter @notre-nid/api run start:dev",
+    "dev:mobile": "pnpm --filter @notre-nid/mobile run start",
+    "lint": "pnpm -r --if-present run lint",
+    "lint:fix": "pnpm -r --if-present run lint:fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "db:generate": "pnpm --filter @notre-nid/api run db:generate",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@notre-nid/eslint-config": "workspace:*",
+    "eslint": "9.39.5",
+    "husky": "9.1.7",
+    "lint-staged": "17.2.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

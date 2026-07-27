@@ -1,0 +1,11 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+allowBuilds:
+  '@prisma/engines': true
+  # Scarf collecte des statistiques d'installation (télémétrie) : désactivé par défaut.
+  '@scarf/scarf': false
+  prisma: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - globals@17.8.0

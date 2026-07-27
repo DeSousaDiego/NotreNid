@@ -1,0 +1,12 @@
+// Schéma Prisma — Phase 1 (Fondation).
+// Le modèle de données complet (User, Household, Item, ...) et la première
+// migration sont hors périmètre de cette phase : voir docs/NOTRE_NID_PRD.md
+// section 5 et docs/IMPLEMENTATION_PLAN.md pour la Phase 2.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
