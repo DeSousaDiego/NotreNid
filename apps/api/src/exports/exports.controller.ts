@@ -1,10 +1,9 @@
 import { Controller, Get, Header, Param, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+import { ExportsService } from './exports.service';
 import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-
-import { ExportsService } from './exports.service';
 
 @ApiTags('exports')
 @ApiBearerAuth()

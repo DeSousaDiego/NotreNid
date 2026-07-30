@@ -13,13 +13,12 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { HouseholdRole } from '@prisma/client';
 
-import { HouseholdRoles } from '../common/decorators/household-roles.decorator';
-import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { HouseholdRoles } from '../common/decorators/household-roles.decorator';
+import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @ApiTags('categories')
 @ApiBearerAuth()

@@ -13,15 +13,14 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import type { AuthenticatedUser } from '../common/types/authenticated-request';
-
 import { CreateItemDto } from './dto/create-item.dto';
 import { ItemsQueryDto } from './dto/items-query.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { ItemsService } from './items.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import type { AuthenticatedUser } from '../common/types/authenticated-request';
 
 @ApiTags('items')
 @ApiBearerAuth()

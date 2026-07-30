@@ -11,6 +11,11 @@ export function parseDurationToMs(value: string): number {
   if (!match) {
     throw new Error(`Durée invalide : "${value}". Formats acceptés : 15m, 30d, 1h, 3600s.`);
   }
-  const [, amount, unit] = match;
-  return Number(amount) * UNIT_MS[unit.toLowerCase()];
+  const amount = Number(match[1]);
+  const unit = (match[2] ?? '').toLowerCase();
+  const unitMs = UNIT_MS[unit];
+  if (unitMs === undefined) {
+    throw new Error(`Unité de durée inconnue dans "${value}".`);
+  }
+  return amount * unitMs;
 }

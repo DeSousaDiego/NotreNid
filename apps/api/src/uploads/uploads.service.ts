@@ -5,9 +5,8 @@ import path from 'node:path';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { AppException } from '../common/exceptions/app-exception';
-
 import { detectImageType } from './image-signature';
+import { AppException } from '../common/exceptions/app-exception';
 
 export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10 Mo
 
@@ -57,7 +56,11 @@ export class UploadsService {
   private resolveSafePath(filename: string): string {
     const resolved = path.resolve(this.uploadDir, filename);
     if (!resolved.startsWith(this.uploadDir + path.sep)) {
-      throw new AppException(HttpStatus.BAD_REQUEST, 'VALIDATION_ERROR', 'Nom de fichier invalide.');
+      throw new AppException(
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        'Nom de fichier invalide.',
+      );
     }
     return resolved;
   }

@@ -1,4 +1,5 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import type { CanActivate, ExecutionContext } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { HouseholdRole } from '@prisma/client';
 
@@ -21,7 +22,8 @@ export class HouseholdMembershipGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const householdId = request.params.householdId;
+    const rawHouseholdId = request.params.householdId;
+    const householdId = Array.isArray(rawHouseholdId) ? rawHouseholdId[0] : rawHouseholdId;
     if (!householdId) {
       throw new ForbiddenException("Aucun household n'est ciblé par cette route.");
     }

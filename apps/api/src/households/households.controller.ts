@@ -13,17 +13,16 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { HouseholdRole } from '@prisma/client';
 
-import { HouseholdRoles } from '../common/decorators/household-roles.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { toPublicUser } from '../common/mappers/public-user.mapper';
-import type { AuthenticatedUser } from '../common/types/authenticated-request';
-
 import { CreateHouseholdDto } from './dto/create-household.dto';
 import { UpdateHouseholdDto } from './dto/update-household.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { HouseholdsService } from './households.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { HouseholdRoles } from '../common/decorators/household-roles.decorator';
+import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { toPublicUser } from '../common/mappers/public-user.mapper';
+import type { AuthenticatedUser } from '../common/types/authenticated-request';
 
 @ApiTags('households')
 @ApiBearerAuth()

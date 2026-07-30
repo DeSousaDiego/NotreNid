@@ -19,7 +19,11 @@ const base = tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      '@typescript-eslint/consistent-type-imports': 'error',
+      // Volontairement absent : @typescript-eslint/consistent-type-imports --fix convertit
+      // aveuglément les imports de classes utilisées uniquement en paramètre de constructeur
+      // vers `import type`, ce qui casse l'injection de dépendances NestJS (les métadonnées
+      // de décorateur perdent la référence runtime à la classe). Trop dangereux à activer
+      // avec --fix dans un code basé sur les décorateurs/reflect-metadata.
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },

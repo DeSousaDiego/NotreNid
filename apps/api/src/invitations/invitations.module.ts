@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import { MailModule } from '../mail/mail.module';
-
-import { InvitationsController } from './invitations.controller';
 import { InvitationsPublicController } from './invitations-public.controller';
+import { InvitationsController } from './invitations.controller';
 import { InvitationsService } from './invitations.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [MailModule],

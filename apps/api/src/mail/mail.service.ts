@@ -9,7 +9,8 @@ export class MailService {
   private readonly from: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.from = this.configService.get<string>('SMTP_FROM') ?? 'Notre Nid <no-reply@notre-nid.local>';
+    this.from =
+      this.configService.get<string>('SMTP_FROM') ?? 'Notre Nid <no-reply@notre-nid.local>';
     this.transporter = createTransport({
       host: this.configService.get<string>('SMTP_HOST') ?? 'localhost',
       port: this.configService.get<number>('SMTP_PORT') ?? 1025,
@@ -32,7 +33,9 @@ export class MailService {
 
     // En développement, sans service email externe configuré, on trace toujours
     // le lien/le jeton d'invitation dans les logs (voir docs/NOTRE_NID_PRD.md section 7).
-    this.logger.log(`Invitation pour ${to} au foyer "${householdName}" — jeton : ${invitationToken}`);
+    this.logger.log(
+      `Invitation pour ${to} au foyer "${householdName}" — jeton : ${invitationToken}`,
+    );
 
     await this.transporter.sendMail({
       from: this.from,

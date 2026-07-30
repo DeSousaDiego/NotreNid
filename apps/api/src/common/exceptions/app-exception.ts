@@ -1,4 +1,5 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import type { HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 
 /**
  * Exception applicative portant un code métier stable (ex. `LAST_OWNER_CANNOT_LEAVE`),

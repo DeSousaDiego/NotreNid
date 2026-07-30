@@ -1,11 +1,10 @@
 import { Controller, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+import { InvitationsService } from './invitations.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../common/types/authenticated-request';
-
-import { InvitationsService } from './invitations.service';
 
 @ApiTags('invitations')
 @ApiBearerAuth()

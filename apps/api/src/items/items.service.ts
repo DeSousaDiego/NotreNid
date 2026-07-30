@@ -1,13 +1,12 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
+import { CategoriesService } from '../categories/categories.service';
+import type { CategoryFieldSchemaDto } from '../categories/dto/category-field-schema.dto';
 import { buildPaginatedResult, type PaginatedResult } from '../common/dto/paginated-result';
 import { AppException } from '../common/exceptions/app-exception';
 import { toPublicUser } from '../common/mappers/public-user.mapper';
-import { CategoriesService } from '../categories/categories.service';
-import type { CategoryFieldSchemaDto } from '../categories/dto/category-field-schema.dto';
 import { PrismaService } from '../prisma/prisma.service';
-
 import type { CreateItemDto } from './dto/create-item.dto';
 import type { ItemsQueryDto } from './dto/items-query.dto';
 import type { UpdateItemDto } from './dto/update-item.dto';
@@ -71,7 +70,12 @@ export class ItemsService {
       this.prisma.item.count({ where }),
     ]);
 
-    return buildPaginatedResult(items.map((item) => this.toResponse(item)), totalItems, page, pageSize);
+    return buildPaginatedResult(
+      items.map((item) => this.toResponse(item)),
+      totalItems,
+      page,
+      pageSize,
+    );
   }
 
   async findOne(householdId: string, itemId: string) {
@@ -157,14 +161,14 @@ export class ItemsService {
           coverImageUrl: dto.coverImageUrl ?? existing.coverImageUrl,
           customMetadata: category.isSystem
             ? undefined
-            : ((dto.customMetadata as Prisma.InputJsonValue | undefined) ?? existing.customMetadata),
+            : ((dto.customMetadata as Prisma.InputJsonValue | undefined) ??
+              existing.customMetadata ??
+              undefined),
           updatedById: userId,
           owners: dto.ownerIds
             ? { create: dto.ownerIds.map((ownerId) => ({ userId: ownerId })) }
             : undefined,
-          bookMetadata: dto.book
-            ? { upsert: { create: dto.book, update: dto.book } }
-            : undefined,
+          bookMetadata: dto.book ? { upsert: { create: dto.book, update: dto.book } } : undefined,
           cdMetadata: dto.cd ? { upsert: { create: dto.cd, update: dto.cd } } : undefined,
           dvdMetadata: dto.dvd ? { upsert: { create: dto.dvd, update: dto.dvd } } : undefined,
         },
@@ -203,7 +207,11 @@ export class ItemsService {
   async archive(householdId: string, itemId: string, userId: string) {
     const existing = await this.getOwnedItem(householdId, itemId);
     if (existing.archivedAt) {
-      throw new AppException(HttpStatus.CONFLICT, 'ITEM_ALREADY_ARCHIVED', 'Cet item est déjà archivé.');
+      throw new AppException(
+        HttpStatus.CONFLICT,
+        'ITEM_ALREADY_ARCHIVED',
+        'Cet item est déjà archivé.',
+      );
     }
 
     const item = await this.prisma.$transaction(async (tx) => {
@@ -230,7 +238,11 @@ export class ItemsService {
   async restore(householdId: string, itemId: string, userId: string) {
     const existing = await this.getOwnedItem(householdId, itemId);
     if (!existing.archivedAt) {
-      throw new AppException(HttpStatus.CONFLICT, 'ITEM_NOT_ARCHIVED', "Cet item n'est pas archivé.");
+      throw new AppException(
+        HttpStatus.CONFLICT,
+        'ITEM_NOT_ARCHIVED',
+        "Cet item n'est pas archivé.",
+      );
     }
 
     const item = await this.prisma.$transaction(async (tx) => {
@@ -278,7 +290,10 @@ export class ItemsService {
     return category;
   }
 
-  private async assertOwnersBelongToHousehold(householdId: string, ownerIds: string[]): Promise<void> {
+  private async assertOwnersBelongToHousehold(
+    householdId: string,
+    ownerIds: string[],
+  ): Promise<void> {
     const members = await this.prisma.householdMember.findMany({
       where: { householdId, userId: { in: ownerIds } },
       select: { userId: true },
@@ -289,7 +304,7 @@ export class ItemsService {
       throw new AppException(
         HttpStatus.BAD_REQUEST,
         'OWNERS_NOT_MEMBERS',
-        "Tous les propriétaires doivent être membres de ce household.",
+        'Tous les propriétaires doivent être membres de ce household.',
       );
     }
   }

@@ -16,7 +16,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset"
   },
   "dependencies": {
     "@nestjs/common": "11.1.28",
@@ -54,6 +57,7 @@
     "prisma": "7.9.0",
     "supertest": "7.2.2",
     "ts-jest": "29.4.12",
+    "tsx": "4.23.1",
     "typescript": "6.0.3"
   }
 }

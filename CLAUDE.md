@@ -42,7 +42,8 @@ pnpm install                     # installation (racine)
 cp .env.example .env             # variables d'environnement locales
 docker compose up -d             # PostgreSQL + Mailpit (+ MinIO via --profile storage)
 pnpm db:generate                 # génère le client Prisma
-pnpm --filter @notre-nid/api exec prisma migrate dev   # migrations (à partir de la Phase 2)
+pnpm --filter @notre-nid/api exec prisma migrate dev   # applique les migrations
+pnpm --filter @notre-nid/api run db:seed               # crée les comptes de démonstration
 
 pnpm dev:api                     # API en mode watch
 pnpm dev:mobile                  # Expo (Metro)

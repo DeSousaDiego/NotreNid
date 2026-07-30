@@ -10,7 +10,6 @@ import { toPublicUser, type PublicUser } from '../common/mappers/public-user.map
 import { parseDurationToMs } from '../common/utils/duration';
 import { normalizeEmail } from '../common/utils/normalize-email';
 import { PrismaService } from '../prisma/prisma.service';
-
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 
@@ -32,7 +31,11 @@ export class AuthService {
     const email = normalizeEmail(dto.email);
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
-      throw new AppException(HttpStatus.CONFLICT, 'EMAIL_ALREADY_USED', 'Cet email est déjà utilisé.');
+      throw new AppException(
+        HttpStatus.CONFLICT,
+        'EMAIL_ALREADY_USED',
+        'Cet email est déjà utilisé.',
+      );
     }
 
     const passwordHash = await argon2.hash(dto.password);
@@ -114,16 +117,21 @@ export class AuthService {
     email: string,
     deviceName: string | undefined,
   ): Promise<AuthResult> {
+    const accessTtlSeconds = Math.floor(
+      parseDurationToMs(this.configService.getOrThrow<string>('JWT_ACCESS_TTL')) / 1000,
+    );
     const accessToken = await this.jwtService.signAsync(
       { sub: userId, email },
       {
         secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.getOrThrow<string>('JWT_ACCESS_TTL'),
+        expiresIn: accessTtlSeconds,
       },
     );
 
     const rawRefreshToken = randomBytes(48).toString('hex');
-    const refreshTtlMs = parseDurationToMs(this.configService.getOrThrow<string>('JWT_REFRESH_TTL'));
+    const refreshTtlMs = parseDurationToMs(
+      this.configService.getOrThrow<string>('JWT_REFRESH_TTL'),
+    );
 
     await this.prisma.refreshSession.create({
       data: {

@@ -5,7 +5,7 @@ Ce document décrit l'ordre des phases, leurs dépendances, leurs critères de s
 ## Ordre des phases
 
 1. **Phase 1 — Fondation** ✅ terminée
-2. **Phase 2 — Backend métier**
+2. **Phase 2 — Backend métier** ✅ terminée
 3. **Phase 3 — Mobile**
 4. **Phase 4 — Qualité**
 5. **Phase 5 — Livraison**
@@ -30,7 +30,9 @@ Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant qu
 
 ---
 
-## Phase 2 — Backend métier
+## Phase 2 — Backend métier ✅
+
+**Statut** : terminée et validée — voir `docs/PHASE_STATUS.md` pour le détail complet (fichiers, commandes exécutées, décisions, problèmes rencontrés et corrigés).
 
 **Contenu** :
 
@@ -47,13 +49,13 @@ Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant qu
 
 **Dépendances** : Phase 1 terminée (API, Prisma, Docker Compose disponibles).
 
-**Critères de sortie** :
+**Critères de sortie** (tous validés) :
 
-- Migration appliquée avec succès sur une base PostgreSQL locale (`docker compose up -d` puis `prisma migrate dev`).
-- Seed exécuté sans erreur.
-- Tests d'autorisation couvrant explicitement le cas critique : un membre du household A ne peut jamais lire, modifier ou supprimer un item du household B.
-- `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` verts.
-- Endpoints de la section 7 du PRD tous exposés et documentés dans Swagger (`/api/v1/docs`).
+- ✅ Migration appliquée avec succès sur une base PostgreSQL locale, y compris depuis une base entièrement réinitialisée (`prisma migrate reset --force`, avec confirmation explicite de l'utilisateur).
+- ✅ Seed exécuté sans erreur (idempotent).
+- ✅ Tests d'autorisation couvrant explicitement le cas critique : un membre du household A ne peut jamais lire, modifier ou supprimer un item du household B (test e2e dédié, contre PostgreSQL réel).
+- ✅ `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` verts sur tout le monorepo.
+- ✅ Endpoints de la section 7 du PRD tous exposés et documentés dans Swagger (`/api/v1/docs`, 26 routes, 15 schémas).
 
 **Opérations nécessitant une intervention humaine** : aucune pour le développement local ; un service SMTP réel (au-delà de Mailpit) et un bucket S3 réel restent nécessaires uniquement pour la production (Phase 5).
 

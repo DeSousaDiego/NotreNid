@@ -12,11 +12,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
+import { MAX_UPLOAD_SIZE_BYTES, UploadsService } from './uploads.service';
 import { AppException } from '../common/exceptions/app-exception';
 import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-
-import { MAX_UPLOAD_SIZE_BYTES, UploadsService } from './uploads.service';
 
 @ApiTags('uploads')
 @ApiBearerAuth()

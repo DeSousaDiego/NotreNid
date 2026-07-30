@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import type { NestMiddleware } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 
 const REQUEST_ID_HEADER = 'x-request-id';

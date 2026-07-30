@@ -4,7 +4,6 @@ import { Prisma } from '@prisma/client';
 import { AppException } from '../common/exceptions/app-exception';
 import { slugify } from '../common/utils/slugify';
 import { PrismaService } from '../prisma/prisma.service';
-
 import type { CategoryFieldSchemaDto } from './dto/category-field-schema.dto';
 import type { CreateCategoryDto } from './dto/create-category.dto';
 import type { UpdateCategoryDto } from './dto/update-category.dto';
@@ -56,8 +55,8 @@ export class CategoriesService {
         icon: dto.icon ?? category.icon,
         metadataSchema:
           dto.metadataSchema !== undefined
-            ? ((dto.metadataSchema as unknown) as Prisma.InputJsonValue)
-            : category.metadataSchema ?? undefined,
+            ? (dto.metadataSchema as unknown as Prisma.InputJsonValue)
+            : (category.metadataSchema ?? undefined),
       },
     });
   }

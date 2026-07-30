@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { PrismaService } from '../prisma/prisma.service';
-
 import { toCsv } from './csv.util';
+import { PrismaService } from '../prisma/prisma.service';
 
 const CSV_COLUMNS = [
   'id',

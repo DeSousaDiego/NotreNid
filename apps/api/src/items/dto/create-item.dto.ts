@@ -74,7 +74,10 @@ export class CreateItemDto {
   @Type(() => DvdMetadataDto)
   dvd?: DvdMetadataDto;
 
-  @ApiPropertyOptional({ type: Object, description: 'Métadonnées pour une catégorie personnalisée' })
+  @ApiPropertyOptional({
+    type: Object,
+    description: 'Métadonnées pour une catégorie personnalisée',
+  })
   @IsOptional()
   @IsObject()
   customMetadata?: Record<string, unknown>;

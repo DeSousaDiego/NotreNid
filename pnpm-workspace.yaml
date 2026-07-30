@@ -6,6 +6,7 @@ allowBuilds:
   # Scarf collecte des statistiques d'installation (télémétrie) : désactivé par défaut.
   '@scarf/scarf': false
   argon2: true
+  esbuild: true
   prisma: true
   unrs-resolver: true
 minimumReleaseAgeExclude:
