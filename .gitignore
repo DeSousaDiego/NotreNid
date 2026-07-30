@@ -30,6 +30,8 @@ apps/mobile/web-build/
 # Local storage (dev image uploads)
 infrastructure/storage/local/
 storage/local/
+apps/api/storage/uploads/*
+!apps/api/storage/uploads/.gitkeep
 
 # Logs
 *.log

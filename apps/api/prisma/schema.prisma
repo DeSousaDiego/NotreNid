@@ -1,7 +1,5 @@
-// Schéma Prisma — Phase 1 (Fondation).
-// Le modèle de données complet (User, Household, Item, ...) et la première
-// migration sont hors périmètre de cette phase : voir docs/NOTRE_NID_PRD.md
-// section 5 et docs/IMPLEMENTATION_PLAN.md pour la Phase 2.
+// Schéma Prisma — Phase 2 (Backend métier).
+// Modèle de données complet conforme à docs/NOTRE_NID_PRD.md section 5.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +7,219 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum HouseholdRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ItemCondition {
+  NEW
+  VERY_GOOD
+  GOOD
+  FAIR
+  POOR
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdHouseholds   Household[]           @relation("HouseholdCreatedBy")
+  memberships         HouseholdMember[]
+  sentInvitations     HouseholdInvitation[] @relation("InvitationInvitedBy")
+  createdItems        Item[]                @relation("ItemCreatedBy")
+  updatedItems        Item[]                @relation("ItemUpdatedBy")
+  ownedItems          ItemOwner[]
+  refreshSessions     RefreshSession[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+model Household {
+  id          String   @id @default(uuid())
+  name        String
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   User                  @relation("HouseholdCreatedBy", fields: [createdById], references: [id])
+  members     HouseholdMember[]
+  invitations HouseholdInvitation[]
+  categories  Category[]
+  items       Item[]
+  auditLogs   AuditLog[]
+
+  @@map("households")
+}
+
+model HouseholdMember {
+  id          String        @id @default(uuid())
+  householdId String
+  userId      String
+  role        HouseholdRole
+  joinedAt    DateTime      @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+  @@map("household_members")
+}
+
+model HouseholdInvitation {
+  id           String    @id @default(uuid())
+  householdId  String
+  email        String
+  tokenHash    String    @unique
+  invitedById  String
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitationInvitedBy", fields: [invitedById], references: [id])
+
+  @@map("household_invitations")
+}
+
+model Category {
+  id             String   @id @default(uuid())
+  householdId    String?
+  name           String
+  slug           String
+  icon           String?
+  isSystem       Boolean  @default(false)
+  metadataSchema Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  household Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items     Item[]
+
+  @@unique([householdId, slug])
+  @@map("categories")
+}
+
+model Item {
+  id             String        @id @default(uuid())
+  householdId    String
+  categoryId     String
+  title          String
+  description    String?
+  condition      ItemCondition
+  coverImageUrl  String?
+  notes          String?
+  customMetadata Json?
+  createdById    String
+  updatedById    String
+  archivedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  household     Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  category      Category      @relation(fields: [categoryId], references: [id])
+  createdBy     User          @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  updatedBy     User          @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
+  owners        ItemOwner[]
+  bookMetadata  BookMetadata?
+  cdMetadata    CdMetadata?
+  dvdMetadata   DvdMetadata?
+
+  @@index([householdId])
+  @@map("items")
+}
+
+model ItemOwner {
+  id        String   @id @default(uuid())
+  itemId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, userId])
+  @@map("item_owners")
+}
+
+model BookMetadata {
+  itemId          String  @id
+  author          String?
+  isbn            String?
+  publisher       String?
+  publicationYear Int?
+  language        String?
+  pageCount       Int?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("book_metadata")
+}
+
+model CdMetadata {
+  itemId      String  @id
+  artist      String?
+  album       String?
+  releaseYear Int?
+  label       String?
+  format      String?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("cd_metadata")
+}
+
+model DvdMetadata {
+  itemId          String  @id
+  director        String?
+  releaseYear     Int?
+  edition         String?
+  region          String?
+  format          String?
+  durationMinutes Int?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("dvd_metadata")
+}
+
+model RefreshSession {
+  id           String    @id @default(uuid())
+  userId       String
+  tokenHash    String    @unique
+  deviceName   String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_sessions")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  householdId String
+  userId      String
+  action      String
+  entityType  String
+  entityId    String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@map("audit_logs")
 }

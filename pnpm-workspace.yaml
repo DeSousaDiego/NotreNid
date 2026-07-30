@@ -5,6 +5,7 @@ allowBuilds:
   '@prisma/engines': true
   # Scarf collecte des statistiques d'installation (télémétrie) : désactivé par défaut.
   '@scarf/scarf': false
+  argon2: true
   prisma: true
   unrs-resolver: true
 minimumReleaseAgeExclude:
