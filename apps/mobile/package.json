@@ -10,28 +10,44 @@
     "web": "expo start --web",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "jest"
   },
   "dependencies": {
+    "@expo-google-fonts/nunito-sans": "^0.4.2",
+    "@expo/vector-icons": "^15.1.1",
+    "@hookform/resolvers": "5.7.1",
+    "@notre-nid/api-client": "workspace:*",
+    "@notre-nid/shared": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
     "expo": "~57.0.8",
     "expo-constants": "~57.0.7",
+    "expo-font": "~57.0.1",
+    "expo-image": "~57.0.2",
     "expo-linking": "~57.0.4",
     "expo-router": "~57.0.8",
+    "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-hook-form": "7.84.0",
     "react-native": "0.86.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@notre-nid/config": "workspace:*",
     "@notre-nid/eslint-config": "workspace:*",
+    "@testing-library/react-native": "14.0.1",
+    "@types/jest": "30.0.0",
     "@types/react": "~19.2.2",
     "eslint": "9.39.5",
+    "jest-expo": "57.0.3",
+    "react-test-renderer": "19.2.8",
     "typescript": "~6.0.3"
   }
 }
