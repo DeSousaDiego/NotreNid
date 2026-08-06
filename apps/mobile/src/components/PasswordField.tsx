@@ -27,7 +27,15 @@ export function PasswordField(props: PasswordFieldProps) {
         accessibilityLabel={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
         onPress={() => setVisible((v) => !v)}
         hitSlop={8}
-        style={{ position: 'absolute', right: 4, top: 28, width: 40, height: 44, alignItems: 'center', justifyContent: 'center' }}
+        style={{
+          position: 'absolute',
+          right: 4,
+          top: 28,
+          width: 40,
+          height: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
         <Ionicons
           name={visible ? 'eye-off-outline' : 'eye-outline'}

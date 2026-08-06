@@ -23,7 +23,9 @@ export class ApiError extends Error {
  * section 4.10 pour le message affiché à l'utilisateur.
  */
 export class NetworkError extends Error {
-  constructor(message = 'Impossible de joindre le service. Vérifiez votre connexion et réessayez.') {
+  constructor(
+    message = 'Impossible de joindre le service. Vérifiez votre connexion et réessayez.',
+  ) {
     super(message);
     this.name = 'NetworkError';
   }

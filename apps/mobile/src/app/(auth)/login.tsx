@@ -43,7 +43,9 @@ export default function LoginScreen() {
   return (
     <ScreenContainer scroll>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
-        <View style={{ alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.lg }}>
+        <View
+          style={{ alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.lg }}
+        >
           <AppText variant="display" color="primary">
             Notre Nid
           </AppText>

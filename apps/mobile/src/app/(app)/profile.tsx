@@ -19,7 +19,10 @@ export default function ProfileScreen() {
 
   return (
     <ScreenContainer>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: theme.spacing.xl }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: theme.spacing.xl }}
+      >
         <View style={{ gap: theme.spacing.xs }}>
           <AppText variant="title">Profil</AppText>
           <AppText variant="body">{user?.displayName}</AppText>

@@ -11,7 +11,12 @@ export interface LoadingSkeletonProps {
 }
 
 /** Bloc de chargement pulsant. Respecte la réduction des animations système. */
-export function LoadingSkeleton({ width = '100%', height = 16, radius, style }: LoadingSkeletonProps) {
+export function LoadingSkeleton({
+  width = '100%',
+  height = 16,
+  radius,
+  style,
+}: LoadingSkeletonProps) {
   const theme = useTheme();
   const [opacity] = useState(() => new Animated.Value(0.4));
 

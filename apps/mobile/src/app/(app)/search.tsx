@@ -77,7 +77,10 @@ export default function SearchScreen() {
           }}
           ListFooterComponent={
             itemsQuery.isFetchingNextPage ? (
-              <ActivityIndicator style={{ marginTop: theme.spacing.md }} color={theme.colors.primary} />
+              <ActivityIndicator
+                style={{ marginTop: theme.spacing.md }}
+                color={theme.colors.primary}
+              />
             ) : null
           }
         />

@@ -44,7 +44,9 @@ export default function RegisterScreen() {
   return (
     <ScreenContainer scroll>
       <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.lg }}>
-        <View style={{ alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.lg }}>
+        <View
+          style={{ alignItems: 'center', gap: theme.spacing.xs, marginBottom: theme.spacing.lg }}
+        >
           <AppText variant="title" color="primary">
             Créer votre nid
           </AppText>

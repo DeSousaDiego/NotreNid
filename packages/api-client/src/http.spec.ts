@@ -88,7 +88,9 @@ describe('createHttpClient', () => {
       refreshToken: 'refresh-1',
     });
     fetchMock
-      .mockResolvedValueOnce(jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }))
+      .mockResolvedValueOnce(
+        jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }),
+      )
       .mockResolvedValueOnce(
         jsonResponse(200, { accessToken: 'new-access', refreshToken: 'new-refresh', user: {} }),
       )
@@ -114,7 +116,9 @@ describe('createHttpClient', () => {
       refreshToken: 'also-expired',
     });
     fetchMock
-      .mockResolvedValueOnce(jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }))
+      .mockResolvedValueOnce(
+        jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }),
+      )
       .mockResolvedValueOnce(
         jsonResponse(401, { statusCode: 401, code: 'INVALID_REFRESH_TOKEN', message: '' }),
       );
@@ -144,13 +148,17 @@ describe('createHttpClient', () => {
       if (headers.Authorization === 'Bearer new-access') {
         return Promise.resolve(jsonResponse(200, { ok: true }));
       }
-      return Promise.resolve(jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }));
+      return Promise.resolve(
+        jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }),
+      );
     });
 
     const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage });
     await Promise.all([http.request('/a'), http.request('/b')]);
 
-    const refreshCalls = fetchMock.mock.calls.filter(([url]) => (url as string).endsWith('/auth/refresh'));
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) =>
+      (url as string).endsWith('/auth/refresh'),
+    );
     expect(refreshCalls).toHaveLength(1);
   });
 });

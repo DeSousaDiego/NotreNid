@@ -25,11 +25,7 @@ export function BottomSheet({ visible, onClose, title, children }: BottomSheetPr
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable
-        accessibilityLabel="Fermer le panneau"
-        style={styles.backdrop}
-        onPress={onClose}
-      />
+      <Pressable accessibilityLabel="Fermer le panneau" style={styles.backdrop} onPress={onClose} />
       <SafeAreaView edges={['bottom']} style={styles.sheetWrapper}>
         <View
           style={[

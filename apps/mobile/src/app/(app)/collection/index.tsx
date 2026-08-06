@@ -131,13 +131,20 @@ export default function CollectionScreen() {
           onRefresh={() => void itemsQuery.refetch()}
           ListFooterComponent={
             itemsQuery.isFetchingNextPage ? (
-              <ActivityIndicator style={{ marginTop: theme.spacing.md }} color={theme.colors.primary} />
+              <ActivityIndicator
+                style={{ marginTop: theme.spacing.md }}
+                color={theme.colors.primary}
+              />
             ) : null
           }
         />
       )}
 
-      <BottomSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtres et tri">
+      <BottomSheet
+        visible={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filtres et tri"
+      >
         <View style={{ gap: theme.spacing.md }}>
           <Select
             label="Catégorie"
@@ -177,7 +184,11 @@ export default function CollectionScreen() {
           </View>
           <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
             <Chip label="Croissant" selected={order === 'asc'} onPress={() => setOrder('asc')} />
-            <Chip label="Décroissant" selected={order === 'desc'} onPress={() => setOrder('desc')} />
+            <Chip
+              label="Décroissant"
+              selected={order === 'desc'}
+              onPress={() => setOrder('desc')}
+            />
           </View>
         </View>
       </BottomSheet>

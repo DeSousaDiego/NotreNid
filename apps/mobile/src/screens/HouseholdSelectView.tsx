@@ -42,7 +42,11 @@ export function HouseholdSelectView({ households, onSelect }: HouseholdSelectVie
             ]}
           >
             <AppText variant="section">{item.name}</AppText>
-            <Ionicons name="chevron-forward" size={theme.iconSizes.md} color={theme.colors.textMuted} />
+            <Ionicons
+              name="chevron-forward"
+              size={theme.iconSizes.md}
+              color={theme.colors.textMuted}
+            />
           </Pressable>
         )}
       />

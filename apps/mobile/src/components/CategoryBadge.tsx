@@ -30,7 +30,11 @@ export function CategoryBadge({ name, slug }: CategoryBadgeProps) {
         borderColor: theme.colors.border,
       }}
     >
-      <Ionicons name={getCategoryIcon(slug)} size={theme.iconSizes.sm} color={theme.colors.primary} />
+      <Ionicons
+        name={getCategoryIcon(slug)}
+        size={theme.iconSizes.sm}
+        color={theme.colors.primary}
+      />
       <AppText variant="caption" color="primary">
         {name}
       </AppText>

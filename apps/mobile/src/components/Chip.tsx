@@ -13,7 +13,13 @@ export interface ChipProps {
 }
 
 /** Étiquette sélectionnable (filtres, catégories). */
-export function Chip({ label, selected = false, onPress, disabled = false, accessibilityLabel }: ChipProps) {
+export function Chip({
+  label,
+  selected = false,
+  onPress,
+  disabled = false,
+  accessibilityLabel,
+}: ChipProps) {
   const theme = useTheme();
 
   return (

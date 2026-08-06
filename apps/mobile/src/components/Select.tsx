@@ -87,7 +87,11 @@ export function Select<T extends string>({
                   {item.label}
                 </AppText>
                 {isSelected ? (
-                  <Ionicons name="checkmark" size={theme.iconSizes.md} color={theme.colors.primary} />
+                  <Ionicons
+                    name="checkmark"
+                    size={theme.iconSizes.md}
+                    color={theme.colors.primary}
+                  />
                 ) : null}
               </Pressable>
             );

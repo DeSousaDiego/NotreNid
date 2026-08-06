@@ -1,13 +1,7 @@
 import { router } from 'expo-router';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
-import {
-  AppText,
-  Button,
-  ErrorState,
-  LoadingSkeleton,
-  ScreenContainer,
-} from '../../components';
+import { AppText, Button, ErrorState, LoadingSkeleton, ScreenContainer } from '../../components';
 import { getErrorMessage } from '../../lib/errorMessage';
 import { useAuth } from '../../providers/AuthProvider';
 import { useHousehold } from '../../providers/HouseholdProvider';
@@ -25,7 +19,10 @@ export default function HomeScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={statsQuery.isRefetching} onRefresh={() => void statsQuery.refetch()} />
+          <RefreshControl
+            refreshing={statsQuery.isRefetching}
+            onRefresh={() => void statsQuery.refetch()}
+          />
         }
         contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.xl }}
       >
@@ -56,10 +53,7 @@ export default function HomeScreen() {
                 gap: theme.spacing.sm,
               }}
             >
-              <StatTile
-                label="Objets actifs"
-                value={statsQuery.data.totalActiveItems}
-              />
+              <StatTile label="Objets actifs" value={statsQuery.data.totalActiveItems} />
               <StatTile label="Archivés" value={statsQuery.data.archivedCount} />
             </View>
 
