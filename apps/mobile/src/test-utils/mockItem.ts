@@ -1,0 +1,66 @@
+import type { Item } from '@notre-nid/shared';
+
+export function mockItem(overrides: Partial<Item> = {}): Item {
+  return {
+    id: 'item-1',
+    householdId: 'household-1',
+    title: 'Les Misérables',
+    description: null,
+    condition: 'GOOD',
+    coverImageUrl: null,
+    notes: null,
+    customMetadata: null,
+    archivedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    category: {
+      id: 'category-book',
+      householdId: null,
+      name: 'Livre',
+      slug: 'book',
+      icon: null,
+      isSystem: true,
+      metadataSchema: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    owners: [
+      {
+        id: 'user-1',
+        email: 'user1@example.com',
+        displayName: 'Alix',
+        avatarUrl: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    book: {
+      itemId: 'item-1',
+      author: 'Victor Hugo',
+      isbn: null,
+      publisher: null,
+      publicationYear: null,
+      language: null,
+      pageCount: null,
+    },
+    cd: null,
+    dvd: null,
+    createdBy: {
+      id: 'user-1',
+      email: 'user1@example.com',
+      displayName: 'Alix',
+      avatarUrl: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    updatedBy: {
+      id: 'user-1',
+      email: 'user1@example.com',
+      displayName: 'Alix',
+      avatarUrl: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    ...overrides,
+  };
+}
