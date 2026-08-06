@@ -6,9 +6,13 @@ Ce document décrit l'ordre des phases, leurs dépendances, leurs critères de s
 
 1. **Phase 1 — Fondation** ✅ terminée
 2. **Phase 2 — Backend métier** ✅ terminée
-3. **Phase 3 — Mobile**
+3. **Phase 3 — Mobile** (découpée en deux sous-phases pour réduire les risques)
+   - **Phase 3A — Fondations mobiles et parcours de consultation** ✅ terminée
+   - **Phase 3B — Mutations, administration et finalisation mobile** ⏳ non démarrée
 4. **Phase 4 — Qualité**
 5. **Phase 5 — Livraison**
+
+La Phase 3 dans son ensemble n'est donc **pas** terminée : seule la 3A l'est.
 
 Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant que la précédente ait ses commandes de validation vertes (lint, typecheck, tests, builds).
 
@@ -63,11 +67,34 @@ Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant qu
 
 ## Phase 3 — Mobile
 
-**Contenu** : système de thème centralisé (tokens de couleur/typographie/espacement — section 4), navigation à cinq destinations (Accueil, Collection, Ajouter, Recherche, Profil), état d'authentification (SecureStore, refresh automatique), sélection de household, écrans Accueil/Collection/Détail/Ajout (multi-étapes)/Profil, gestion des erreurs réseau et états vides/chargement.
+La Phase 3 est découpée en deux sous-phases afin de réduire les risques et de permettre une validation sérieuse des fondations avant d'implémenter toutes les mutations.
+
+### Phase 3A — Fondations mobiles et parcours de consultation ✅
+
+**Statut** : terminée et validée — voir `docs/PHASE_STATUS.md` pour le détail complet.
+
+**Contenu** : système de thème centralisé (tokens couleur/typographie/espacement — section 4), design system de 17+ composants de consultation, client API typé complet (`packages/api-client`), types de domaine partagés (`packages/shared`), navigation Expo Router ((auth) + (app) à 4 onglets, garde d'authentification/household), état d'authentification (SecureStore, restauration de session via TanStack Query, refresh automatique, expiration de session), sélection/mémorisation du household, écrans Accueil (stats + ajouts récents), Collection (liste infinie, recherche, filtres, tri), Détail item (livre/CD/DVD/catégorie personnalisée), Recherche globale, Profil (lecture seule) + déconnexion, gestion des erreurs réseau et états vides/chargement/erreur, premiers tests mobiles (composants, hooks, provider d'authentification).
 
 **Dépendances** : Phase 2 terminée (l'API doit exposer les routes consommées par le mobile).
 
-**Critères de sortie** : parcours principaux navigables sur un simulateur/émulateur, formulaire d'ajout fonctionnel bout en bout contre l'API locale, `pnpm lint`/`typecheck`/`test`/`build` verts.
+**Critères de sortie** (tous validés) :
+
+- ✅ `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, `pnpm build` verts sur tout le monorepo.
+- ✅ Connexion réelle à l'API (comptes de démonstration, vérifié via requêtes HTTP directes contre l'API locale démarrée avec Docker + le seed).
+- ✅ Restauration/expiration de session, sélection de household, Accueil, Collection (recherche/filtres/tri/pagination), détail d'item, recherche globale : logique vérifiée par tests automatisés et par appels HTTP réels reproduisant chaque flux consommé par le mobile.
+- ⚠️ Vérification visuelle sur un simulateur/émulateur/téléphone réel **non réalisée** : aucun simulateur iOS (Windows), aucun émulateur Android disponible dans l'environnement d'exécution. De plus, le serveur de développement Metro (`expo start`) rencontre un bug de résolution de module spécifique à cet environnement (Windows + pnpm + monorepo) qui empêche de servir le bundle applicatif via le protocole de manifeste moderne d'Expo — voir `docs/PHASE_STATUS.md` pour la reproduction complète. Ce point doit être vérifié manuellement par le propriétaire du dépôt sur sa propre machine avant la Phase 3B.
+
+**Fonctionnalités explicitement préparées mais non implémentées (réservées à la Phase 3B)** : ajout d'item, modification d'item, upload/remplacement de couverture, archivage/restauration, gestion complète des membres, création/révocation d'invitations, gestion des catégories personnalisées, exports JSON/CSV, profil/paramètres avancés. Aucun bouton actif ni écran factice ne laisse croire que ces fonctionnalités sont disponibles.
+
+### Phase 3B — Mutations, administration et finalisation mobile ⏳
+
+**Statut** : non démarrée.
+
+**Contenu prévu** : formulaire d'ajout d'item multi-étapes, modification, upload de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports, profil/paramètres complets, tests de mutation, finalisation des tests Phase 3.
+
+**Dépendances** : Phase 3A terminée et validée (c'est le cas).
+
+**Critères de sortie** : parcours de mutation complets navigables et fonctionnels contre l'API réelle, `pnpm lint`/`typecheck`/`test`/`build` verts, vérification visuelle sur simulateur/émulateur/appareil réel.
 
 ---
 

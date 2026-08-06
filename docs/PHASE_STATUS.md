@@ -2,9 +2,91 @@
 
 ## Phase courante
 
-**Phase 2 — Backend métier** : ✅ terminée et validée. Prochaine phase : **Phase 3 — Mobile** (non démarrée).
+**Phase 3A — Fondations mobiles et parcours de consultation** : ✅ terminée et validée.
 
-Historique : Phase 1 — Fondation ✅ (voir section dédiée plus bas).
+La **Phase 3** dans son ensemble (voir `docs/IMPLEMENTATION_PLAN.md`) n'est **pas** terminée : la **Phase 3B — Mutations, administration et finalisation mobile** n'a pas démarré. Ne pas commencer la Phase 3B tant qu'elle n'a pas été explicitement demandée.
+
+Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅ (voir sections dédiées plus bas).
+
+---
+
+## Phase 3A — Fondations mobiles et parcours de consultation
+
+### Éléments terminés
+
+- **`packages/shared`** : types de domaine miroir exact des réponses API (`PublicUser`, `Household`/`HouseholdWithRole`/`HouseholdMember`, `Category`/`CategoryFieldSchema`/`SYSTEM_CATEGORY_SLUGS`, `Item`/`BookMetadata`/`CdMetadata`/`DvdMetadata`/`ItemsQueryParams`, `PaginationMeta`/`PaginatedResult`, `ApiErrorBody`, `AuthResult`).
+- **`packages/api-client`** : client HTTP typé indépendant de React Native — intercepteur de rafraîchissement de token à vol unique (single-flight), `ApiError`/`NetworkError` typés, endpoints `auth`/`households`/`categories`/`items`/`stats`. 6 tests unitaires (`http.spec.ts` : rattachement Bearer, mapping `ApiError`, encapsulation `NetworkError`, rafraîchissement puis nouvelle tentative, expiration de session si le rafraîchissement échoue, déduplication du rafraîchissement concurrent).
+- **Thème « Notre Nid »** (`apps/mobile/src/theme`) : palette exacte du PRD (crème/vert forêt/orange automnal), grille d'espacement 4pt, typographie Nunito Sans (400/500/600, avec repli système), rayons organiques, élévations légères.
+- **Design system** (`apps/mobile/src/components`, 17 composants) : `AppText`, `ScreenContainer`, `Button`, `IconButton`, `TextField`, `PasswordField`, `SearchField`, `Select`, `Chip`, `CategoryBadge`, `ConditionBadge`, `OwnerAvatarGroup`, `ItemCard`, `EmptyState`, `ErrorState`, `LoadingSkeleton`, `Toast`/`ToastProvider`, `BottomSheet` — états complets (default/pressed/focused/disabled/loading/error/selected pertinents), zones tactiles ≥ 44×44, aucune couleur/marge/taille de police écrite en dur.
+- **Providers** (`apps/mobile/src/providers`) : `QueryProvider` (TanStack Query, pas de nouvelle tentative sur 401/403/404/409/422), `AuthProvider` (restauration de session via `useQuery` — dérive le statut `loading`/`authenticated`/`unauthenticated`/`restore-error` sans effet de bord synchrone, `login`/`register`/`logout`, expiration de session déclenchée par le client API), `HouseholdProvider` (sélection automatique si un seul household, restauration du dernier household utilisé depuis SecureStore, sinon écran de sélection).
+- **Navigation Expo Router** : groupe `(auth)` (connexion/inscription, React Hook Form + Zod) et groupe `(app)` avec garde d'authentification/household (redirection, écran de chargement, sélection de household), 4 onglets stables (Accueil, Collection, Recherche, Profil — le 5ᵉ onglet « Ajouter » est réservé à la Phase 3B).
+- **Écran Accueil** : statistiques réelles (`GET /households/:id/stats`), ajouts récents, raccourcis.
+- **Écran Collection** : liste infinie (`useInfiniteQuery`), recherche avec debounce, panneau de filtres (catégorie/propriétaire/condition) et tri (`BottomSheet`), pull-to-refresh, squelettes de chargement, état vide, état d'erreur avec nouvelle tentative.
+- **Écran Détail item** : couverture, catégorie, propriétaires, état, métadonnées spécifiques (livre/CD/DVD/catégorie personnalisée), notes, créateur/dates.
+- **Écran Recherche globale** : recherche debouncée sur l'ensemble du household.
+- **Écran Profil** : utilisateur courant, household courant, liste des membres, changement de foyer, déconnexion — lecture seule (gestion complète réservée à la Phase 3B).
+- **Tests mobiles** (`apps/mobile/src/**/*.test.{ts,tsx}`, 8 suites/24 tests) : composants (`Button`, `ConditionBadge`, `ItemCard`, `EmptyState`, `ErrorState`), hook (`useDebouncedValue`), utilitaire (`getErrorMessage`), et `AuthProvider` (restauration réussie/échouée/en erreur réseau, connexion, déconnexion, expiration de session).
+- **`apps/mobile/metro.config.js`** ajouté (absent depuis la Phase 1) : configuration Metro adaptée au monorepo pnpm (`watchFolders`, `nodeModulesPaths`), conforme à la documentation officielle Expo pour les monorepos.
+
+### Fichiers principaux créés ou modifiés
+
+- `packages/shared/src/types/*.ts`, `packages/shared/src/index.ts`.
+- `packages/api-client/src/{errors,types,query-string,http,client}.ts`, `packages/api-client/src/endpoints/*.ts`, `packages/api-client/src/http.spec.ts`, `packages/api-client/jest.config.js`.
+- `apps/mobile/src/theme/*.ts` (`colors`, `spacing`, `typography`, `elevation`, `ThemeProvider`).
+- `apps/mobile/src/components/*.tsx` (17 composants + `index.ts`).
+- `apps/mobile/src/providers/{QueryProvider,AuthProvider,HouseholdProvider}.tsx`.
+- `apps/mobile/src/lib/{config,secureTokenStorage,lastHouseholdStorage,queryKeys,errorMessage}.ts`.
+- `apps/mobile/src/hooks/{useHouseholds,useItems,useItem,useCategories,useStats,useMembers,useDebouncedValue}.ts`.
+- `apps/mobile/src/screens/{HouseholdSelectView,NoHouseholdView}.tsx`.
+- `apps/mobile/src/app/_layout.tsx`, `apps/mobile/src/app/(auth)/{_layout,login,register}.tsx`, `apps/mobile/src/app/(app)/{_layout,index,profile,search}.tsx`, `apps/mobile/src/app/(app)/collection/{_layout,index,[itemId]}.tsx`.
+- `apps/mobile/src/{components,hooks,lib,providers}/*.test.{ts,tsx}`, `apps/mobile/src/test-utils/{renderWithTheme,mockItem}.ts(x)`.
+- `apps/mobile/metro.config.js` (nouveau), `apps/mobile/jest.config.js`, `apps/mobile/tsconfig.json` (`types: ["jest"]`), `apps/mobile/eslint.config.js` (exclusion de `metro.config.js`).
+- `apps/mobile/.env.example`, `apps/mobile/.env` (`EXPO_PUBLIC_API_URL`, non commité pour `.env`).
+
+### Migrations ajoutées
+
+Aucune — la Phase 3A n'a modifié ni le schéma Prisma ni le contrat API.
+
+### Commandes réellement exécutées et leur résultat
+
+| Commande | Résultat |
+| --- | --- |
+| `pnpm format` / `pnpm format:check` | ✅ succès sur tout le monorepo |
+| `pnpm -r --if-present run lint` | ✅ succès sur les 4 packages (`apps/api`, `apps/mobile`, `packages/shared`, `packages/api-client`) |
+| `pnpm -r --if-present run typecheck` | ✅ succès sur les 4 packages, zéro erreur |
+| `pnpm -r --if-present run test` | ✅ 54/54 tests (24 `apps/api`, 6 `packages/api-client`, 24 `apps/mobile`) |
+| `pnpm -r --if-present run build` | ✅ succès (`apps/api`, `packages/shared`, `packages/api-client`) |
+| `pnpm --filter @notre-nid/api exec prisma validate` | ✅ schéma valide (inchangé) |
+| `npx expo-doctor` (dans `apps/mobile`) | ⚠️ 18/20 — voir « Problèmes rencontrés » : dérive de versions patch Expo (acceptée, non bloquante) et avertissement générique sur la présence d'un `metro.config.js` personnalisé (attendu, conforme à la doc Expo monorepo) |
+| Démarrage de l'API (`node dist/main.js`) + parcours réel via `curl` : `/health`, `/health/ready`, `login` (compte de démonstration), `households`, `stats`, `items` (pagination/recherche/filtre par condition), détail d'un item, `refresh`, erreur d'identifiants invalides | ✅ tous les appels répondent avec les formes exactes attendues par les hooks mobiles |
+| `npx expo start` / `npx expo start --web` / `npx expo export --platform ios` (vérification du bundle applicatif) | ❌ échec reproductible — voir « Problèmes rencontrés » |
+
+### Problèmes rencontrés et corrigés
+
+- **5 problèmes de lint découverts en fin d'implémentation** : `Array<T>` au lieu de `T[]` (corrigé), imports dupliqués `import/no-duplicates` dans `AuthProvider.tsx` (fusionnés), et surtout **deux erreurs `react-hooks/set-state-in-effect`** (règle du compilateur React, plus stricte que les règles classiques) : `AuthProvider` appelait `setStatus` de façon synchrone dans un effet de montage, `HouseholdProvider` appelait `setHouseholdId` de façon synchrone dans l'effet de sélection automatique. **Corrigé en profondeur plutôt que masqué** : la restauration de session a été migrée vers `useQuery` (TanStack Query gère l'effet en interne, hors de portée du linter applicatif) ; la sélection de household a été migrée vers un `householdId` dérivé par `useMemo` à partir de l'état des households/de la sélection manuelle/du dernier household persisté, avec un effet séparé ne faisant que persister ce choix (aucun appel `setState`).
+- **`@testing-library/react-native` v14 est intégralement asynchrone** (changement de comportement non documenté rencontré en pratique) : `render`, `rerender`, `unmount`, `renderHook` et `fireEvent.*` renvoient désormais des `Promise` (auparavant synchrones). Tous les tests ont dû être écrits avec `await`. Découvert car les premiers tests échouaient avec des erreurs trompeuses (« render function has not been called », `result` `undefined`) tant que cette exigence n'était pas comprise.
+- **`jest-expo` nécessite `@react-native/jest-preset`** comme dépendance explicite désormais séparée (non incluse automatiquement) — ajoutée en `devDependency` de `apps/mobile`.
+- **`@types/jest` non résolu par TypeScript** malgré son installation : nécessite `"types": ["jest"]` explicite dans `tsconfig.json` de `apps/mobile` et `packages/api-client` (l'inclusion automatique des paquets `@types/*` ne se produisait pas dans cette configuration monorepo).
+- **Conflit de version `jest-mock`/`jest-environment-node` entre `apps/api`/`packages/api-client` (jest 30) et `@react-native/jest-preset` (jest 29, transitif via `apps/mobile`)** : dans une installation pnpm stricte, `apps/api` et `packages/api-client` ne déclarant pas explicitement `jest-environment-node`, la résolution du testEnvironment de Jest 30 pouvait retomber sur la copie 29.7.0 apportée par la chaîne de dépendances d'Expo, provoquant `TypeError: this._moduleMocker.clearMocksOnScope is not a function`. **Corrigé** en épinglant `"jest-environment-node": "30.4.1"` comme `devDependency` explicite de `apps/api` et `packages/api-client`, forçant une résolution locale correcte indépendamment de ce qui est présent ailleurs dans le monorepo.
+- **Tentative de mise à jour des versions Expo (`expo`, `expo-router`, `react-native`, etc.) vers les derniers correctifs pour satisfaire `expo-doctor`** : cette mise à jour a introduit une régression réelle du bundler Metro (`Unable to resolve module react-native-safe-area-context` puis d'autres erreurs de résolution). **Annulée** (retour aux versions précédentes, qui fonctionnaient) — une alerte cosmétique d'`expo-doctor` sur des versions patch ne justifiait pas de risquer une régression fonctionnelle réelle. Les 7 paquets restent donc légèrement en retard sur les derniers correctifs Expo SDK 57 ; `@types/jest` reste volontairement sur `30.0.0` (cohérence avec `jest` 30 utilisé dans tout le monorepo) via `"expo": { "install": { "exclude": ["@types/jest"] } }`.
+- **Bug de résolution de module Metro/Expo CLI spécifique à cet environnement (Windows + pnpm + monorepo), non résolu** : `npx expo start`, `npx expo start --web` et `npx expo export --platform ios` échouent tous de façon reproductible — même après un cache entièrement vidé (`.expo`, `node_modules/.cache`, cache Metro au niveau du système d'exploitation) et après l'ajout d'un `metro.config.js` conforme aux recommandations officielles d'Expo pour les monorepos — avec des erreurs telles que `Unable to resolve module ./apps/mobile/node_modules/expo-router/entry from <racine du monorepo>/.` ou `Cannot read properties of undefined (reading 'get')` dans `metro/src/node-haste/DependencyGraph.js`. Le serveur Metro démarre correctement (`Waiting on http://localhost:8081`, `/status` répond `packager-status:running`) mais échoue précisément lors du chargement du module d'entrée via le protocole de manifeste moderne d'Expo (`getStaticPageAsync`/`ssrLoadModuleContents`), qui sert à la fois le rendu web statique et la construction du bundle natif. **Non corrigé** : ce point ne relève pas du code de l'application (`tsc` ne rapporte aucune erreur sur l'intégralité du code mobile) mais d'une interaction entre outils (Expo CLI/Metro, pnpm, Windows) — **vérification manuelle indispensable avant la Phase 3B**, idéalement sur une autre machine (macOS/Linux) ou après mise à jour d'Expo CLI.
+- **Incident de synchronisation OneDrive ayant corrompu silencieusement plusieurs fichiers du dépôt de travail** : le dépôt se trouve dans un dossier synchronisé OneDrive ; des cycles rapides de suppression/réinstallation de dépendances (`rm -rf node_modules/.cache`, `.expo`, réinstallations successives) ont créé une course avec la synchronisation en temps réel de OneDrive, qui a silencieusement remplacé le contenu de plusieurs fichiers suivis (`packages/api-client/src/index.ts`, `packages/shared/src/index.ts`, `packages/api-client/package.json`/`tsconfig.json`, `packages/shared/package.json`, `apps/mobile/package.json`/`app.json`/`src/app/_layout.tsx`) par un contenu ancien (squelette de Phase 1), tout en déposant le contenu récent dans des copies de conflit `*-Camarade.*` (supprimées par erreur avant que leur signification ne soit comprise). **Détecté** car `tsc` a commencé à signaler des exports manquants sur des modules pourtant implémentés. **Corrigé sans perte** : l'historique Git (commits `4376ae7` et `6e55e03`, déjà réalisés séparément par le propriétaire du dépôt) contenait la version correcte de chaque fichier concerné ; restauration ciblée via `git checkout HEAD -- <fichiers>`, puis reconstruction des paquets et réapplication des ajustements réalisés après ces commits (voir points ci-dessus). Chaque fichier modifié a été vérifié individuellement (diff contre `HEAD`) avant toute décision de restauration ou de conservation, pour ne pas écraser du travail légitime.
+
+### Décisions prises
+
+- **4 onglets seulement en Phase 3A** (Accueil, Collection, Recherche, Profil) — le 5ᵉ onglet « Ajouter » (visuellement accentué en orange selon le PRD) est différé à la Phase 3B, faute de formulaire de mutation à cette étape.
+- **Restauration de session modélisée via TanStack Query plutôt qu'un `useEffect` manuel** : élimine intrinsèquement l'anti-pattern « setState synchrone dans un effet », réutilise la gestion d'état de chargement/erreur déjà en place pour toutes les autres requêtes serveur, cohérent avec le reste de l'application.
+- **Sélection de household dérivée (`useMemo`) plutôt que pilotée par effet** : le household actif est une fonction pure de (households disponibles, sélection manuelle, dernier household persisté) — recalculée à chaque rendu sans effet de bord, la persistance sur disque étant un effet séparé qui n'affecte jamais l'état React.
+- **Aucune tentative supplémentaire de correction du bug Metro/Expo CLI au-delà du diagnostic** : la piste (bug d'interaction Expo CLI/monorepo/Windows) a été investiguée en profondeur (cache vidé à tous les niveaux, `metro.config.js` conforme, versions de dépendances vérifiées) sans succès ; poursuivre aurait consommé un temps disproportionné pour un problème d'environnement, non de code applicatif.
+
+### Actions manuelles restantes
+
+- **Vérifier visuellement l'application sur un simulateur/émulateur/téléphone réel** : non réalisable dans cet environnement (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré). Lancer `pnpm dev:mobile` (ou `npx expo start` dans `apps/mobile`) depuis une machine où Expo Go ou un émulateur est disponible, et vérifier en particulier le bug de résolution Metro documenté ci-dessus avant de considérer la Phase 3B.
+- **Mettre à jour les paquets Expo (`expo`, `expo-router`, `expo-constants`, `expo-linking`, `expo-system-ui`, `react-native`) vers les derniers correctifs** une fois le bug Metro élucidé, pour satisfaire complètement `expo-doctor` — non fait ici après la régression constatée lors de la tentative.
+
+### Prochaine étape recommandée
+
+Ne pas démarrer la **Phase 3B — Mutations, administration et finalisation mobile** avant que le propriétaire du dépôt ait pu vérifier manuellement l'application sur un appareil réel ou un émulateur (voir « Actions manuelles restantes »). Une fois cette vérification faite, la Phase 3B pourra couvrir : ajout d'item (formulaire multi-étapes), modification, upload de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports, profil/paramètres complets, et la finalisation des tests de la Phase 3.
 
 ---
 

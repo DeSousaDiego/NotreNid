@@ -4,7 +4,7 @@ Application mobile de gestion de collection partagée pour un couple (livres, CD
 
 ## Statut du projet
 
-**Phase 2 — Backend métier** est terminée et validée (lint, typecheck, tests unitaires et e2e contre PostgreSQL réel, build, migration + seed sur base réinitialisée). L'API expose désormais l'ensemble des fonctionnalités métier définies par le PRD. Voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) pour les phases suivantes et [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail complet de l'état actuel.
+**Phase 3A — Fondations mobiles et parcours de consultation** est terminée et validée (lint, format, typecheck, tests unitaires, build, verts sur tout le monorepo). La **Phase 3** dans son ensemble n'est **pas** terminée : la **Phase 3B — Mutations, administration et finalisation mobile** reste à faire (voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)). Voir [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail complet de l'état actuel.
 
 Ce qui existe aujourd'hui :
 
@@ -13,19 +13,18 @@ Ce qui existe aujourd'hui :
 - isolation stricte entre households, vérifiée à chaque requête et testée explicitement (un membre d'un household ne peut jamais accéder aux données d'un autre) ;
 - documentation Swagger complète (`/api/v1/docs`) ;
 - un schéma Prisma complet avec sa première migration, et un script de seed idempotent (2 comptes de démonstration, 1 household, 3 catégories, 4 items) ;
-- une application mobile Expo (Expo Router, TypeScript strict) avec un unique écran de bienvenue — les écrans métier arrivent en Phase 3 ;
+- un client API typé (`packages/api-client`) et des types de domaine partagés (`packages/shared`), miroir exact des réponses de l'API ;
+- une application mobile Expo (Expo Router, TypeScript strict) avec : système de thème « Notre Nid », design system de 17 composants, authentification (SecureStore, restauration/rafraîchissement de session), sélection de household, écrans Accueil/Collection/Détail/Recherche/Profil (lecture seule) — **les mutations (ajout, modification, archivage, gestion des membres/invitations/catégories, exports) arrivent en Phase 3B** ;
 - un environnement Docker local (PostgreSQL, Mailpit, MinIO optionnel).
-
-Aucune interface mobile métier (navigation, écrans de collection, formulaires) n'est encore implémentée : c'est l'objet de la Phase 3.
 
 ## Stack
 
-- **Mobile** : Expo (SDK 57), Expo Router, React Native, TypeScript strict, TanStack Query et React Hook Form (prévus Phase 3).
+- **Mobile** : Expo (SDK 57), Expo Router, React Native, TypeScript strict, TanStack Query, React Hook Form + Zod, Expo SecureStore.
 - **API** : Node.js LTS, NestJS 11, REST, class-validator, Argon2, JWT (access + refresh révocable via driver PostgreSQL propre).
 - **Base de données** : PostgreSQL 16, Prisma ORM (driver adapter `@prisma/adapter-pg`, requis par Prisma 7).
 - **Stockage** : local en développement (validation réelle du type de fichier par signature binaire), S3-compatible/Supabase Storage prévu en production (Phase 5).
 - **Emails** : Mailpit en développement (capture SMTP locale), réel via `nodemailer`.
-- **Tests** : Jest (unitaire + e2e côté API via Supertest, contre PostgreSQL réel).
+- **Tests** : Jest (API : unitaire + e2e via Supertest contre PostgreSQL réel ; `api-client` : unitaire ; mobile : `jest-expo` + `@testing-library/react-native`, composants/hooks/providers).
 - **CI** : à mettre en place en Phase 4.
 
 ## Pré-requis
@@ -103,9 +102,17 @@ apps/
       prisma/           PrismaService (driver adapter pg)
       common/           Guards, filtre d'erreurs, décorateurs, utilitaires partagés
   mobile/         Expo Router — application mobile TypeScript strict
+    src/
+      theme/           Tokens de couleur/typographie/espacement, ThemeProvider
+      components/      Design system (17 composants réutilisables)
+      providers/       QueryProvider, AuthProvider, HouseholdProvider
+      hooks/           Hooks TanStack Query par ressource (items, households, stats, ...)
+      lib/             Config, stockage sécurisé des tokens, clés de requête, messages d'erreur
+      screens/         Écrans partagés (sélection de household)
+      app/             Routes Expo Router : (auth) connexion/inscription, (app) onglets
 packages/
   shared/         Types et constantes partagés entre l'API et le mobile
-  api-client/      Client HTTP typé consommé par le mobile (squelette)
+  api-client/      Client HTTP typé consommé par le mobile (auth, households, catégories, items, stats)
   config/          tsconfig de base partagé
   eslint-config/    Configuration ESLint (flat config) partagée
 docs/              Documentation (PRD, plan d'implémentation, statut des phases, ...)
@@ -131,11 +138,15 @@ Scripts spécifiques à l'API (`pnpm --filter @notre-nid/api run <script>`) : `d
 ## Tests
 
 ```bash
-pnpm --filter @notre-nid/api run test       # 24 tests unitaires (Jest)
-pnpm --filter @notre-nid/api run test:e2e   # 13 tests d'intégration (Supertest, PostgreSQL réel requis)
+pnpm --filter @notre-nid/api run test         # 24 tests unitaires (Jest)
+pnpm --filter @notre-nid/api run test:e2e     # 13 tests d'intégration (Supertest, PostgreSQL réel requis)
+pnpm --filter @notre-nid/api-client run test  # 6 tests unitaires (client HTTP : auth, rafraîchissement, erreurs)
+pnpm --filter @notre-nid/mobile run test      # 24 tests (composants, hooks, AuthProvider)
 ```
 
-Couverture actuelle : règle du dernier propriétaire (households), validation des propriétaires d'items, isolation entre households (guard + service), cycle Argon2/JWT complet (register/login/refresh/logout), cycle de vie complet d'un household (création, invitation, acceptation, rôles), CRUD et archivage d'items, statistiques et exports — **y compris le cas critique obligatoire** : un membre du household A ne peut jamais lire, modifier ou supprimer un item du household B.
+Couverture API actuelle : règle du dernier propriétaire (households), validation des propriétaires d'items, isolation entre households (guard + service), cycle Argon2/JWT complet (register/login/refresh/logout), cycle de vie complet d'un household (création, invitation, acceptation, rôles), CRUD et archivage d'items, statistiques et exports — **y compris le cas critique obligatoire** : un membre du household A ne peut jamais lire, modifier ou supprimer un item du household B.
+
+Couverture mobile actuelle : composants de consultation (`Button`, `ConditionBadge`, `ItemCard`, `EmptyState`, `ErrorState`), hook de debounce, formatage des messages d'erreur, et `AuthProvider` (restauration de session réussie/échouée/en erreur réseau, connexion, déconnexion, expiration de session). Les tests de mutation (formulaires d'ajout/modification) sont prévus en Phase 3B.
 
 ## Déploiement
 
@@ -162,7 +173,9 @@ Non applicable à ce stade (Phase 5, voir `docs/BACKUP_AND_RESTORE.md` à venir)
 
 ## Limitations connues
 
-- Aucune interface mobile métier (navigation, écrans, formulaires) : prévue Phase 3.
+- **Mutations mobiles non implémentées** (Phase 3B) : ajout/modification d'item, upload de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports, profil/paramètres avancés.
+- **Vérification visuelle du mobile sur simulateur/émulateur non réalisée** dans l'environnement de développement utilisé pour la Phase 3A (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré). De plus, `npx expo start`/`expo export` rencontrent un bug de résolution de module Metro spécifique à cet environnement (Windows + pnpm + monorepo) qui empêche de servir le bundle applicatif — voir `docs/PHASE_STATUS.md` pour la reproduction complète. À vérifier manuellement avant la Phase 3B.
+- Quelques paquets Expo (`expo`, `expo-router`, `expo-constants`, `expo-linking`, `expo-system-ui`, `react-native`) sont en léger retard sur les derniers correctifs SDK 57 : une tentative de mise à jour a provoqué une régression du bundler Metro et a été annulée (voir `docs/PHASE_STATUS.md`).
 - Recherche full-text PostgreSQL, rate limiting, client API généré depuis OpenAPI, CI : prévus Phases 4-5 (déjà documentés dans `docs/IMPLEMENTATION_PLAN.md`).
 - Stockage d'images local uniquement pour l'instant (pas de driver S3, prévu Phase 5).
 - `prisma migrate reset` n'exécute pas automatiquement le seed dans cette version : relancer `pnpm --filter @notre-nid/api run db:seed` manuellement après un reset.
