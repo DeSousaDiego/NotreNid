@@ -40,11 +40,7 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {status === 'authenticated' ? (
-        <Stack.Screen name="(app)" />
-      ) : (
-        <Stack.Screen name="(auth)" />
-      )}
+      {status === 'authenticated' ? <Stack.Screen name="(app)" /> : <Stack.Screen name="(auth)" />}
     </Stack>
   );
 }
