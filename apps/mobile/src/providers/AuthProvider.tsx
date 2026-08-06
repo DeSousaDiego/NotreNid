@@ -6,15 +6,8 @@ import {
   type RegisterInput,
 } from '@notre-nid/api-client';
 import type { PublicUser } from '@notre-nid/shared';
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { API_BASE_URL } from '../lib/config';
 import { clearLastHouseholdId } from '../lib/lastHouseholdStorage';
@@ -31,51 +24,70 @@ interface AuthContextValue {
   retryRestore: () => void;
 }
 
+/**
+ * Une fois qu'une action explicite (connexion, inscription, déconnexion,
+ * expiration de session) s'est produite, elle prévaut définitivement sur le
+ * résultat de la requête de restauration de session — celle-ci n'est utile
+ * qu'au tout premier rendu, avant toute interaction.
+ */
+type AuthOverride =
+  { kind: 'authenticated'; user: PublicUser } | { kind: 'unauthenticated' } | null;
+
 const ApiClientContext = createContext<ApiClient | null>(null);
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>('loading');
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [override, setOverride] = useState<AuthOverride>(null);
 
   const [apiClient] = useState(() =>
     createApiClient({
       baseUrl: API_BASE_URL,
       tokenStorage: secureTokenStorage,
       onSessionExpired: () => {
-        setUser(null);
-        setStatus('unauthenticated');
+        setOverride({ kind: 'unauthenticated' });
       },
     }),
   );
 
-  const restore = useCallback(async () => {
-    const tokens = await secureTokenStorage.getTokens();
-    if (!tokens) {
-      setStatus('unauthenticated');
-      return;
-    }
-    try {
-      const me = await apiClient.auth.me();
-      setUser(me);
-      setStatus('authenticated');
-    } catch (error) {
-      if (error instanceof NetworkError) {
-        setStatus('restore-error');
-      } else {
-        setStatus('unauthenticated');
-      }
-    }
-  }, [apiClient]);
+  const restoreQuery = useQuery({
+    queryKey: ['auth', 'restore'],
+    queryFn: async (): Promise<PublicUser | null> => {
+      const tokens = await secureTokenStorage.getTokens();
+      if (!tokens) return null;
+      return apiClient.auth.me();
+    },
+    enabled: override === null,
+    retry: false,
+    staleTime: Infinity,
+  });
 
-  useEffect(() => {
-    void restore();
-  }, [restore]);
+  const status: AuthStatus = useMemo(() => {
+    if (override?.kind === 'authenticated') return 'authenticated';
+    if (override?.kind === 'unauthenticated') return 'unauthenticated';
+    if (restoreQuery.isError) {
+      return restoreQuery.error instanceof NetworkError ? 'restore-error' : 'unauthenticated';
+    }
+    if (restoreQuery.isSuccess) {
+      return restoreQuery.data ? 'authenticated' : 'unauthenticated';
+    }
+    return 'loading';
+  }, [
+    override,
+    restoreQuery.isError,
+    restoreQuery.error,
+    restoreQuery.isSuccess,
+    restoreQuery.data,
+  ]);
+
+  const user: PublicUser | null = useMemo(() => {
+    if (override?.kind === 'authenticated') return override.user;
+    if (override?.kind === 'unauthenticated') return null;
+    return restoreQuery.data ?? null;
+  }, [override, restoreQuery.data]);
 
   const retryRestore = useCallback(() => {
-    setStatus('loading');
-    void restore();
-  }, [restore]);
+    void restoreQuery.refetch();
+  }, [restoreQuery]);
 
   const login = useCallback(
     async (input: LoginInput) => {
@@ -84,8 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       });
-      setUser(result.user);
-      setStatus('authenticated');
+      setOverride({ kind: 'authenticated', user: result.user });
     },
     [apiClient],
   );
@@ -97,8 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       });
-      setUser(result.user);
-      setStatus('authenticated');
+      setOverride({ kind: 'authenticated', user: result.user });
     },
     [apiClient],
   );
@@ -112,8 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await secureTokenStorage.clearTokens();
     await clearLastHouseholdId();
-    setUser(null);
-    setStatus('unauthenticated');
+    setOverride({ kind: 'unauthenticated' });
   }, [apiClient]);
 
   const authValue = useMemo<AuthContextValue>(

@@ -1,12 +1,5 @@
 import type { HouseholdWithRole } from '@notre-nid/shared';
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useHouseholds } from '../hooks/useHouseholds';
 import {

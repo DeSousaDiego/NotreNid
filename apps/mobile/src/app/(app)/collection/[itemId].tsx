@@ -17,7 +17,11 @@ import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useTheme } from '../../../theme';
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(value).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 export default function ItemDetailScreen() {
