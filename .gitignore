@@ -52,3 +52,6 @@ Thumbs.db
 
 # Turbo (reserved, not currently used)
 .turbo/
+
+# Claude Code local session state (permissions, scheduled tasks) — not shared project config
+.claude/
