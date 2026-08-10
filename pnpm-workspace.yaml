@@ -1,6 +1,12 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+# Metro (used by Expo/React Native) does not reliably resolve pnpm's
+# isolated, deeply-nested symlink structure for transitive dependencies
+# (e.g. expo, @expo/metro-runtime accessed from within expo-router's own
+# dependency scope) even with unstable_enableSymlinks enabled. Hoisting
+# flattens node_modules so Metro's resolver can find them directly.
+shamefullyHoist: true
 allowBuilds:
   '@prisma/engines': true
   # Scarf collecte des statistiques d'installation (télémétrie) : désactivé par défaut.
