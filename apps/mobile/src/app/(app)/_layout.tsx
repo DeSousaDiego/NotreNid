@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { useHousehold } from '../../providers/HouseholdProvider';
 import { HouseholdSelectView } from '../../screens/HouseholdSelectView';
@@ -18,7 +18,18 @@ export default function AppLayout() {
   }
 
   if (isLoading) {
-    return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.background,
+        }}
+      >
+        <ActivityIndicator color={theme.colors.primary} />
+      </View>
+    );
   }
 
   if (households.length === 0) {

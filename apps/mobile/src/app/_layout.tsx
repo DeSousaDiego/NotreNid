@@ -4,11 +4,11 @@ import {
   NunitoSans_600SemiBold,
 } from '@expo-google-fonts/nunito-sans';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ErrorState, ToastProvider } from '../components';
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
@@ -18,12 +18,38 @@ import { ThemeProvider, useTheme } from '../theme';
 
 void SplashScreen.preventAutoHideAsync();
 
+/**
+ * Redirection explicite plutôt que le simple montage/démontage conditionnel
+ * des groupes de routes : plus fiable que de compter sur expo-router pour
+ * renaviguer tout seul quand l'écran actuellement focus disparaît de l'arbre
+ * (constaté peu fiable en pratique — le changement d'état n'était parfois
+ * répercuté à l'écran qu'après une mise en arrière-plan/premier plan).
+ */
 function RootNavigator() {
   const { status, retryRestore } = useAuth();
   const theme = useTheme();
 
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/(app)');
+    } else if (status === 'unauthenticated') {
+      router.replace('/(auth)/login');
+    }
+  }, [status]);
+
   if (status === 'loading') {
-    return <View style={{ flex: 1, backgroundColor: theme.colors.background }} />;
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.background,
+        }}
+      >
+        <ActivityIndicator color={theme.colors.primary} />
+      </View>
+    );
   }
 
   if (status === 'restore-error') {
@@ -40,7 +66,8 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {status === 'authenticated' ? <Stack.Screen name="(app)" /> : <Stack.Screen name="(auth)" />}
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(app)" />
     </Stack>
   );
 }
