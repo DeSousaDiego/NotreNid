@@ -4,7 +4,7 @@ import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 export interface ButtonProps {
   label: string;
@@ -31,7 +31,12 @@ export function Button({
 
   const backgroundFor = (pressed: boolean): string => {
     if (variant === 'ghost') return 'transparent';
-    const base = variant === 'primary' ? theme.colors.primary : theme.colors.secondary;
+    const base =
+      variant === 'primary'
+        ? theme.colors.primary
+        : variant === 'danger'
+          ? theme.colors.danger
+          : theme.colors.secondary;
     return pressed ? withOpacity(base, 0.85) : base;
   };
 
