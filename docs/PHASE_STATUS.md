@@ -2,11 +2,100 @@
 
 ## Phase courante
 
-**Phase 3A — Fondations mobiles et parcours de consultation** : ✅ terminée et validée.
+**Phase 3B — Mutations, administration et finalisation mobile** : ✅ terminée et validée.
 
-La **Phase 3** dans son ensemble (voir `docs/IMPLEMENTATION_PLAN.md`) n'est **pas** terminée : la **Phase 3B — Mutations, administration et finalisation mobile** n'a pas démarré. Ne pas commencer la Phase 3B tant qu'elle n'a pas été explicitement demandée.
+La **Phase 3** dans son ensemble est donc **terminée** (3A + 3B toutes deux validées) — voir `docs/IMPLEMENTATION_PLAN.md`. La **Phase 4 — Qualité** n'a pas démarré.
 
-Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅ (voir sections dédiées plus bas).
+Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅ (voir sections dédiées plus bas).
+
+---
+
+## Phase 3B — Mutations, administration et finalisation mobile
+
+### Éléments terminés
+
+- **Correctif de sécurité hérité de la Phase 2** : `InvitationsService.create`/`listForHousehold` renvoyaient `tokenHash` en clair dans la réponse HTTP (violation de la règle PRD « les réponses ne doivent jamais contenir de hash ou secret »). Corrigé via un mapper dédié (`invitations.mapper.ts`) avant toute autre modification de la Phase 3B, avec test de non-régression.
+- **`packages/api-client`** étendu : support `FormData` (upload de fichier, sans `Content-Type` JSON) et réponses texte brut (`requestText`, pour l'export CSV) dans `http.ts` ; nouveaux endpoints `households` (rename/rôle/retrait/leave), `categories` (create/update/remove), `items` (create/update/archive/restore), `invitations` (list/create/revoke/accept), `uploads`, `exports`.
+- **`packages/shared`** : types `HouseholdInvitation`/`HouseholdInvitationWithToken`, `HouseholdExportItem`.
+- **Design system** : composant `ConfirmDialog` (prévu par le PRD, absent de la Phase 3A) — confirmation modale centrée avec état de chargement, réutilisé pour toutes les actions destructrices (archivage, retrait de membre, révocation d'invitation, suppression de catégorie) ; ajout d'une variante `danger` à `Button` plutôt que des styles ad hoc.
+- **Hooks de mutation** (`apps/mobile/src/hooks`) : `useItemMutations` (create/update/archive/restore, avec invalidation ciblée items+stats et écriture directe du cache pour update/archive/restore), `useCategoryMutations`, `useMemberMutations`, `useInvitations` (liste + create/revoke/accept), `useUploads` (upload/suppression de couverture via `FormData`), `useExports` (récupération JSON/CSV + partage).
+- **Formulaire d'ajout/modification d'un item** (`apps/mobile/src/screens/item-form/`) : assistant en 3 étapes (catégorie/titre/état/description/notes → métadonnées spécifiques livre/CD/DVD ou schéma dynamique d'une catégorie personnalisée → propriétaires + couverture + récapitulatif + confirmation), React Hook Form + Zod, mode création et modification partageant exactement le même composant (`ItemFormScreen`). `schema.ts` centralise le modèle de formulaire (tout en chaînes de caractères, converties vers les types API uniquement à la soumission) et la construction du payload par catégorie.
+- **Couverture d'image** (`useCoverPicker`) : sélection via `expo-image-picker`, aperçu immédiat, upload réel, remplacement, suppression — ne conserve jamais un `file://` local comme référence persistante.
+- **5ᵉ onglet « Ajouter »** (accent orange, `tabBarActiveTintColor`/`tabBarInactiveTintColor` forcés) et nouvelle route `/(app)/collection/edit/[itemId]`, toutes deux rendant `ItemFormScreen`.
+- **Écran détail d'un item** : boutons « Modifier » (navigation vers l'édition) et « Archiver » (via `ConfirmDialog`) ; bouton « Restaurer » pour un item déjà archivé.
+- **Restructuration de Profil en pile de navigation** (`app/(app)/profile/`) : `index` (profil, foyer courant, changement de foyer, exports JSON/CSV, déconnexion/déconnexion globale), `members` (changement de rôle via `BottomSheet` + `Chip`, retrait, « Quitter ce foyer »), `invitations` (création avec affichage du jeton de développement, liste, révocation), `categories` (CRUD catégories personnalisées avec éditeur de schéma de champs simple : libellé/type/requis), `archives` (liste infinie des items archivés, réutilise `ItemCard`), `join` (rejoindre un foyer par jeton). Toutes les actions d'administration sont conditionnées au rôle courant de l'utilisateur (`OWNER`/`ADMIN`), l'API restant l'autorité finale.
+- **`AuthProvider`** : ajout de `logoutAllDevices()` (`POST /auth/logout-all`), avec test miroir de celui de `logout()`.
+- **Export JSON/CSV** (`lib/exportFile.ts`) : écrit le contenu dans le cache local via l'API `File`/`Paths` d'`expo-file-system`, puis ouvre le panneau de partage natif (`expo-sharing`) ; `SharingUnavailableError` prévient explicitement l'utilisateur plutôt que de rapporter un succès muet si le partage n'est pas disponible sur la plateforme.
+- **Correctif backend découvert en testant les nouveaux parcours de bout en bout contre l'API réelle** : la suppression d'une catégorie personnalisée encore référencée par un item renvoyait une erreur 500 brute (violation de contrainte de clé étrangère Postgres non interceptée) au lieu du message convivial attendu par le PRD (« erreurs liées aux catégories déjà utilisées »). `CategoriesService.remove` vérifie désormais le nombre d'items concernés avant de supprimer, et intercepte en filet de sécurité une éventuelle violation de contrainte au moment du `delete()` lui-même (avec une détection par message en repli, le code d'erreur Prisma n'étant pas toujours peuplé par l'adaptateur `@prisma/adapter-pg`).
+- **Tests mobiles** : 43 nouveaux tests (67 au total, contre 24 en Phase 3A) — `ConfirmDialog`, chaque hook de mutation (avec un `ApiClient`/`QueryClient` mockés partagés via `test-utils/mockApiClient.ts` et `test-utils/queryWrapper.tsx`), `schema.ts` du formulaire d'item (14 tests couvrant la construction du payload par catégorie, la conversion inverse pour l'édition, et les champs personnalisés requis manquants), `lib/exportFile.ts`, et un test d'intégration de `ItemFormScreen` (blocage de la navigation tant que la validation échoue, parcours complet de création).
+- **Tests API** : `invitations.service.spec.ts` (2 tests, non-fuite de `tokenHash`) et `categories.service.spec.ts` (7 tests, permissions/appartenance/catégorie en cours d'utilisation) — 33 tests unitaires au total contre 24 en Phase 3A ; les 13 tests e2e existants restent verts sans modification.
+
+### Fichiers principaux créés ou modifiés
+
+- `apps/api/src/invitations/invitations.mapper.ts` (nouveau), `invitations.service.ts`, `invitations.service.spec.ts` (nouveau).
+- `apps/api/src/categories/categories.service.ts`, `categories.service.spec.ts` (nouveau).
+- `packages/shared/src/types/{invitation,export}.ts` (nouveaux), `packages/shared/src/index.ts`.
+- `packages/api-client/src/http.ts`, `http.spec.ts`, `client.ts`, `index.ts`, `src/endpoints/{households,categories,items}.ts`, `src/endpoints/{invitations,uploads,exports}.ts` (nouveaux).
+- `apps/mobile/src/components/{ConfirmDialog,ConfirmDialog.test}.tsx` (nouveaux), `Button.tsx`, `index.ts`.
+- `apps/mobile/src/hooks/{useItemMutations,useCategoryMutations,useMemberMutations,useInvitations,useUploads,useExports}.ts` (+ `.test.ts` associés).
+- `apps/mobile/src/screens/item-form/` (nouveau dossier complet : `ItemFormScreen`, `StepBasics`, `StepMetadata`, `StepReview`, `useCoverPicker`, `metadataFields.ts`, `schema.ts` + tests).
+- `apps/mobile/src/lib/{exportFile,exportFile.test}.ts` (nouveaux), `errorMessage.ts`, `queryKeys.ts`.
+- `apps/mobile/src/constants/condition.ts` (ajout de `CONDITION_OPTIONS`).
+- `apps/mobile/src/app/(app)/add.tsx` (nouveau), `_layout.tsx` (5ᵉ onglet).
+- `apps/mobile/src/app/(app)/collection/{_layout,[itemId],index}.tsx`, `collection/edit/[itemId].tsx` (nouveau).
+- `apps/mobile/src/app/(app)/profile/` (nouveau dossier remplaçant `profile.tsx` : `_layout`, `index`, `members`, `invitations`, `categories`, `archives`, `join`).
+- `apps/mobile/src/providers/AuthProvider.tsx` (`logoutAllDevices`), `AuthProvider.test.tsx`.
+- `apps/mobile/src/test-utils/{mockApiClient,queryWrapper}.tsx` (nouveaux).
+- `apps/mobile/app.json`, `package.json` (`expo-image-picker`, `expo-file-system`, `expo-sharing`), `pnpm-lock.yaml`.
+
+### Migrations ajoutées
+
+Aucune — la Phase 3B n'a modifié ni le schéma Prisma ni le contrat des routes existantes (uniquement corrigé une fuite de champ interne et ajouté un cas d'erreur convivial déjà prévu par le contrat documenté).
+
+### Commandes réellement exécutées et leur résultat
+
+| Commande | Résultat |
+| --- | --- |
+| `pnpm -r --if-present run lint` | ✅ succès sur les 4 packages |
+| `pnpm -r --if-present run typecheck` | ✅ succès sur les 4 packages, zéro erreur |
+| `pnpm run format:check` | ✅ succès sur tout le monorepo |
+| `pnpm --filter @notre-nid/api exec jest` | ✅ 33/33 tests unitaires |
+| `pnpm --filter @notre-nid/api run test:e2e` (contre PostgreSQL réel) | ✅ 13/13 tests e2e, aucune régression |
+| `pnpm --filter @notre-nid/api-client exec jest` | ✅ 8/8 tests |
+| `pnpm --filter @notre-nid/mobile exec jest --forceExit` | ✅ 67/67 tests (exécuté 3 fois pour confirmer l'absence de flakiness) |
+| `pnpm -r --if-present run build` | ✅ succès (`apps/api`, `packages/shared`, `packages/api-client` — `apps/mobile` n'a pas de script `build`, vérifié séparément via `expo-doctor`) |
+| `pnpm --filter @notre-nid/api exec prisma validate` | ✅ schéma valide (inchangé) |
+| `npx expo-doctor` (dans `apps/mobile`) | ✅ 18/20 — identique à la référence Phase 3A (les 2 échecs restants sont les mêmes déjà documentés : `metro.config.js` personnalisé attendu, dérive de versions patch Expo volontairement non corrigée) |
+| Démarrage réel de l'API (`node dist/main.js`) + parcours complets via `curl` contre PostgreSQL et le seed réels : login, création de catégorie personnalisée, création d'un item à deux propriétaires avec métadonnées personnalisées, modification (propriétaires + notes), archivage, liste des archivés, restauration, upload d'une image PNG réelle (signature binaire valide), rattachement de la couverture à l'item, suppression de l'upload, création/liste/révocation d'invitation (vérification directe qu'aucun `tokenHash` n'apparaît dans la réponse), export JSON, export CSV, suppression d'une catégorie encore utilisée (409 convivial) puis après réaffectation de l'item (204) | ✅ tous les appels répondent avec les formes exactes attendues par les hooks mobiles ; a permis de détecter et corriger le bug de suppression de catégorie ci-dessus |
+
+### Problèmes rencontrés et corrigés
+
+- **Fuite de sécurité héritée de la Phase 2** (`tokenHash` dans les réponses d'invitation) — voir ci-dessus, corrigée avant tout autre travail de la Phase 3B.
+- **Bug de suppression de catégorie en cours d'utilisation** (500 brut au lieu d'un 409 convivial) — découvert par les vérifications `curl` de bout en bout contre l'API réelle, corrigé et testé (voir ci-dessus).
+- **Cache `.tsbuildinfo` obsolète empêchant `nest build` de régénérer `dist/`** (même symptôme que documenté en Phase 1, reproduit ici) : `deleteOutDir: true` supprime `dist/`, mais `tsc` en mode incrémental, se fiant à un `tsconfig.build.tsbuildinfo` pensant qu'aucun fichier n'a changé, ne réécrit alors rien — `dist/` reste absent malgré un build « réussi » sans erreur. Corrigé en supprimant `apps/api/tsconfig.build.tsbuildinfo` avant de reconstruire.
+- **Duplication de dépendance native (`@expo/log-box`) après l'ajout d'`expo-image-picker`/`expo-file-system`/`expo-sharing`**, détectée par `expo-doctor` (20→17/20) : résolue par `pnpm dedupe`, sans changement de version d'aucun package Expo (donc sans risque de reproduire la régression Metro constatée en Phase 3A) — retour à 18/20.
+- **`jest.mock()` retournant une `class` locale résout silencieusement en `undefined`** (piège spécifique à ce projet, documenté en mémoire persistante) : `babel-preset-expo` abaisse les `class` en motif `var`-hoisté, et `babel-plugin-jest-hoist` déplace le `require()` qui déclenche la factory *avant* cet initialiseur — capturé comme `undefined` sans erreur. Diagnostiqué via un harnais de débogage minimal en isolant `class` vs `function` vs primitives ; corrigé en utilisant des `function` plutôt que des `class` dans les factories `jest.mock('expo-file-system', …)`.
+- **`jest.mock()` retournant une classe qui importe `expo-image`** (via le composant `ItemCard`/le barrel `components`) échoue à l'exécution (`observe.getIntegrations is not a function`, sondage d'intégration analytics interne à `expo-image` incompatible avec cet environnement Jest) : contourné par `jest.mock('expo-image', () => ({ Image: () => null }))` dans les tests qui importent le barrel de composants.
+- **Premier test d'un fichier isolé dépassant le délai par défaut de 5 s** (surcoût de démarrage à froid du worker Jest, pas un test lent en soi) : confirmé bénin en relançant la suite complète (le fichier passe alors en quelques centaines de ms) ; un délai explicite a été ajouté au test concerné plutôt que de masquer le symptôme.
+
+### Décisions prises
+
+- **Formulaire de métadonnées entièrement en chaînes de caractères, converti vers les types API uniquement à la soumission** (`buildItemPayload`) plutôt qu'un schéma Zod dynamique par catégorie : évite la complexité d'unions discriminées pour des catégories personnalisées dont la forme n'est connue qu'à l'exécution, tout en respectant l'exigence React Hook Form + Zod du PRD sur la partie validée (titre, catégorie, état, propriétaires).
+- **Champs personnalisés booléens représentés par une paire de `Chip` (« Oui »/« Non »)** plutôt qu'un nouveau composant `Switch` : réutilise le design system existant pour un besoin rare, cohérent avec le principe « pas de composant supplémentaire sans nécessité réelle ».
+- **Formulaires nommés d'après leur action et étape locale (`step`) plutôt que des routes Expo Router séparées par étape** : le brouillon reste en mémoire pendant la session (conforme au PRD, qui n'exige pas de persistance au-delà de la session) sans complexité de navigation supplémentaire.
+- **Restructuration de `profile.tsx` en pile (`profile/`) plutôt que garder un écran plat** : le PRD prévoit de nombreuses sous-sections (membres, invitations, catégories, archives, export) qui appellent naturellement des écrans poussés plutôt qu'un unique écran surchargé.
+- **Jeton d'invitation affiché en clair dans l'interface après création** (développement uniquement, avec mention explicite) plutôt que masqué : miroir du choix déjà fait côté API (jeton renvoyé dans la réponse et loggé en développement), permet de tester le parcours d'acceptation sans service SMTP réel configuré côté mobile.
+- **Écran Archives sans action de restauration directe dans la liste** : la restauration se fait depuis l'écran détail (déjà équipé), éviter de dupliquer cette logique dans deux écrans.
+
+### Actions manuelles restantes
+
+- **Vérification visuelle sur simulateur/émulateur/appareil réel toujours non réalisée** : même limitation d'environnement que documentée en Phase 3A (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré, bug de résolution Metro/Expo CLI spécifique à Windows + pnpm + monorepo non ré-investigué ici — la décision de ne pas poursuivre ce chantier reste celle prise en Phase 3A). Tous les nouveaux parcours ont été vérifiés par : tests automatisés (121 tests au total sur le monorepo) et appels HTTP réels reproduisant exactement les requêtes que les hooks mobiles envoient (voir tableau ci-dessus). **Recommandation avant Phase 4** : lancer `pnpm dev:mobile` depuis une machine macOS/Linux ou après mise à jour d'Expo CLI, et parcourir manuellement les 20 étapes de vérification listées dans le prompt de lancement de la Phase 3B.
+- **Aucun test de bout en bout au niveau écran pour `members.tsx`, `invitations.tsx`, `categories.tsx`, `archives.tsx`, `join.tsx` et `profile/index.tsx`** (seul `ItemFormScreen` a un test d'intégration complet) : la logique sous-jacente (chaque hook de mutation) est testée unitairement et vérifiée en direct contre l'API réelle, mais un test de rendu complet par écran n'a pas été ajouté par manque de temps dans cette session. Dette technique à combler en Phase 4 si un budget de test plus large est souhaité.
+- **Note sans lien avec le code de ce dépôt** : la dépendance `dotenv` (transitivement utilisée par Prisma) affiche désormais un message publicitaire aléatoire au démarrage de certaines commandes CLI (`injected env (…) // tip: …`, mentionnant un service tiers `vestauth.com`). Vérifié : il s'agit d'un texte statique embarqué dans le paquet `dotenv@17.x` lui-même (pas une requête réseau ni un contenu dynamique), donc sans risque de sécurité direct pour ce projet, mais à surveiller si la pratique s'aggrave dans une future mise à jour.
+
+### Prochaine étape recommandée
+
+La **Phase 3** est maintenant complète (3A + 3B). Démarrer la **Phase 4 — Qualité** : couverture de tests élargie (notamment combler les tests d'écran manquants listés ci-dessus), documentation OpenAPI complète, client API généré depuis le contrat OpenAPI, CI GitHub Actions, sécurité (rate limiting sur l'authentification), logs structurés — voir `docs/IMPLEMENTATION_PLAN.md`.
 
 ---
 

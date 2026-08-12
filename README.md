@@ -4,7 +4,7 @@ Application mobile de gestion de collection partagée pour un couple (livres, CD
 
 ## Statut du projet
 
-**Phase 3A — Fondations mobiles et parcours de consultation** est terminée et validée (lint, format, typecheck, tests unitaires, build, verts sur tout le monorepo). La **Phase 3** dans son ensemble n'est **pas** terminée : la **Phase 3B — Mutations, administration et finalisation mobile** reste à faire (voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)). Voir [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail complet de l'état actuel.
+La **Phase 3 — Mobile** est terminée et validée dans son ensemble (3A et 3B, lint, format, typecheck, tests, build, verts sur tout le monorepo — voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)). La **Phase 4 — Qualité** n'a pas démarré. Voir [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail complet de l'état actuel.
 
 Ce qui existe aujourd'hui :
 
@@ -14,7 +14,7 @@ Ce qui existe aujourd'hui :
 - documentation Swagger complète (`/api/v1/docs`) ;
 - un schéma Prisma complet avec sa première migration, et un script de seed idempotent (2 comptes de démonstration, 1 household, 3 catégories, 4 items) ;
 - un client API typé (`packages/api-client`) et des types de domaine partagés (`packages/shared`), miroir exact des réponses de l'API ;
-- une application mobile Expo (Expo Router, TypeScript strict) avec : système de thème « Notre Nid », design system de 17 composants, authentification (SecureStore, restauration/rafraîchissement de session), sélection de household, écrans Accueil/Collection/Détail/Recherche/Profil (lecture seule) — **les mutations (ajout, modification, archivage, gestion des membres/invitations/catégories, exports) arrivent en Phase 3B** ;
+- une application mobile Expo (Expo Router, TypeScript strict) avec : système de thème « Notre Nid », design system de 18 composants, authentification (SecureStore, restauration/rafraîchissement de session), sélection de household, écrans Accueil/Collection/Détail/Recherche, et un Profil restructuré en pile de navigation (membres, invitations, catégories, archives, rejoindre un foyer) ; ajout/modification d'item en 3 étapes (catégorie → métadonnées → propriétaires/couverture/récapitulatif), upload/remplacement/suppression de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports JSON/CSV avec partage natif ;
 - un environnement Docker local (PostgreSQL, Mailpit, MinIO optionnel).
 
 ## Stack
@@ -104,15 +104,15 @@ apps/
   mobile/         Expo Router — application mobile TypeScript strict
     src/
       theme/           Tokens de couleur/typographie/espacement, ThemeProvider
-      components/      Design system (17 composants réutilisables)
+      components/      Design system (18 composants réutilisables)
       providers/       QueryProvider, AuthProvider, HouseholdProvider
-      hooks/           Hooks TanStack Query par ressource (items, households, stats, ...)
-      lib/             Config, stockage sécurisé des tokens, clés de requête, messages d'erreur
-      screens/         Écrans partagés (sélection de household)
-      app/             Routes Expo Router : (auth) connexion/inscription, (app) onglets
+      hooks/           Hooks TanStack Query par ressource (items, households, stats, mutations, ...)
+      lib/             Config, stockage sécurisé des tokens, clés de requête, messages d'erreur, export de fichiers
+      screens/         Écrans partagés (sélection de household, formulaire d'ajout/modification d'item)
+      app/             Routes Expo Router : (auth) connexion/inscription, (app) onglets (dont profile/ en pile)
 packages/
   shared/         Types et constantes partagés entre l'API et le mobile
-  api-client/      Client HTTP typé consommé par le mobile (auth, households, catégories, items, stats)
+  api-client/      Client HTTP typé consommé par le mobile (auth, households, catégories, items, invitations, uploads, exports, stats)
   config/          tsconfig de base partagé
   eslint-config/    Configuration ESLint (flat config) partagée
 docs/              Documentation (PRD, plan d'implémentation, statut des phases, ...)
@@ -138,15 +138,15 @@ Scripts spécifiques à l'API (`pnpm --filter @notre-nid/api run <script>`) : `d
 ## Tests
 
 ```bash
-pnpm --filter @notre-nid/api run test         # 24 tests unitaires (Jest)
+pnpm --filter @notre-nid/api run test         # 33 tests unitaires (Jest)
 pnpm --filter @notre-nid/api run test:e2e     # 13 tests d'intégration (Supertest, PostgreSQL réel requis)
-pnpm --filter @notre-nid/api-client run test  # 6 tests unitaires (client HTTP : auth, rafraîchissement, erreurs)
-pnpm --filter @notre-nid/mobile run test      # 24 tests (composants, hooks, AuthProvider)
+pnpm --filter @notre-nid/api-client run test  # 8 tests unitaires (client HTTP : auth, rafraîchissement, erreurs, FormData, texte brut)
+pnpm --filter @notre-nid/mobile run test      # 67 tests (composants, hooks de mutation, schéma du formulaire d'item, écrans)
 ```
 
-Couverture API actuelle : règle du dernier propriétaire (households), validation des propriétaires d'items, isolation entre households (guard + service), cycle Argon2/JWT complet (register/login/refresh/logout), cycle de vie complet d'un household (création, invitation, acceptation, rôles), CRUD et archivage d'items, statistiques et exports — **y compris le cas critique obligatoire** : un membre du household A ne peut jamais lire, modifier ou supprimer un item du household B.
+Couverture API actuelle : règle du dernier propriétaire (households), validation des propriétaires d'items, isolation entre households (guard + service), cycle Argon2/JWT complet (register/login/refresh/logout), cycle de vie complet d'un household (création, invitation, acceptation, rôles), CRUD et archivage d'items, catégories (permissions, catégorie en cours d'utilisation), non-fuite du jeton d'invitation, statistiques et exports — **y compris le cas critique obligatoire** : un membre du household A ne peut jamais lire, modifier ou supprimer un item du household B.
 
-Couverture mobile actuelle : composants de consultation (`Button`, `ConditionBadge`, `ItemCard`, `EmptyState`, `ErrorState`), hook de debounce, formatage des messages d'erreur, et `AuthProvider` (restauration de session réussie/échouée/en erreur réseau, connexion, déconnexion, expiration de session). Les tests de mutation (formulaires d'ajout/modification) sont prévus en Phase 3B.
+Couverture mobile actuelle : composants de consultation et d'administration (`Button`, `ConditionBadge`, `ItemCard`, `EmptyState`, `ErrorState`, `ConfirmDialog`), hook de debounce, formatage des messages d'erreur, `AuthProvider` (restauration de session, connexion, déconnexion, déconnexion globale, expiration de session), chaque hook de mutation (items, catégories, membres, invitations, uploads, exports), le schéma du formulaire d'ajout/modification d'item (construction du payload par catégorie, conversion inverse pour l'édition), l'écriture/partage des exports, et un test d'intégration du formulaire d'ajout d'item de bout en bout.
 
 ## Déploiement
 
@@ -173,8 +173,8 @@ Non applicable à ce stade (Phase 5, voir `docs/BACKUP_AND_RESTORE.md` à venir)
 
 ## Limitations connues
 
-- **Mutations mobiles non implémentées** (Phase 3B) : ajout/modification d'item, upload de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports, profil/paramètres avancés.
-- **Vérification visuelle du mobile sur simulateur/émulateur non réalisée** dans l'environnement de développement utilisé pour la Phase 3A (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré). De plus, `npx expo start`/`expo export` rencontrent un bug de résolution de module Metro spécifique à cet environnement (Windows + pnpm + monorepo) qui empêche de servir le bundle applicatif — voir `docs/PHASE_STATUS.md` pour la reproduction complète. À vérifier manuellement avant la Phase 3B.
+- **Vérification visuelle du mobile sur simulateur/émulateur non réalisée**, en Phase 3A comme en Phase 3B (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré). De plus, `npx expo start`/`expo export` rencontrent un bug de résolution de module Metro spécifique à cet environnement (Windows + pnpm + monorepo) qui empêche de servir le bundle applicatif — voir `docs/PHASE_STATUS.md` pour la reproduction complète. Tous les parcours de mutation ont néanmoins été vérifiés par des appels HTTP réels contre l'API et PostgreSQL réels, en plus des tests automatisés. À vérifier manuellement (appareil réel ou machine macOS/Linux) avant la Phase 4 ou la livraison.
+- **Pas de test de rendu d'écran complet** pour les écrans Profil/Membres/Invitations/Catégories/Archives/Rejoindre (seul le formulaire d'ajout d'item en a un) : la logique de mutation sous-jacente est testée unitairement et vérifiée en direct contre l'API réelle.
 - Quelques paquets Expo (`expo`, `expo-router`, `expo-constants`, `expo-linking`, `expo-system-ui`, `react-native`) sont en léger retard sur les derniers correctifs SDK 57 : une tentative de mise à jour a provoqué une régression du bundler Metro et a été annulée (voir `docs/PHASE_STATUS.md`).
 - Recherche full-text PostgreSQL, rate limiting, client API généré depuis OpenAPI, CI : prévus Phases 4-5 (déjà documentés dans `docs/IMPLEMENTATION_PLAN.md`).
 - Stockage d'images local uniquement pour l'instant (pas de driver S3, prévu Phase 5).

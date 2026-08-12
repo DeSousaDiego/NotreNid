@@ -6,13 +6,13 @@ Ce document décrit l'ordre des phases, leurs dépendances, leurs critères de s
 
 1. **Phase 1 — Fondation** ✅ terminée
 2. **Phase 2 — Backend métier** ✅ terminée
-3. **Phase 3 — Mobile** (découpée en deux sous-phases pour réduire les risques)
+3. **Phase 3 — Mobile** ✅ terminée (découpée en deux sous-phases pour réduire les risques)
    - **Phase 3A — Fondations mobiles et parcours de consultation** ✅ terminée
-   - **Phase 3B — Mutations, administration et finalisation mobile** ⏳ non démarrée
+   - **Phase 3B — Mutations, administration et finalisation mobile** ✅ terminée
 4. **Phase 4 — Qualité**
 5. **Phase 5 — Livraison**
 
-La Phase 3 dans son ensemble n'est donc **pas** terminée : seule la 3A l'est.
+La Phase 3 dans son ensemble est **terminée** (3A et 3B toutes deux validées).
 
 Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant que la précédente ait ses commandes de validation vertes (lint, typecheck, tests, builds).
 
@@ -86,15 +86,21 @@ La Phase 3 est découpée en deux sous-phases afin de réduire les risques et de
 
 **Fonctionnalités explicitement préparées mais non implémentées (réservées à la Phase 3B)** : ajout d'item, modification d'item, upload/remplacement de couverture, archivage/restauration, gestion complète des membres, création/révocation d'invitations, gestion des catégories personnalisées, exports JSON/CSV, profil/paramètres avancés. Aucun bouton actif ni écran factice ne laisse croire que ces fonctionnalités sont disponibles.
 
-### Phase 3B — Mutations, administration et finalisation mobile ⏳
+### Phase 3B — Mutations, administration et finalisation mobile ✅
 
-**Statut** : non démarrée.
+**Statut** : terminée et validée — voir `docs/PHASE_STATUS.md` pour le détail complet.
 
-**Contenu prévu** : formulaire d'ajout d'item multi-étapes, modification, upload de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports, profil/paramètres complets, tests de mutation, finalisation des tests Phase 3.
+**Contenu** : formulaire d'ajout/modification d'item en 3 étapes (réutilisant le même composant pour les deux modes), upload/remplacement/suppression de couverture (`expo-image-picker` + l'API réelle), archivage/restauration, gestion des membres (rôles, retrait, quitter) et invitations (création/liste/révocation/acceptation par jeton), gestion des catégories personnalisées (CRUD + schéma de champs simple), exports JSON/CSV avec partage natif (`expo-file-system` + `expo-sharing`), Profil restructuré en pile de navigation, 5ᵉ onglet « Ajouter », 43 nouveaux tests mobiles + 9 nouveaux tests API. Corrige au passage une fuite de sécurité héritée de la Phase 2 (`tokenHash` exposé par les endpoints d'invitation) et un bug de suppression de catégorie (500 au lieu d'un message convivial), tous deux découverts et corrigés durant cette phase.
 
 **Dépendances** : Phase 3A terminée et validée (c'est le cas).
 
-**Critères de sortie** : parcours de mutation complets navigables et fonctionnels contre l'API réelle, `pnpm lint`/`typecheck`/`test`/`build` verts, vérification visuelle sur simulateur/émulateur/appareil réel.
+**Critères de sortie** (tous validés) :
+
+- ✅ Parcours de mutation complets navigables et fonctionnels contre l'API réelle — vérifiés à la fois par 121 tests automatisés sur le monorepo et par des appels HTTP réels reproduisant chaque requête envoyée par les hooks mobiles (households/categories/items/invitations/uploads/exports, contre PostgreSQL réel et le seed).
+- ✅ `pnpm lint`/`typecheck`/`format:check`/`test`/`build` verts sur tout le monorepo.
+- ⚠️ Vérification visuelle sur simulateur/émulateur/appareil réel **non réalisée**, pour la même raison qu'en Phase 3A (aucun simulateur/émulateur disponible dans cet environnement, bug de résolution Metro/Expo CLI Windows + pnpm + monorepo non ré-investigué) — à faire par le propriétaire du dépôt avant la Phase 4 ou la livraison.
+
+**Dette technique documentée** : pas de test de rendu d'écran complet pour `members`/`invitations`/`categories`/`archives`/`join`/`profile/index` (seul `ItemFormScreen` en a un) — la logique de mutation sous-jacente est testée unitairement et vérifiée en direct contre l'API, mais un test d'intégration par écran reste à ajouter en Phase 4 si souhaité.
 
 ---
 
