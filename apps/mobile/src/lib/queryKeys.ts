@@ -9,7 +9,10 @@ export const queryKeys = {
   categories: (householdId: string) => ['households', householdId, 'categories'] as const,
   items: (householdId: string, query: ItemsQueryParams) =>
     ['households', householdId, 'items', query] as const,
+  /** Préfixe commun à toutes les variantes de `items` (filtres/pages) — cible générique d'invalidation. */
+  itemsRoot: (householdId: string) => ['households', householdId, 'items'] as const,
   item: (householdId: string, itemId: string) =>
     ['households', householdId, 'items', itemId] as const,
   stats: (householdId: string) => ['households', householdId, 'stats'] as const,
+  invitations: (householdId: string) => ['households', householdId, 'invitations'] as const,
 };

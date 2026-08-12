@@ -8,3 +8,6 @@ export { createApiClient, type ApiClient } from './client';
 export { ApiError, NetworkError } from './errors';
 export type { ApiClientConfig, StoredTokens, TokenStorage } from './types';
 export type { LoginInput, RegisterInput } from './endpoints/auth';
+export type { CreateCategoryInput, UpdateCategoryInput } from './endpoints/categories';
+export type { CreateItemInput, ItemInput, MetadataInput, UpdateItemInput } from './endpoints/items';
+export type { UploadResult } from './endpoints/uploads';
