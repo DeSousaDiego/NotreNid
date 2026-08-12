@@ -63,7 +63,42 @@ export class CategoriesService {
 
   async remove(householdId: string, categoryId: string): Promise<void> {
     const category = await this.getOwnedCustomCategory(householdId, categoryId);
-    await this.prisma.category.delete({ where: { id: category.id } });
+
+    const itemCount = await this.prisma.item.count({ where: { categoryId: category.id } });
+    if (itemCount > 0) {
+      throw new AppException(
+        HttpStatus.CONFLICT,
+        'CATEGORY_IN_USE',
+        'Cette catégorie est encore utilisée par au moins un objet et ne peut pas être supprimée.',
+      );
+    }
+
+    try {
+      await this.prisma.category.delete({ where: { id: category.id } });
+    } catch (error) {
+      if (this.isForeignKeyViolation(error)) {
+        throw new AppException(
+          HttpStatus.CONFLICT,
+          'CATEGORY_IN_USE',
+          'Cette catégorie est encore utilisée par au moins un objet et ne peut pas être supprimée.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Filet de sécurité contre une suppression concurrente d'un item juste après
+   * la vérification `itemCount` ci-dessus (fenêtre de course inévitable sans
+   * verrou explicite). Vérifie le message plutôt que `instanceof`/`error.code`
+   * seuls : observé en pratique que Prisma 7 (driver adapter @prisma/adapter-pg)
+   * ne peuple pas toujours `code` sur cette erreur précise.
+   */
+  private isForeignKeyViolation(error: unknown): boolean {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      return true;
+    }
+    return error instanceof Error && /foreign key constraint/i.test(error.message);
   }
 
   /** Valide `customMetadata` d'un item par rapport au `metadataSchema` de sa catégorie. */

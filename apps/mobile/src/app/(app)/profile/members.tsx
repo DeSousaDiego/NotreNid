@@ -175,6 +175,7 @@ export default function MembersScreen() {
                   key={option.value}
                   label={option.label}
                   selected={managedMember?.role === option.value}
+                  disabled={updateRole.isPending}
                   onPress={() => void handleChangeRole(option.value)}
                 />
               ))}
@@ -183,6 +184,7 @@ export default function MembersScreen() {
           <Button
             label="Retirer du foyer"
             variant="danger"
+            disabled={updateRole.isPending}
             onPress={() => {
               if (managedMember) setConfirmRemove(managedMember);
             }}

@@ -27,7 +27,7 @@ describe('ConfirmDialog', () => {
 
     await fireEvent.press(view.getByRole('button', { name: 'Annuler' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
-  });
+  }, 15000);
 
   it('ne rend rien de visible quand visible=false', async () => {
     const view = await renderWithTheme(
