@@ -1,4 +1,4 @@
-import type { ItemCondition } from '@notre-nid/shared';
+import { ITEM_CONDITIONS, type ItemCondition } from '@notre-nid/shared';
 
 import type { ColorToken } from '../theme';
 
@@ -10,3 +10,7 @@ export const CONDITION_INFO: Record<ItemCondition, { label: string; color: Color
   FAIR: { label: 'État correct', color: 'secondary' },
   POOR: { label: 'État moyen', color: 'danger' },
 };
+
+export const CONDITION_OPTIONS: { value: ItemCondition; label: string }[] = ITEM_CONDITIONS.map(
+  (condition) => ({ value: condition, label: CONDITION_INFO[condition].label }),
+);

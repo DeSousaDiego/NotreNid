@@ -72,6 +72,15 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="add"
+        options={{
+          title: 'Ajouter',
+          tabBarActiveTintColor: theme.colors.secondary,
+          tabBarInactiveTintColor: theme.colors.secondary,
+          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           title: 'Recherche',

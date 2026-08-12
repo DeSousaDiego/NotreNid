@@ -16,6 +16,7 @@ import {
   SearchField,
   Select,
 } from '../../../components';
+import { CONDITION_OPTIONS } from '../../../constants/condition';
 import { useCategories } from '../../../hooks/useCategories';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useItems } from '../../../hooks/useItems';
@@ -29,14 +30,6 @@ const SORT_OPTIONS: { value: ItemSortField; label: string }[] = [
   { value: 'title', label: 'Titre' },
   { value: 'updatedAt', label: 'Dernière modification' },
   { value: 'condition', label: 'État' },
-];
-
-const CONDITION_OPTIONS: { value: ItemCondition; label: string }[] = [
-  { value: 'NEW', label: 'Neuf' },
-  { value: 'VERY_GOOD', label: 'Très bon état' },
-  { value: 'GOOD', label: 'Bon état' },
-  { value: 'FAIR', label: 'État correct' },
-  { value: 'POOR', label: 'État moyen' },
 ];
 
 export default function CollectionScreen() {

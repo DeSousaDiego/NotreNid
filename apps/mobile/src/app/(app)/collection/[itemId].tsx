@@ -1,16 +1,21 @@
 import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import {
   AppText,
+  Button,
   CategoryBadge,
   ConditionBadge,
+  ConfirmDialog,
   ErrorState,
   LoadingSkeleton,
   OwnerAvatarGroup,
   ScreenContainer,
+  useToast,
 } from '../../../components';
+import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations';
 import { useItem } from '../../../hooks/useItem';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
@@ -26,9 +31,33 @@ function formatDate(value: string): string {
 
 export default function ItemDetailScreen() {
   const theme = useTheme();
+  const { showToast } = useToast();
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const { householdId } = useHousehold();
   const itemQuery = useItem(householdId, itemId);
+  const archiveItem = useArchiveItem(householdId);
+  const restoreItem = useRestoreItem(householdId);
+  const [confirmArchiveVisible, setConfirmArchiveVisible] = useState(false);
+
+  const handleArchive = async () => {
+    try {
+      await archiveItem.mutateAsync(itemId);
+      setConfirmArchiveVisible(false);
+      showToast('Objet archivé. Vous pouvez le restaurer depuis les archives.', 'success');
+    } catch (error) {
+      setConfirmArchiveVisible(false);
+      showToast(getErrorMessage(error), 'error');
+    }
+  };
+
+  const handleRestore = async () => {
+    try {
+      await restoreItem.mutateAsync(itemId);
+      showToast('Objet restauré dans votre collection.', 'success');
+    } catch (error) {
+      showToast(getErrorMessage(error), 'error');
+    }
+  };
 
   if (itemQuery.isLoading) {
     return (
@@ -119,8 +148,53 @@ export default function ItemDetailScreen() {
               </AppText>
             ) : null}
           </View>
+
+          {item.archivedAt ? (
+            <View style={{ gap: theme.spacing.sm }}>
+              <AppText variant="helper" color="textMuted">
+                Cet objet est archivé.
+              </AppText>
+              <Button
+                label="Restaurer"
+                variant="secondary"
+                onPress={() => void handleRestore()}
+                loading={restoreItem.isPending}
+              />
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+              <Button
+                label="Modifier"
+                variant="ghost"
+                style={{ flex: 1 }}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/collection/edit/[itemId]',
+                    params: { itemId: item.id },
+                  })
+                }
+              />
+              <Button
+                label="Archiver"
+                variant="danger"
+                style={{ flex: 1 }}
+                onPress={() => setConfirmArchiveVisible(true)}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmArchiveVisible}
+        title="Archiver cet objet ?"
+        message="Vous pourrez le restaurer à tout moment depuis les archives."
+        confirmLabel="Archiver"
+        destructive
+        loading={archiveItem.isPending}
+        onConfirm={() => void handleArchive()}
+        onCancel={() => setConfirmArchiveVisible(false)}
+      />
     </ScreenContainer>
   );
 }

@@ -16,6 +16,7 @@ export default function CollectionLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Collection' }} />
       <Stack.Screen name="[itemId]" options={{ title: '' }} />
+      <Stack.Screen name="edit/[itemId]" options={{ title: '' }} />
     </Stack>
   );
 }
