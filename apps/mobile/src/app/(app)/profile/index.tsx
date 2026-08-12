@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 
-import { AppText, Button, LoadingSkeleton, ScreenContainer } from '../../../components';
+import { AppText, Button, LoadingSkeleton, ScreenContainer, useToast } from '../../../components';
+import { useExportCollection } from '../../../hooks/useExports';
 import { useHouseholds } from '../../../hooks/useHouseholds';
+import { getErrorMessage } from '../../../lib/errorMessage';
 import { useAuth } from '../../../providers/AuthProvider';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useTheme } from '../../../theme';
@@ -41,11 +43,21 @@ function NavRow({ icon, label, onPress }: NavRowProps) {
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { showToast } = useToast();
   const { user, logout, logoutAllDevices } = useAuth();
   const { householdId, households, clearSelection } = useHousehold();
   const householdsQuery = useHouseholds(true);
 
   const currentHousehold = households.find((h) => h.id === householdId);
+  const exportCollection = useExportCollection(householdId, currentHousehold?.name ?? 'Notre Nid');
+
+  const handleExport = async (format: 'json' | 'csv') => {
+    try {
+      await exportCollection.mutateAsync(format);
+    } catch (error) {
+      showToast(getErrorMessage(error), 'error');
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -91,6 +103,11 @@ export default function ProfileScreen() {
             onPress={() => router.push('/(app)/profile/invitations')}
           />
           <NavRow
+            icon="pricetag-outline"
+            label="Catégories"
+            onPress={() => router.push('/(app)/profile/categories')}
+          />
+          <NavRow
             icon="archive-outline"
             label="Archives"
             onPress={() => router.push('/(app)/profile/archives')}
@@ -103,6 +120,26 @@ export default function ProfileScreen() {
         </View>
 
         {householdsQuery.isLoading ? <LoadingSkeleton height={40} /> : null}
+
+        <View style={{ gap: theme.spacing.sm }}>
+          <AppText variant="section">Exporter la collection</AppText>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <Button
+              label="Exporter en JSON"
+              variant="ghost"
+              style={{ flex: 1 }}
+              onPress={() => void handleExport('json')}
+              loading={exportCollection.isPending}
+            />
+            <Button
+              label="Exporter en CSV"
+              variant="ghost"
+              style={{ flex: 1 }}
+              onPress={() => void handleExport('csv')}
+              loading={exportCollection.isPending}
+            />
+          </View>
+        </View>
 
         <View style={{ gap: theme.spacing.sm }}>
           <Button label="Se déconnecter" variant="secondary" onPress={() => void logout()} />
