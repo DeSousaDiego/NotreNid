@@ -21,6 +21,7 @@ interface AuthContextValue {
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  logoutAllDevices: () => Promise<void>;
   retryRestore: () => void;
 }
 
@@ -125,9 +126,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOverride({ kind: 'unauthenticated' });
   }, [apiClient]);
 
+  const logoutAllDevices = useCallback(async () => {
+    await apiClient.auth.logoutAll().catch(() => {
+      /* déconnexion locale malgré tout si l'appel réseau échoue */
+    });
+    await secureTokenStorage.clearTokens();
+    await clearLastHouseholdId();
+    setOverride({ kind: 'unauthenticated' });
+  }, [apiClient]);
+
   const authValue = useMemo<AuthContextValue>(
-    () => ({ status, user, login, register, logout, retryRestore }),
-    [status, user, login, register, logout, retryRestore],
+    () => ({ status, user, login, register, logout, logoutAllDevices, retryRestore }),
+    [status, user, login, register, logout, logoutAllDevices, retryRestore],
   );
 
   return (

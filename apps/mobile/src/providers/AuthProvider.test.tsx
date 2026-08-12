@@ -149,6 +149,27 @@ describe('AuthProvider', () => {
     expect(secureTokenStorage.clearTokens).toHaveBeenCalled();
   });
 
+  it('revient à "unauthenticated" après logoutAllDevices()', async () => {
+    secureTokenStorage.getTokens.mockResolvedValue({
+      accessToken: 'access',
+      refreshToken: 'refresh',
+    });
+    (mockAuthClient.auth.me as jest.Mock).mockResolvedValue(user);
+    (mockAuthClient.auth.logoutAll as jest.Mock).mockResolvedValue(undefined);
+
+    const { result } = await renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+
+    await act(async () => {
+      await result.current.logoutAllDevices();
+    });
+
+    expect(mockAuthClient.auth.logoutAll).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('unauthenticated');
+    expect(result.current.user).toBeNull();
+    expect(secureTokenStorage.clearTokens).toHaveBeenCalled();
+  });
+
   it('revient à "unauthenticated" quand la session expire (refresh token révoqué)', async () => {
     secureTokenStorage.getTokens.mockResolvedValue({
       accessToken: 'access',
