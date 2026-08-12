@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { HouseholdRole } from '@prisma/client';
 
+import { toPublicInvitation, type PublicInvitation } from './invitations.mapper';
 import { AppException } from '../common/exceptions/app-exception';
 import { normalizeEmail } from '../common/utils/normalize-email';
 import { MailService } from '../mail/mail.service';
@@ -17,7 +18,11 @@ export class InvitationsService {
     private readonly mailService: MailService,
   ) {}
 
-  async create(householdId: string, invitedById: string, email: string) {
+  async create(
+    householdId: string,
+    invitedById: string,
+    email: string,
+  ): Promise<PublicInvitation & { token: string }> {
     const household = await this.prisma.household.findUniqueOrThrow({ where: { id: householdId } });
 
     const rawToken = randomBytes(32).toString('hex');
@@ -50,14 +55,15 @@ export class InvitationsService {
       invitationToken: rawToken,
     });
 
-    return { ...invitation, token: rawToken };
+    return { ...toPublicInvitation(invitation), token: rawToken };
   }
 
-  async listForHousehold(householdId: string) {
-    return this.prisma.householdInvitation.findMany({
+  async listForHousehold(householdId: string): Promise<PublicInvitation[]> {
+    const invitations = await this.prisma.householdInvitation.findMany({
       where: { householdId },
       orderBy: { createdAt: 'desc' },
     });
+    return invitations.map(toPublicInvitation);
   }
 
   async accept(rawToken: string, userId: string, userEmail: string) {

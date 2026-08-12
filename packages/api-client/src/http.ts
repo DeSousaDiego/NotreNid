@@ -8,7 +8,12 @@ export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 export interface RequestOptions {
   method?: HttpMethod;
-  body?: unknown;
+  /**
+   * `FormData` (ex. upload de fichier) est envoyé tel quel, sans
+   * `Content-Type: application/json` ni sérialisation — le runtime fixe
+   * lui-même l'en-tête multipart avec la bonne frontière (`boundary`).
+   */
+  body?: unknown | FormData;
   query?: Record<string, string | number | boolean | undefined>;
   /**
    * `false` pour les routes publiques (register/login/refresh) : n'attache
@@ -29,7 +34,10 @@ export function createHttpClient(config: ApiClientConfig) {
 
   async function rawFetch(path: string, options: RequestOptions): Promise<Response> {
     const url = `${config.baseUrl}${path}${buildQueryString(options.query)}`;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+    const headers: Record<string, string> = isFormData
+      ? {}
+      : { 'Content-Type': 'application/json' };
 
     if (options.auth !== false) {
       const tokens = await config.tokenStorage.getTokens();
@@ -42,7 +50,11 @@ export function createHttpClient(config: ApiClientConfig) {
       return await fetch(url, {
         method: options.method ?? 'GET',
         headers,
-        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        body: isFormData
+          ? (options.body as FormData)
+          : options.body !== undefined
+            ? JSON.stringify(options.body)
+            : undefined,
       });
     } catch {
       throw new NetworkError();
@@ -110,7 +122,7 @@ export function createHttpClient(config: ApiClientConfig) {
     return refreshPromise;
   }
 
-  async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  async function requestRaw(path: string, options: RequestOptions = {}): Promise<Response> {
     let response = await rawFetch(path, options);
 
     if (response.status === 401 && options.auth !== false) {
@@ -122,14 +134,24 @@ export function createHttpClient(config: ApiClientConfig) {
       throw new ApiError(await parseErrorBody(response));
     }
 
+    return response;
+  }
+
+  async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const response = await requestRaw(path, options);
     if (response.status === 204) {
       return undefined as T;
     }
-
     return (await response.json()) as T;
   }
 
-  return { request };
+  /** Réponses non-JSON (ex. export CSV, `Content-Type: text/csv`). */
+  async function requestText(path: string, options: RequestOptions = {}): Promise<string> {
+    const response = await requestRaw(path, options);
+    return response.text();
+  }
+
+  return { request, requestText };
 }
 
 export type HttpClient = ReturnType<typeof createHttpClient>;

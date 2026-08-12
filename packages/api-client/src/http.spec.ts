@@ -10,6 +10,14 @@ function jsonResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
+function textResponse(status: number, body: string): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: () => Promise.resolve(body),
+  } as unknown as Response;
+}
+
 function createMemoryTokenStorage(initial: StoredTokens | null = null): TokenStorage {
   let tokens = initial;
   return {
@@ -160,5 +168,31 @@ describe('createHttpClient', () => {
       (url as string).endsWith('/auth/refresh'),
     );
     expect(refreshCalls).toHaveLength(1);
+  });
+
+  it('sends FormData bodies as-is, without a JSON Content-Type header', async () => {
+    const tokenStorage = createMemoryTokenStorage({ accessToken: 'a', refreshToken: 'r' });
+    fetchMock.mockResolvedValue(jsonResponse(201, { id: 'file-1', url: 'http://x/file-1.jpg' }));
+
+    const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage });
+    const formData = new FormData();
+    formData.append('file', 'fake-binary');
+
+    const result = await http.request('/uploads', { method: 'POST', body: formData });
+
+    expect(result).toEqual({ id: 'file-1', url: 'http://x/file-1.jpg' });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers['Content-Type']).toBeUndefined();
+    expect(init.body).toBe(formData);
+  });
+
+  it('requestText returns the raw response body without JSON parsing (CSV export)', async () => {
+    const tokenStorage = createMemoryTokenStorage({ accessToken: 'a', refreshToken: 'r' });
+    fetchMock.mockResolvedValue(textResponse(200, 'id,title\n1,Dune\n'));
+
+    const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage });
+    const result = await http.requestText('/households/h1/exports/csv');
+
+    expect(result).toBe('id,title\n1,Dune\n');
   });
 });
