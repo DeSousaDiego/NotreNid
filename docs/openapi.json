@@ -1,0 +1,1861 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Vérifie que le processus de l'API répond (liveness).",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "503": {
+            "description": "La base de données est injoignable."
+          }
+        },
+        "summary": "Vérifie que les dépendances critiques (base de données) sont disponibles (readiness).",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Compte créé, session ouverte."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          },
+          "429": {
+            "description": "Trop de requêtes ont été envoyées dans un court instant."
+          }
+        },
+        "summary": "Crée un compte et retourne un access token et un refresh token.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Identifiants valides, session ouverte."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "429": {
+            "description": "Trop de requêtes ont été envoyées dans un court instant."
+          }
+        },
+        "summary": "Authentifie un utilisateur et retourne une nouvelle session.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Nouveau couple access/refresh token."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "429": {
+            "description": "Trop de requêtes ont été envoyées dans un court instant."
+          }
+        },
+        "summary": "Fait tourner le refresh token et retourne un nouveau couple de tokens.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Session révoquée."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          }
+        },
+        "summary": "Révoque le refresh token fourni (déconnexion de cet appareil).",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout-all": {
+      "post": {
+        "operationId": "AuthController_logoutAll",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Toutes les sessions ont été révoquées."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Révoque toutes les sessions actives de l'utilisateur courant.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profil de l'utilisateur courant."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retourne le profil de l'utilisateur authentifié.",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/households": {
+      "get": {
+        "operationId": "HouseholdsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Households de l'utilisateur, avec son rôle dans chacun."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les households dont l'utilisateur courant est membre.",
+        "tags": [
+          "households"
+        ]
+      },
+      "post": {
+        "operationId": "HouseholdsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHouseholdDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Household créé."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crée un household ; le créateur en devient OWNER.",
+        "tags": [
+          "households"
+        ]
+      }
+    },
+    "/households/{householdId}": {
+      "get": {
+        "operationId": "HouseholdsController_getById",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Household trouvé."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retourne les informations d'un household.",
+        "tags": [
+          "households"
+        ]
+      },
+      "patch": {
+        "operationId": "HouseholdsController_rename",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHouseholdDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Household renommé."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomme un household (réservé à OWNER/ADMIN).",
+        "tags": [
+          "households"
+        ]
+      },
+      "delete": {
+        "operationId": "HouseholdsController_remove",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Household supprimé."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime un household (réservé à OWNER).",
+        "tags": [
+          "households"
+        ]
+      }
+    },
+    "/households/{householdId}/members": {
+      "get": {
+        "operationId": "HouseholdsController_listMembers",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Membres du household, avec leur rôle."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les membres d'un household.",
+        "tags": [
+          "households"
+        ]
+      }
+    },
+    "/households/{householdId}/members/{userId}": {
+      "patch": {
+        "operationId": "HouseholdsController_updateMemberRole",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rôle mis à jour."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change le rôle d'un membre (réservé à OWNER/ADMIN).",
+        "tags": [
+          "households"
+        ]
+      },
+      "delete": {
+        "operationId": "HouseholdsController_removeMember",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Membre retiré."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire un membre du household (réservé à OWNER/ADMIN).",
+        "tags": [
+          "households"
+        ]
+      }
+    },
+    "/households/{householdId}/leave": {
+      "post": {
+        "operationId": "HouseholdsController_leave",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Household quitté."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fait quitter le household courant à l’utilisateur authentifié.",
+        "tags": [
+          "households"
+        ]
+      }
+    },
+    "/households/{householdId}/invitations": {
+      "post": {
+        "operationId": "InvitationsController_create",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitation créée."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). En développement, le jeton d'acceptation est renvoyé en clair.",
+        "tags": [
+          "invitations"
+        ]
+      },
+      "get": {
+        "operationId": "InvitationsController_list",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitations en attente."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les invitations en attente du household (réservé à OWNER/ADMIN).",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/invitations/{token}/accept": {
+      "post": {
+        "operationId": "InvitationsPublicController_accept",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Invitation acceptée, utilisateur ajouté au household."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accepte une invitation par son jeton (l'email du compte connecté doit correspondre à l'invitation).",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/invitations/{invitationId}/revoke": {
+      "post": {
+        "operationId": "InvitationsPublicController_revoke",
+        "parameters": [
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Invitation révoquée."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Révoque une invitation en attente (réservé à OWNER/ADMIN du household concerné).",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
+    "/households/{householdId}/categories": {
+      "get": {
+        "operationId": "CategoriesController_list",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catégories disponibles."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les catégories (système et personnalisées) du household.",
+        "tags": [
+          "categories"
+        ]
+      },
+      "post": {
+        "operationId": "CategoriesController_create",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catégorie créée."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crée une catégorie personnalisée (réservé à OWNER/ADMIN).",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/households/{householdId}/categories/{categoryId}": {
+      "patch": {
+        "operationId": "CategoriesController_update",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Catégorie mise à jour."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie une catégorie personnalisée (réservé à OWNER/ADMIN).",
+        "tags": [
+          "categories"
+        ]
+      },
+      "delete": {
+        "operationId": "CategoriesController_remove",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Catégorie supprimée."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          },
+          "409": {
+            "description": "La requête entre en conflit avec l'état actuel de la ressource."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime une catégorie personnalisée (réservé à OWNER/ADMIN). Les catégories système ne sont pas supprimables.",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/households/{householdId}/items": {
+      "get": {
+        "operationId": "ItemsController_findAll",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "condition",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "VERY_GOOD",
+                "GOOD",
+                "FAIR",
+                "POOR"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "createdById",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "title",
+                "createdAt",
+                "updatedAt",
+                "condition"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page de résultats paginée."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les items du household, avec recherche, filtres, tri et pagination.",
+        "tags": [
+          "items"
+        ]
+      },
+      "post": {
+        "operationId": "ItemsController_create",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Item créé."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute un item au household, avec un ou plusieurs propriétaires.",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/households/{householdId}/items/{itemId}": {
+      "get": {
+        "operationId": "ItemsController_findOne",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item trouvé."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retourne le détail d'un item, avec ses métadonnées spécifiques.",
+        "tags": [
+          "items"
+        ]
+      },
+      "patch": {
+        "operationId": "ItemsController_update",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Item mis à jour."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie un item (champs communs, métadonnées ou propriétaires).",
+        "tags": [
+          "items"
+        ]
+      },
+      "delete": {
+        "operationId": "ItemsController_archive",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item archivé."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive un item (suppression logique, restaurable).",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/households/{householdId}/items/{itemId}/restore": {
+      "post": {
+        "operationId": "ItemsController_restore",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Item restauré."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Restaure un item précédemment archivé.",
+        "tags": [
+          "items"
+        ]
+      }
+    },
+    "/households/{householdId}/uploads": {
+      "post": {
+        "operationId": "UploadsController_upload",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "URL publique de l'image téléversée."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Téléverse une image de couverture (JPEG/PNG/WebP, validé par signature binaire, 10 Mo max).",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/households/{householdId}/uploads/{uploadId}": {
+      "delete": {
+        "operationId": "UploadsController_remove",
+        "parameters": [
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Fichier supprimé."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime un fichier précédemment téléversé.",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/households/{householdId}/stats": {
+      "get": {
+        "operationId": "StatsController_getStats",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Statistiques du household."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retourne les statistiques du household (total actif, par catégorie, par propriétaire, ajouts récents, archivés).",
+        "tags": [
+          "stats"
+        ]
+      }
+    },
+    "/households/{householdId}/exports/json": {
+      "get": {
+        "operationId": "ExportsController_exportJson",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection exportée en JSON."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Exporte la collection active du household au format JSON.",
+        "tags": [
+          "exports"
+        ]
+      }
+    },
+    "/households/{householdId}/exports/csv": {
+      "get": {
+        "operationId": "ExportsController_exportCsv",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Collection exportée en CSV."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Exporte la collection active du household au format CSV.",
+        "tags": [
+          "exports"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Notre Nid API",
+    "description": "API de gestion de collection partagée pour Notre Nid.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "alex@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "un-mot-de-passe-solide",
+            "minLength": 8
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Alex"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "displayName"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "alex@example.com"
+          },
+          "password": {
+            "type": "string"
+          },
+          "deviceName": {
+            "type": "string",
+            "example": "iPhone d'Alex"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "CreateHouseholdDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Notre nid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateHouseholdDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Notre nid"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateMemberRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "ADMIN",
+              "MEMBER"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "CreateInvitationDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "sam@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "CategoryFieldSchemaDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "edition"
+          },
+          "label": {
+            "type": "string",
+            "example": "Édition"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "type"
+        ]
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Vinyles"
+          },
+          "icon": {
+            "type": "string",
+            "example": "disc"
+          },
+          "metadataSchema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryFieldSchemaDto"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Vinyles"
+          },
+          "icon": {
+            "type": "string",
+            "example": "disc"
+          },
+          "metadataSchema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryFieldSchemaDto"
+            }
+          }
+        }
+      },
+      "BookMetadataDto": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "isbn": {
+            "type": "string"
+          },
+          "publisher": {
+            "type": "string"
+          },
+          "publicationYear": {
+            "type": "number"
+          },
+          "language": {
+            "type": "string"
+          },
+          "pageCount": {
+            "type": "number"
+          }
+        }
+      },
+      "CdMetadataDto": {
+        "type": "object",
+        "properties": {
+          "artist": {
+            "type": "string"
+          },
+          "album": {
+            "type": "string"
+          },
+          "releaseYear": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          }
+        }
+      },
+      "DvdMetadataDto": {
+        "type": "object",
+        "properties": {
+          "director": {
+            "type": "string"
+          },
+          "releaseYear": {
+            "type": "number"
+          },
+          "edition": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateItemDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Dune"
+          },
+          "description": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "VERY_GOOD",
+              "GOOD",
+              "FAIR",
+              "POOR"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "coverImageUrl": {
+            "type": "string"
+          },
+          "ownerIds": {
+            "description": "IDs des membres propriétaires (au moins un)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "book": {
+            "$ref": "#/components/schemas/BookMetadataDto"
+          },
+          "cd": {
+            "$ref": "#/components/schemas/CdMetadataDto"
+          },
+          "dvd": {
+            "$ref": "#/components/schemas/DvdMetadataDto"
+          },
+          "customMetadata": {
+            "type": "object",
+            "description": "Métadonnées pour une catégorie personnalisée"
+          }
+        },
+        "required": [
+          "categoryId",
+          "title",
+          "condition",
+          "ownerIds"
+        ]
+      },
+      "UpdateItemDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "example": "Dune"
+          },
+          "description": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "VERY_GOOD",
+              "GOOD",
+              "FAIR",
+              "POOR"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "coverImageUrl": {
+            "type": "string"
+          },
+          "ownerIds": {
+            "description": "IDs des membres propriétaires (au moins un)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "book": {
+            "$ref": "#/components/schemas/BookMetadataDto"
+          },
+          "cd": {
+            "$ref": "#/components/schemas/CdMetadataDto"
+          },
+          "dvd": {
+            "$ref": "#/components/schemas/DvdMetadataDto"
+          },
+          "customMetadata": {
+            "type": "object",
+            "description": "Métadonnées pour une catégorie personnalisée"
+          }
+        }
+      }
+    }
+  }
+}

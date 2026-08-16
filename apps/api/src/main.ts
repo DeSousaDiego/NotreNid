@@ -4,19 +4,30 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { AppLogger } from './common/logger/app-logger.service';
+import { buildOpenApiDocument } from './common/swagger/document';
 
 const API_PREFIX = 'api/v1';
+// Les images passent par l'upload multipart dédié (limite propre de 10 Mo, voir
+// UploadsModule) : le corps JSON/urlencoded n'a besoin de contenir que des
+// métadonnées textuelles, jamais de fichier binaire.
+const JSON_BODY_LIMIT = '1mb';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new AppLogger(isProduction),
+  });
   const configService = app.get(ConfigService);
 
   app.use(helmet());
+  app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
+  app.useBodyParser('urlencoded', { limit: JSON_BODY_LIMIT, extended: true });
   // Stockage local des images (Phase 1/2) : servi hors préfixe /api pour des URLs simples.
   app.useStaticAssets(path.resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads' });
   app.setGlobalPrefix(API_PREFIX);
@@ -38,14 +49,7 @@ async function bootstrap(): Promise<void> {
   });
 
   if (configService.get<string>('NODE_ENV') !== 'production') {
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('Notre Nid API')
-      .setDescription('API de gestion de collection partagée pour Notre Nid.')
-      .setVersion('0.1.0')
-      .addBearerAuth()
-      .build();
-    const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup(`${API_PREFIX}/docs`, app, document);
+    SwaggerModule.setup(`${API_PREFIX}/docs`, app, buildOpenApiDocument(app));
   }
 
   const port = configService.get<number>('PORT') ?? 3000;

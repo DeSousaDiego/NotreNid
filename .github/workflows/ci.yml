@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  HUSKY: '0'
+  NODE_ENV: test
+  DATABASE_URL: postgresql://notre_nid:notre_nid_ci_password@localhost:5432/notre_nid?schema=public
+  JWT_ACCESS_SECRET: ci_access_secret_not_a_real_secret
+  JWT_ACCESS_TTL: 15m
+  JWT_REFRESH_SECRET: ci_refresh_secret_not_a_real_secret
+  JWT_REFRESH_TTL: 30d
+  CORS_ORIGINS: http://localhost:8081
+  SMTP_HOST: localhost
+  SMTP_PORT: '1025'
+  SMTP_FROM: 'Notre Nid <no-reply@notre-nid.local>'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: notre_nid
+          POSTGRES_PASSWORD: notre_nid_ci_password
+          POSTGRES_DB: notre_nid
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U notre_nid -d notre_nid"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Validate Prisma schema
+        run: pnpm --filter @notre-nid/api exec prisma validate
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Apply database migrations
+        run: pnpm --filter @notre-nid/api exec prisma migrate deploy
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: API integration (e2e) tests
+        run: pnpm --filter @notre-nid/api run test:e2e
+
+      - name: Verify the demo seed runs cleanly
+        run: pnpm --filter @notre-nid/api run db:seed
+
+      - name: Build
+        run: pnpm build
+
+      - name: Export OpenAPI contract and check it is up to date
+        run: |
+          pnpm --filter @notre-nid/api run export:openapi
+          git diff --exit-code -- docs/openapi.json
+
+      - name: Regenerate api-client types from the contract and check they are up to date
+        run: |
+          pnpm --filter @notre-nid/api-client run generate:types
+          git diff --exit-code -- packages/api-client/src/generated/schema.d.ts
+
+      - name: Expo config check (mobile)
+        working-directory: apps/mobile
+        run: npx expo-doctor
+        continue-on-error: true

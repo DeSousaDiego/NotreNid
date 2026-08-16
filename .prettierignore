@@ -6,3 +6,8 @@ coverage
 .turbo
 pnpm-lock.yaml
 *.md
+apps/mobile/expo-env.d.ts
+# Contrat OpenAPI figé et types générés à partir de lui (voir apps/api/scripts/export-openapi.ts
+# et packages/api-client/package.json "generate:types") : machine-générés, jamais édités à la main.
+docs/openapi.json
+packages/api-client/src/generated/

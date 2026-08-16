@@ -3,10 +3,13 @@ import path from 'node:path';
 import type { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CommonModule } from './common/common.module';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { ExportsModule } from './exports/exports.module';
 import { HealthModule } from './health/health.module';
@@ -25,6 +28,9 @@ import { UploadsModule } from './uploads/uploads.module';
       isGlobal: true,
       envFilePath: path.resolve(process.cwd(), '../../.env'),
     }),
+    // Limite globale par défaut, appliquée à toutes les routes non couvertes par un
+    // @Throttle() plus spécifique (voir AuthController pour les limites renforcées).
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     PrismaModule,
     CommonModule,
     HealthModule,
@@ -36,6 +42,10 @@ import { UploadsModule } from './uploads/uploads.module';
     UploadsModule,
     StatsModule,
     ExportsModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestLoggingInterceptor },
   ],
 })
 export class AppModule implements NestModule {
