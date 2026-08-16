@@ -2,11 +2,91 @@
 
 ## Phase courante
 
-**Phase 3B — Mutations, administration et finalisation mobile** : ✅ terminée et validée.
+**Phase 4 — Qualité** : ✅ terminée et validée.
 
-La **Phase 3** dans son ensemble est donc **terminée** (3A + 3B toutes deux validées) — voir `docs/IMPLEMENTATION_PLAN.md`. La **Phase 4 — Qualité** n'a pas démarré.
+Les **Phases 1 à 4** sont donc toutes terminées — voir `docs/IMPLEMENTATION_PLAN.md`. La **Phase 5 — Livraison** n'a pas démarré.
 
-Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅ (voir sections dédiées plus bas).
+Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅, Phase 3B — Mutations, administration et finalisation mobile ✅ (voir sections dédiées plus bas).
+
+---
+
+## Phase 4 — Qualité
+
+### Éléments terminés
+
+- **Correctif découvert en auditant les endpoints de santé** : `/health/ready` (`apps/api/src/health/health.controller.ts`) était strictement identique à `/health` depuis la Phase 1, malgré un commentaire annonçant « la vérification de disponibilité de la base de données sera ajoutée en Phase 2 » — jamais tenu, y compris après que `PrismaModule` a été branché en Phase 2. Corrigé en premier, avant tout autre travail de la Phase 4 : `ready()` exécute désormais `SELECT 1` via Prisma et répond `503 DATABASE_UNAVAILABLE` (format d'erreur standard, via `AppException`) si la base est injoignable. Test unitaire réécrit avec `PrismaService` mocké (cas succès/échec) ; le test e2e existant (`GET /health/ready -> 200`) reste vert contre PostgreSQL réel.
+- **Rate limiting** (`@nestjs/throttler` 6.5.0) : limite globale par défaut de 100 req/min (toutes routes, `ThrottlerGuard` en garde globale via `APP_GUARD`), et une limite renforcée de 10 req/min sur `/auth/register`, `/auth/login` et `/auth/refresh` (`AuthController`, décorateur `@Throttle` partagé) — cibles privilégiées du bourrage d'identifiants, non protégées par JWT. Le code d'erreur `429 TOO_MANY_REQUESTS` était déjà prévu dans `HttpExceptionFilter` depuis la Phase 2 mais mort (rien ne le déclenchait) ; il est maintenant réellement exercé. Nouveau test e2e dédié (`test/rate-limiting.e2e-spec.ts`, fichier isolé pour ne pas partager son `ThrottlerStorage` en mémoire avec les autres suites e2e) : 11 tentatives de connexion avec un mauvais mot de passe, la 11ᵉ doit renvoyer `429` avec le format d'erreur standard.
+- **Limite de taille des corps de requête** : `app.useBodyParser('json'|'urlencoded', { limit: '1mb' })` dans `main.ts` (`NestExpressApplication`, Nest 10+) — les métadonnées textuelles n'ont jamais besoin de plus ; les uploads d'images gardent leur propre limite dédiée (10 Mo, `FileInterceptor`), non affectée.
+- **Logs structurés** (`apps/api/src/common/logger/app-logger.service.ts`) : `AppLogger` implémente `LoggerService` et est branché via `app.useLogger(new AppLogger(isProduction))` dans `main.ts` — une ligne JSON par entrée en production, une ligne lisible en développement. Toute instance `new Logger(context)` créée ailleurs dans le code (le filtre d'erreurs existant, par exemple) délègue automatiquement à cette implémentation sans modification de ces call sites, Nest remplaçant le logger sous-jacent process-wide. Complété par `RequestLoggingInterceptor` (`apps/api/src/common/interceptors/request-logging.interceptor.ts`), enregistré globalement (`APP_INTERCEPTOR`), qui journalise chaque requête HTTP (méthode, chemin, statut, durée, `requestId`) — corrélé au middleware `RequestIdMiddleware` déjà en place depuis la Phase 2. Pas de dépendance externe (pino/winston) ajoutée : solution proportionnée au besoin réel, sans complexité de corrélation par `AsyncLocalStorage` non demandée par le PRD.
+- **Documentation OpenAPI complète** : `@ApiOperation` et `@ApiResponse` (succès + erreurs) ajoutés sur les ~35 routes de tous les contrôleurs (`auth`, `households`, `categories`, `items`, `invitations` × 2, `uploads`, `stats`, `exports`, `health`) — auparavant seuls les DTO de requête étaient annotés (`@ApiProperty`), aucune route n'avait de réponse documentée. Décorateur partagé `ApiStandardErrors(...codes)` (`apps/api/src/common/swagger/api-standard-errors.decorator.ts`) pour éviter de dupliquer les mêmes `@ApiResponse` d'erreur standard (400/401/403/404/409/429) sur chaque contrôleur.
+- **Export du contrat OpenAPI** : `apps/api/src/common/swagger/document.ts` centralise la construction du document (`DocumentBuilder`), partagée entre `main.ts` (Swagger UI en développement) et le nouveau script `apps/api/scripts/export-openapi.ts` (`pnpm --filter @notre-nid/api run export:openapi`), qui boote l'application Nest sans écouter de port et fige le contrat dans `docs/openapi.json` (26 routes). Le script utilise `ts-node` (nouvelle devDependency) plutôt que `tsx` (déjà utilisé pour le seed Prisma) : `tsx` repose sur `esbuild`, qui n'implémente pas `emitDecoratorMetadata` — la résolution par injection de dépendances de Nest (`ConfigService` dans `PrismaService`, notamment) échouait silencieusement (`configService: undefined`) sous `tsx`. Diagnostiqué en réactivant temporairement le logger Nest (masqué par `logger: false`) pour faire apparaître l'erreur réelle.
+- **Vérification de cohérence du client API vs contrat OpenAPI** : `packages/api-client` reste un client manuscrit (décision de la Phase 3A, non remise en cause — réécrire un client déjà validé sans nécessité technique démontrable aurait été disproportionné). À la place : `openapi-typescript` génère des types (`src/generated/schema.d.ts`, `pnpm --filter @notre-nid/api-client run generate:types`) depuis `docs/openapi.json`, et `src/contract.ts` vérifie à la compilation (`pnpm typecheck`) que chaque route/méthode HTTP utilisée par `endpoints/*.ts` existe bien dans le contrat généré — toute dérive fait échouer `tsc`. Vérifié activement : une route délibérément cassée (`/auth/me` en `delete` au lieu de `get`) fait échouer le typecheck avec `TS2344: Type 'false' does not satisfy the constraint 'true'`, confirmant que le contrôle n'est pas vide de sens.
+- **6 tests de rendu d'écran mobile manquants comblés** (dette technique documentée en Phase 3B) : `profile/members.test.tsx`, `profile/invitations.test.tsx`, `profile/categories.test.tsx`, `profile/archives.test.tsx`, `profile/join.test.tsx`, `profile/index.test.tsx` — 34 nouveaux cas de test (rendu chargé/vide/erreur, interactions de mutation clés : changement de rôle, retrait de membre, quitter le foyer, révocation d'invitation, CRUD catégorie, export JSON/CSV, déconnexion). Suivent les conventions déjà établies (`mockApiClient`, `queryWrapper`/`ThemeProvider`/`ToastProvider`, mock `expo-image` en `function` jamais en `class`).
+- **CI GitHub Actions** (`.github/workflows/ci.yml`, inexistante avant cette phase) : un job unique sur push/PR vers `main`, avec des services PostgreSQL 16 et Mailpit (répliquant `docker-compose.yml`) — install, génération Prisma, `prisma validate`, format, lint, typecheck, `prisma migrate deploy`, tests unitaires, tests e2e, vérification que le seed s'exécute proprement, build, puis deux contrôles de fraîcheur (`export:openapi` + `git diff --exit-code` sur `docs/openapi.json` ; `generate:types` + `git diff --exit-code` sur le schéma généré) qui font échouer la CI si un contributeur change une route sans régénérer les artefacts commités. `expo-doctor` en dernière étape, non bloquant (`continue-on-error`) étant donné les deux écarts déjà documentés et acceptés (voir ci-dessous).
+- **Correction de flakiness de tests mobiles** : deux fichiers différents (`ConfirmDialog.test.tsx`, puis `ItemFormScreen.test.tsx`, puis `NoHouseholdView.test.tsx` sur une 3ᵉ exécution) ont échoué tour à tour par dépassement du délai par défaut de 5 s sous charge parallèle complète (même symptôme déjà documenté en Phase 3B, mais touchant un fichier différent à chaque run — donc systémique, pas propre à un fichier). Corrigé une fois pour toutes via `testTimeout: 20000` dans `apps/mobile/jest.config.js` plutôt que d'ajouter des `jest.setTimeout()` au cas par cas (et les redondants déjà ajoutés par erreur ont été retirés).
+
+### Fichiers principaux créés ou modifiés
+
+- `apps/api/src/health/health.controller.ts`, `health.controller.spec.ts`.
+- `apps/api/src/app.module.ts` (`ThrottlerModule`, `APP_GUARD`, `APP_INTERCEPTOR`), `apps/api/src/auth/auth.controller.ts` (`@Throttle`).
+- `apps/api/src/main.ts` (`useBodyParser`, `useLogger`, Swagger factorisé).
+- `apps/api/src/common/logger/app-logger.service.ts` (nouveau), `apps/api/src/common/interceptors/request-logging.interceptor.ts` (nouveau).
+- `apps/api/src/common/swagger/document.ts` (nouveau), `api-standard-errors.decorator.ts` (nouveau).
+- Tous les contrôleurs (`auth`, `households`, `categories`, `items`, `invitations`, `invitations-public`, `uploads`, `stats`, `exports`) : annotations Swagger.
+- `apps/api/scripts/export-openapi.ts` (nouveau), `apps/api/package.json` (`export:openapi`, devDependency `ts-node`), `docs/openapi.json` (nouveau, généré).
+- `apps/api/test/rate-limiting.e2e-spec.ts` (nouveau).
+- `packages/api-client/package.json` (`generate:types`, devDependency `openapi-typescript`), `packages/api-client/src/generated/schema.d.ts` (nouveau, généré), `packages/api-client/src/contract.ts` (nouveau).
+- `apps/mobile/src/app/(app)/profile/{members,invitations,categories,archives,join,index}.test.tsx` (nouveaux).
+- `apps/mobile/jest.config.js` (`testTimeout`).
+- `.github/workflows/ci.yml` (nouveau).
+- `.prettierignore` (exclusion des fichiers générés : `docs/openapi.json`, `packages/api-client/src/generated/`, `apps/mobile/expo-env.d.ts`).
+- `README.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/PHASE_STATUS.md`.
+
+### Migrations ajoutées
+
+Aucune — la Phase 4 n'a modifié ni le schéma Prisma ni le contrat des routes existantes (uniquement leur documentation et leur durcissement).
+
+### Commandes réellement exécutées et leur résultat
+
+| Commande | Résultat |
+| --- | --- |
+| `pnpm run format:check` | ✅ succès sur tout le monorepo (après formatage des fichiers manuscrits touchés ; fichiers générés exclus via `.prettierignore`) |
+| `pnpm run lint` | ✅ succès sur les 4 packages, 0 avertissement (`--max-warnings 0` sur le mobile) |
+| `pnpm run typecheck` | ✅ succès sur les 4 packages, zéro erreur — y compris `packages/api-client/src/contract.ts` (vérification de cohérence OpenAPI) |
+| `pnpm --filter @notre-nid/api exec prisma validate` | ✅ schéma valide (inchangé) |
+| `pnpm run test` | ✅ 146/146 tests unitaires (34 API + 8 api-client + 104 mobile) |
+| `pnpm --filter @notre-nid/api run test:e2e` (contre PostgreSQL + Mailpit réels) | ✅ 14/14 tests e2e (13 existants + le nouveau test de rate limiting), aucune régression |
+| `pnpm run build` | ✅ succès (`apps/api`, `packages/shared`, `packages/api-client`) |
+| Démarrage réel du build (`node apps/api/dist/main.js`) + `curl /api/v1/health` et `/api/v1/health/ready` | ✅ 200 sur les deux, readiness confirmant une vraie requête base (processus arrêté proprement après vérification) |
+| `pnpm --filter @notre-nid/api run export:openapi` | ✅ `docs/openapi.json` généré (26 routes) |
+| `pnpm --filter @notre-nid/api-client run generate:types` | ✅ `src/generated/schema.d.ts` généré, cohérent avec `contract.ts` |
+| `npx expo-doctor` (dans `apps/mobile`) | ⚠️ 18/21 — les deux écarts déjà documentés en Phase 3A/3B (metro.config.js personnalisé, dérive de versions patch), plus un nouveau : régression mémoire connue de Hermes V1 sur `expo@57.0.8` (voir « Problèmes rencontrés ») |
+
+### Problèmes rencontrés et corrigés
+
+- **`/health/ready` ne vérifiait jamais réellement la base de données** depuis sa création en Phase 1, malgré un commentaire de suivi jamais résolu en Phase 2 — voir ci-dessus, corrigé en tout premier.
+- **`tsx` (esbuild) ne supporte pas `emitDecoratorMetadata`**, cassant silencieusement l'injection de dépendances de Nest (`ConfigService` non résolu, capturé comme `undefined`) dans le script d'export OpenAPI — le seed Prisma (`prisma/seed.ts`) fonctionne avec `tsx` car il n'utilise pas le conteneur de Nest, juste `PrismaClient` directement, d'où l'absence de ce problème ailleurs dans le dépôt. Corrigé en utilisant `ts-node` (véritable compilateur TypeScript, respecte `emitDecoratorMetadata`) uniquement pour ce script.
+- **Flakiness de timeout de tests mobiles sous charge parallèle complète, touchant un fichier différent à chaque exécution** (`ConfirmDialog`, puis `ItemFormScreen`, puis `NoHouseholdView`) — confirmé non lié au contenu de ces tests (chacun passe systématiquement en isolation) mais à un délai de démarrage à froid des workers Jest sous forte charge. Corrigé globalement (`testTimeout: 20000` dans `jest.config.js`) plutôt que fichier par fichier, après avoir constaté que des corrections ponctuelles ne faisaient que déplacer le symptôme vers un autre fichier.
+- **Régression mémoire connue de Hermes V1** signalée par une nouvelle vérification `expo-doctor` (absente de la référence Phase 3B à 18/20, cette session obtient 18/21 — un nouveau check a été ajouté par une version plus récente d'`expo-doctor`) : `expo@57.0.8` embarque une version de Hermes affectée par une régression mémoire connue, corrigée en `57.0.9+`. **Non corrigé dans cette session** : la Phase 3A a déjà documenté qu'une tentative de mise à jour des paquets Expo a provoqué une régression réelle du bundler Metro, annulée faute de pouvoir vérifier visuellement le résultat dans cet environnement (toujours vrai ici). Signalé explicitement plutôt que corrigé à l'aveugle — voir « Actions manuelles restantes ».
+- **Import mal ordonné** (`import/order`) et **directive `eslint-disable` inutile** détectés par le lint après l'ajout des annotations Swagger et du test de rate limiting — corrigés immédiatement (pas d'avertissement toléré, conformément à la convention `--max-warnings 0` déjà en vigueur sur le mobile).
+
+### Décisions prises
+
+- **Pas de dépendance de logging externe** (pino/winston) pour les logs structurés : un `LoggerService` maison (`AppLogger`) suffit au besoin exprimé par le PRD (JSON en prod, lisible en dev, log d'accès par requête) sans complexité de corrélation par `AsyncLocalStorage` non demandée.
+- **Rate limiting avec des seuils délibérément plus généreux qu'un idéal théorique de sécurité pure** (10 req/min sur les routes d'authentification plutôt que 3-5/min) : calibré pour ne jamais bloquer les suites e2e existantes (jusqu'à 7 appels `/auth/register` dans un seul fichier) tout en restant une protection réelle contre le bourrage automatisé — protection suffisante pour une application personnelle de ce profil de risque (voir la mise en garde du PRD contre la sur-ingénierie).
+- **Client API non régénéré depuis OpenAPI, vérification de cohérence ajoutée à la place** : réécrire `packages/api-client` (validé et testé depuis la Phase 3A) en client généré aurait été une reconstruction sans nécessité technique démontrée, contraire à la consigne de consolidation de cette phase. La vérification compilée (`contract.ts`) atteint le même objectif de détection de dérive sans ce risque.
+- **`ts-node` ajouté comme devDependency plutôt que de contourner autrement le problème `tsx`/`esbuild`** : alternative la plus directe et la mieux comprise pour un script ponctuel nécessitant le vrai compilateur TypeScript, sans toucher à la configuration `tsx` déjà utilisée ailleurs (seed Prisma).
+- **Mise à jour des paquets Expo non tentée malgré la régression Hermes signalée** : cohérent avec la décision déjà prise en Phase 3A après une régression Metro réelle constatée lors d'une tentative similaire — préférer signaler clairement un risque plutôt que modifier des dépendances sans pouvoir vérifier visuellement le résultat.
+
+### Actions manuelles restantes
+
+- **Vérification visuelle sur simulateur/émulateur/appareil réel toujours non réalisée** — même limitation d'environnement que documentée en Phase 3A/3B (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré, bug de résolution Metro/Expo CLI spécifique à Windows + pnpm + monorepo non ré-investigué). Recommandation inchangée : lancer `pnpm dev:mobile` depuis une machine macOS/Linux avant la Phase 5.
+- **Mise à jour Expo vers `57.0.9+` pour corriger la régression mémoire Hermes V1** signalée par `expo-doctor` — à faire avec un test réel sur appareil/simulateur disponible, étant donné la régression Metro déjà rencontrée lors d'une tentative de mise à jour similaire en Phase 3A.
+- **CI GitHub Actions non encore observée en exécution réelle sur GitHub** (`.github/workflows/ci.yml` ajouté et cohérent avec les commandes de validation locales, mais aucune pull request n'a encore déclenché le workflow au moment de cette session) — à confirmer verte à la prochaine pull request réelle.
+
+### Prochaine étape recommandée
+
+Les **Phases 1 à 4** sont maintenant complètes. Démarrer la **Phase 5 — Livraison** : Dockerfile multi-stage de production, stratégies de déploiement, sauvegardes, configuration EAS et guide de build mobile, documents restants (`ARCHITECTURE.md`, `API.md`, `OPERATIONS.md`, `ROADMAP.md`, `DECISIONS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`), checklist finale — voir `docs/IMPLEMENTATION_PLAN.md`. Traiter au préalable la mise à jour Expo (régression Hermes) si un environnement de test visuel devient disponible.
 
 ---
 

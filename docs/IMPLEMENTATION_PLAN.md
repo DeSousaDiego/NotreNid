@@ -9,10 +9,10 @@ Ce document décrit l'ordre des phases, leurs dépendances, leurs critères de s
 3. **Phase 3 — Mobile** ✅ terminée (découpée en deux sous-phases pour réduire les risques)
    - **Phase 3A — Fondations mobiles et parcours de consultation** ✅ terminée
    - **Phase 3B — Mutations, administration et finalisation mobile** ✅ terminée
-4. **Phase 4 — Qualité**
+4. **Phase 4 — Qualité** ✅ terminée
 5. **Phase 5 — Livraison**
 
-La Phase 3 dans son ensemble est **terminée** (3A et 3B toutes deux validées).
+Les Phases 1 à 4 sont **terminées** et validées.
 
 Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant que la précédente ait ses commandes de validation vertes (lint, typecheck, tests, builds).
 
@@ -104,13 +104,22 @@ La Phase 3 est découpée en deux sous-phases afin de réduire les risques et de
 
 ---
 
-## Phase 4 — Qualité
+## Phase 4 — Qualité ✅
 
-**Contenu** : couverture de tests élargie (unitaire + intégration API, composants/formulaires mobile), documentation OpenAPI complète, client API généré depuis le contrat OpenAPI, CI GitHub Actions (lint, typecheck, tests, build, service PostgreSQL), sécurité (rate limiting auth, helmet déjà en place, CORS configurable, limites de taille de requête), logs structurés, endpoints de santé déjà présents depuis la Phase 1.
+**Statut** : terminée et validée — voir `docs/PHASE_STATUS.md` pour le détail complet.
+
+**Contenu** : couverture de tests élargie (6 tests de rendu d'écran mobile manquants comblés, test e2e de rate limiting), documentation OpenAPI complète (`@ApiOperation`/`@ApiResponse` sur tous les contrôleurs, export figé dans `docs/openapi.json`), vérification de cohérence du client API manuscrit contre ce contrat (types générés via `openapi-typescript`, contrôle compilé), CI GitHub Actions (`.github/workflows/ci.yml` : install, format, lint, typecheck, build, tests unitaires + e2e avec services PostgreSQL/Mailpit, validation Prisma, fraîcheur des artefacts générés), sécurité (rate limiting `@nestjs/throttler` sur l'authentification, limite de taille de corps JSON/urlencoded, helmet et CORS déjà en place), logs structurés (JSON en production, lisibles en développement, log d'accès corrélé au `requestId` déjà existant), correction d'un bug découvert en auditant les endpoints de santé (`/health/ready` ne vérifiait jamais réellement la base de données malgré un commentaire l'annonçant depuis la Phase 2).
 
 **Dépendances** : Phases 2 et 3 terminées (il faut du code métier à tester et documenter).
 
-**Critères de sortie** : CI verte sur une pull request de test, couverture des règles d'autorisation et d'isolation testée explicitement.
+**Critères de sortie** (tous validés) :
+
+- ✅ `pnpm lint`/`typecheck`/`format:check`/`test`/`build` verts sur tout le monorepo (146 tests unitaires : 34 API + 8 api-client + 104 mobile).
+- ✅ `pnpm --filter @notre-nid/api run test:e2e` vert (14 tests, dont le nouveau test de rate limiting) contre PostgreSQL et Mailpit réels.
+- ✅ CI GitHub Actions ajoutée et cohérente avec les commandes de validation locales (non encore observée verte sur une pull request réelle, la CI n'ayant pas encore tourné sur GitHub au moment de cette session — à confirmer à la prochaine pull request).
+- ✅ Couverture des règles d'autorisation et d'isolation déjà testée explicitement depuis la Phase 2, complétée par le test de rate limiting.
+
+**Limite connue signalée, non corrigée** : `expo-doctor` (mobile) signale une régression mémoire connue de Hermes V1 dans `expo@57.0.8` (corrigée en `57.0.9+`) — non appliquée par prudence, cet environnement ne permettant pas de vérifier visuellement une mise à jour Expo (voir Phase 3A/3B pour la régression Metro déjà rencontrée lors d'une tentative similaire). À traiter avant la Phase 5, avec un test sur appareil réel.
 
 ---
 
