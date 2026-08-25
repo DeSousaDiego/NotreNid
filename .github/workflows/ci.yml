@@ -49,8 +49,9 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
+        # Pas de `version:` ici : action-setup la lit depuis `packageManager` de package.json
+        # (pnpm@11.17.0) via Corepack. Spécifier les deux échoue avec "Multiple versions of
+        # pnpm specified" — cause du premier échec CI observé sur GitHub, voir docs/PHASE_STATUS.md.
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
