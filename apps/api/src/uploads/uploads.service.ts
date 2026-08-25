@@ -1,20 +1,22 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 
 import { detectImageType } from './image-signature';
+import { STORAGE_DRIVER, type StorageDriver } from './storage/storage-driver.interface';
 import { AppException } from '../common/exceptions/app-exception';
 
 export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10 Mo
 
+// Format exact des noms de fichiers générés par `save()` (UUID v4 + extension connue) :
+// revalidé ici avant toute suppression, indépendamment du driver de stockage utilisé,
+// pour ne jamais transmettre une clé/chemin non maîtrisé(e) au driver actif.
+const SAFE_FILENAME_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i;
+
 @Injectable()
 export class UploadsService {
-  private readonly uploadDir = path.resolve(process.cwd(), 'storage', 'uploads');
-
-  constructor(private readonly configService: ConfigService) {}
+  constructor(@Inject(STORAGE_DRIVER) private readonly storageDriver: StorageDriver) {}
 
   async save(file: { buffer: Buffer; size: number }): Promise<{ id: string; url: string }> {
     if (file.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -34,34 +36,23 @@ export class UploadsService {
       );
     }
 
-    await mkdir(this.uploadDir, { recursive: true });
-    const filename = `${randomUUID()}.${detectedType === 'jpeg' ? 'jpg' : detectedType}`;
-    await writeFile(path.join(this.uploadDir, filename), file.buffer);
-
-    const apiPublicUrl = this.configService.get<string>('API_PUBLIC_URL') ?? '';
-    return { id: filename, url: `${apiPublicUrl}/uploads/${filename}` };
+    const extension = detectedType === 'jpeg' ? 'jpg' : detectedType;
+    const filename = `${randomUUID()}.${extension}`;
+    return this.storageDriver.save({
+      buffer: file.buffer,
+      filename,
+      contentType: `image/${detectedType}`,
+    });
   }
 
   async remove(filename: string): Promise<void> {
-    const filePath = this.resolveSafePath(filename);
-    try {
-      await stat(filePath);
-    } catch {
-      throw new AppException(HttpStatus.NOT_FOUND, 'NOT_FOUND', "Ce fichier n'existe pas.");
-    }
-    await rm(filePath);
-  }
-
-  /** Empêche toute traversée de répertoire (`../..`) via le paramètre reçu du client. */
-  private resolveSafePath(filename: string): string {
-    const resolved = path.resolve(this.uploadDir, filename);
-    if (!resolved.startsWith(this.uploadDir + path.sep)) {
+    if (!SAFE_FILENAME_PATTERN.test(filename)) {
       throw new AppException(
         HttpStatus.BAD_REQUEST,
         'VALIDATION_ERROR',
         'Nom de fichier invalide.',
       );
     }
-    return resolved;
+    await this.storageDriver.remove(filename);
   }
 }
