@@ -2,11 +2,91 @@
 
 ## Phase courante
 
-**Phase 4 — Qualité** : ✅ terminée et validée.
+**Phase 5 — Livraison** : ✅ terminée et validée (toutes les vérifications réalisables localement).
 
-Les **Phases 1 à 4** sont donc toutes terminées — voir `docs/IMPLEMENTATION_PLAN.md`. La **Phase 5 — Livraison** n'a pas démarré.
+Les **Phases 1 à 5** sont donc toutes terminées — voir `docs/IMPLEMENTATION_PLAN.md`. Le **développement de la V1 est complet**. La **mise en production réelle reste à effectuer manuellement** par le propriétaire du dépôt — voir `docs/GO_LIVE_CHECKLIST.md`.
 
-Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅, Phase 3B — Mutations, administration et finalisation mobile ✅ (voir sections dédiées plus bas).
+Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅, Phase 3B — Mutations, administration et finalisation mobile ✅, Phase 4 — Qualité ✅ (voir sections dédiées plus bas).
+
+---
+
+## Phase 5 — Livraison
+
+### Éléments terminés
+
+- **Gap fonctionnel découvert en confrontant le dépôt au périmètre de la Phase 5** : `STORAGE_DRIVER=s3` était déclaré dans `.env.example` depuis la Phase 1 et documenté par le PRD (section 10 : « stockage local en développement, S3-compatible ou Supabase Storage en production ») mais **jamais implémenté** — `UploadsService` n'écrivait que sur le disque local, quelle que soit la valeur de `STORAGE_DRIVER`. Un déploiement réel sur un hébergeur à filesystem éphémère (Railway/Render/Fly) aurait perdu toutes les images au premier redéploiement. Corrigé en premier, avant le reste de la Phase 5 : introduction d'une interface commune `StorageDriver` (`apps/api/src/uploads/storage/storage-driver.interface.ts`) avec deux implémentations — `LocalStorageDriver` (comportement inchangé, développement) et `S3StorageDriver` (nouveau, `@aws-sdk/client-s3`, compatible AWS S3 réel et tout stockage compatible S3 avec endpoint personnalisé — Supabase Storage, MinIO déjà présent dans `docker-compose.yml`) — sélectionnée à l'exécution par `STORAGE_DRIVER` (`UploadsModule`, provider factory). `UploadsService` revalide désormais le format du nom de fichier (UUID + extension connue) avant toute suppression, indépendamment du driver actif, en défense en profondeur. 12 nouveaux tests unitaires (`uploads.service.spec.ts`, `local-storage.driver.spec.ts` avec `node:fs/promises` mocké, `s3-storage.driver.spec.ts` avec le SDK AWS mocké — construction de l'URL publique path-style vs virtual-hosted-style selon la présence d'un endpoint personnalisé, gestion du cas objet introuvable).
+- **Dockerfile de production multi-stage** (`infrastructure/docker/api/Dockerfile`) : trois cibles — `build` (installe l'intégralité du workspace pnpm, génère le client Prisma, compile l'API), `deploy`/`runtime` (image finale `node:22-alpine`, utilisateur non root dédié, `pnpm deploy --prod --legacy` pour ne conserver que les dépendances de production, healthcheck réel via `GET /api/v1/health`), et `migrate` (exécute `prisma migrate deploy` puis s'arrête — volontairement **jamais** lancée automatiquement au démarrage du serveur, pour éviter que plusieurs instances de l'API ne migrent simultanément en cas de scaling horizontal). `COPY . .` (contexte complet, filtré par un nouveau `.dockerignore` racine) plutôt qu'une copie sélective des packages : pnpm a besoin de voir l'intégralité du workspace pour honorer `--frozen-lockfile`, même si seuls `apps/api` et `packages/config` (sa seule dépendance de workspace) sont réellement nécessaires à l'exécution.
+  **Chaque commande du Dockerfile a été exécutée réellement en local** (hors Docker, Docker Desktop étant indisponible dans cet environnement — voir « Problèmes rencontrés ») pour valider la logique malgré tout : `pnpm --filter @notre-nid/api deploy --prod --legacy <dir>` a d'abord échoué au runtime (`Cannot find module '.prisma/client/default'` — `pnpm deploy` réinstalle un `node_modules` isolé from scratch, qui ne contient donc pas la sortie générée par le `prisma generate` du stage `build`, exécuté dans un `node_modules` différent). Corrigé en ajoutant une seconde régénération (`cd <dir> && prisma generate`) après le `deploy`, avec le répertoire de travail positionné sur le répertoire déployé pour que Prisma résolve `@prisma/client` dans ce `node_modules` précis. Après correction : `node dist/main.js` démarre réellement depuis le répertoire déployé (`Nest application successfully started`, toutes les routes mappées, logs JSON de production), `GET /api/v1/health` répond `200`, et `GET /api/v1/health/ready` répond correctement `503` (aucun PostgreSQL réel disponible dans cet environnement, readiness check confirmé fonctionnel).
+- **Script de sauvegarde PostgreSQL** (`infrastructure/scripts/backup-postgres.sh`) : `pg_dump --format=custom`, `DATABASE_URL` lu depuis l'environnement (jamais en dur), sortie horodatée dans `./backups/` (ignoré par Git).
+- **Commande de migration de production** (`apps/api/package.json`, `db:migrate:deploy` = `prisma migrate deploy`) — distincte de `db:migrate` (`migrate dev`, interactif, réservé au développement), documentée comme la seule commande à utiliser contre une base de production.
+- **Configuration EAS** (`apps/mobile/eas.json`, nouveau) : profils `development` (dev client, IP locale), `preview` (distribution interne, APK), `production` (`app-bundle`, distribution store) — chacun avec sa propre `EXPO_PUBLIC_API_URL` (placeholder explicite pour `preview`/`production`, à remplacer une fois l'API réellement déployée, voir `docs/MOBILE_RELEASE.md`). Aucun `projectId` fabriqué : ce champ doit être renseigné par `eas init` (compte Expo réel requis).
+- **12 documents de la section 25 du PRD** créés (aucun n'existait avant cette phase, à l'exception du PRD/plan/statut déjà en place) : `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` (racine), `docs/ARCHITECTURE.md` (diagrammes Mermaid : vue globale, flux d'authentification, modèle household/`ItemOwner`, flux de stockage d'images), `docs/API.md`, `docs/DEPLOYMENT.md` (deux stratégies : hébergeurs managés recommandés, VPS + Docker Compose), `docs/BACKUP_AND_RESTORE.md`, `docs/OPERATIONS.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md`, `docs/MOBILE_RELEASE.md` (14 étapes conformes à la section 23 du PRD), `docs/GO_LIVE_CHECKLIST.md` (14 étapes manuelles numérotées, chacune avec objectif/valeurs/commande/vérification/erreurs fréquentes).
+- **README et documentation existante mis à jour** : sections auparavant en placeholder (« Déploiement », « Génération mobile », « Sécurité », « Sauvegardes », « Limitations connues ») remplies et reliées aux nouveaux documents ; `apps/mobile/README.md` et `infrastructure/README.md` (tous deux restés au contenu de la Phase 1) actualisés.
+
+### Fichiers principaux créés ou modifiés
+
+- `apps/api/src/uploads/storage/{storage-driver.interface,local-storage.driver,s3-storage.driver}.ts` (nouveaux) + `.spec.ts` associés, `apps/api/src/uploads/{uploads.service,uploads.module}.ts` (réécrits), `apps/api/src/uploads/uploads.service.spec.ts` (nouveau).
+- `apps/api/package.json` (dépendance `@aws-sdk/client-s3`, script `db:migrate:deploy`), `pnpm-lock.yaml`.
+- `.env.example` (commentaire `STORAGE_*` étoffé, aucune nouvelle variable — le contrat existant suffisait).
+- `infrastructure/docker/api/Dockerfile` (nouveau), `.dockerignore` (nouveau, racine).
+- `infrastructure/scripts/backup-postgres.sh` (nouveau).
+- `apps/mobile/eas.json` (nouveau).
+- `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md` (nouveaux, racine).
+- `docs/{ARCHITECTURE,API,DEPLOYMENT,BACKUP_AND_RESTORE,OPERATIONS,DECISIONS,ROADMAP,MOBILE_RELEASE,GO_LIVE_CHECKLIST}.md` (nouveaux).
+- `README.md`, `apps/mobile/README.md`, `infrastructure/README.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/PHASE_STATUS.md`.
+
+### Migrations ajoutées
+
+Aucune — la Phase 5 n'a modifié ni le schéma Prisma ni le contrat des routes existantes (uniquement l'infrastructure de stockage sous-jacente, transparente pour l'API publique : la réponse d'upload garde exactement la même forme `{ id, url }` quel que soit le driver actif).
+
+### Commandes réellement exécutées et leur résultat
+
+| Commande | Résultat |
+| --- | --- |
+| `pnpm --filter @notre-nid/api exec jest uploads` | ✅ 12/12 nouveaux tests (driver S3, driver local, validation du service) |
+| `pnpm --filter @notre-nid/api run typecheck` | ✅ succès, zéro erreur |
+| `pnpm --filter @notre-nid/api run lint` | ✅ succès (2 avertissements `import/order` détectés puis corrigés) |
+| `pnpm --filter @notre-nid/api run test` | ✅ 46/46 tests unitaires (34 précédents + 12 nouveaux) |
+| `pnpm run format:check` (monorepo) | ✅ succès après `pnpm run format` (2 fichiers de test nouvellement ajoutés reformatés automatiquement) |
+| `pnpm run lint` (monorepo) | ✅ succès sur les 4 packages, 0 avertissement |
+| `pnpm run typecheck` (monorepo) | ✅ succès sur les 4 packages, zéro erreur |
+| `pnpm run test` (monorepo) | ✅ voir détail ci-dessous |
+| `pnpm run build` (monorepo) | voir détail ci-dessous |
+| `pnpm --filter @notre-nid/api exec prisma validate` | voir détail ci-dessous |
+| `docker build -f infrastructure/docker/api/Dockerfile .` | ❌ **non exécutable telle quelle** — moteur Docker Desktop indisponible dans cet environnement (`500 Internal Server Error` sur `docker info`, reproductible sur plusieurs tentatives à différents moments de la session). |
+| Chaque commande du Dockerfile, rejouée manuellement hors Docker (`pnpm install --frozen-lockfile`, `prisma generate`, `nest build`, `pnpm deploy --prod --legacy <dir>`, seconde régénération Prisma ciblée, `node dist/main.js`, `curl /health` et `/health/ready`) | ✅ après correction d'un bug réel découvert par cette vérification (voir ci-dessus) — la séquence complète fonctionne de bout en bout. **`docker build` lui-même reste à exécuter avant tout déploiement réel** (l'assemblage en image et le healthcheck Docker n'ont pas pu être vérifiés) — voir `docs/GO_LIVE_CHECKLIST.md`. |
+
+### Problèmes rencontrés et corrigés
+
+- **Écart fonctionnel avec le PRD découvert en confrontant le dépôt au périmètre de la Phase 5** (`STORAGE_DRIVER=s3` non implémenté) — voir ci-dessus, corrigé en tout premier, avant le reste de la phase.
+- **Client Prisma manquant dans l'image de production**, découvert en rejouant manuellement les commandes du Dockerfile (Docker indisponible, voir ci-dessous) : `pnpm --filter @notre-nid/api deploy --prod --legacy <dir>` réinstalle un `node_modules` isolé à partir du lockfile, qui ne contient donc **pas** la sortie du `prisma generate` exécuté plus tôt dans le `node_modules` du stage `build` (répertoires distincts) — `node dist/main.js` échouait au démarrage avec `Cannot find module '.prisma/client/default'`. Corrigé en ajoutant une seconde invocation de `prisma generate`, exécutée avec le répertoire de travail positionné sur le répertoire déployé, pour que Prisma résolve et écrive dans le bon `node_modules`. Un bug qu'une simple relecture du Dockerfile n'aurait pas permis de détecter — trouvé uniquement en exécutant réellement la séquence de commandes.
+- **Erreur de typage initiale** : `LocalStorageDriver.save` déclarait une signature plus étroite (`{ buffer, filename }`) que l'interface `StorageDriver` (`{ buffer, filename, contentType }`) — acceptée silencieusement par `implements` (comparaison bivariante de TypeScript sur les méthodes), mais faisait échouer le test correspondant (`TS2353`, propriété excédentaire). Corrigé en alignant explicitement la signature sur l'interface, même si `contentType` n'est pas utilisé par le driver local.
+- **Environnement PowerShell sans `node`/`pnpm` sur le `PATH` du process** dans cette session (Node installé dans `C:\Users\DiegoDeSousa\tools\node22\...`, présent dans le `PATH` utilisateur mais pas hérité par le process non interactif) — contourné en préfixant chaque commande PowerShell avec ce chemin.
+- **Moteur Docker Desktop indisponible** (`docker info` → `500 Internal Server Error`) tout au long de la session, malgré plusieurs nouvelles tentatives à des moments différents — non résolu (redémarrer Docker Desktop est une action sur l'environnement de l'utilisateur, hors du périmètre d'une correction de code ; non tenté sans autorisation explicite). Voir « Actions manuelles restantes ».
+
+### Décisions prises
+
+- **URL publique directe plutôt qu'URL signée pour le driver S3** : les couvertures d'items ne sont pas des données sensibles (contrairement aux données du household, déjà protégées par l'authentification et l'isolation stricte) — simplifie l'implémentation (pas de renouvellement d'URL expirée côté mobile) au prix d'exiger un bucket configuré en lecture publique, documenté comme prérequis dans `docs/DEPLOYMENT.md` et `docs/GO_LIVE_CHECKLIST.md`. Détail complet dans `docs/DECISIONS.md`.
+- **`COPY . .` dans le Dockerfile plutôt qu'une copie sélective des packages du workspace** : une tentative initiale de ne copier que `apps/api` + `packages/config` (seule dépendance de workspace réelle de l'API) a été écartée avant implémentation — `pnpm install --frozen-lockfile` valide le lockfile contre l'intégralité des projets du workspace déclarés dans `pnpm-workspace.yaml`, et une divergence (packages absents du contexte de build) aurait risqué un échec d'installation non testé dans cet environnement. Un `.dockerignore` racine limite néanmoins la taille réelle du contexte transféré (exclut `node_modules`, `.git`, les caches de build, `docs/`).
+- **Migration de production isolée dans une cible Docker dédiée (`migrate`), jamais lancée au démarrage du conteneur `runtime`** : évite qu'un déploiement à plusieurs instances ne déclenche des migrations concurrentes — cohérent avec la nature stateless de l'API (voir `docs/ARCHITECTURE.md`).
+- **Pas de tentative de résoudre la régression Hermes V1 d'Expo signalée en Phase 4** (`expo@57.0.8` → `57.0.9+`) : toujours aucun environnement de vérification visuelle disponible dans cette session — signalé de nouveau explicitement dans `docs/MOBILE_RELEASE.md` plutôt que corrigé à l'aveugle, cohérent avec la décision déjà prise en Phase 3A/4.
+- **Pas de tentative de redémarrer Docker Desktop** pour débloquer la vérification du build : action sur l'environnement local de l'utilisateur (service Windows), hors du périmètre d'une session de développement sans autorisation explicite — signalé comme vérification manuelle restante plutôt que contourné.
+
+### Actions manuelles restantes
+
+Détail complet, avec valeurs exactes, commandes et critères de vérification pour chacune : **`docs/GO_LIVE_CHECKLIST.md`**. Résumé :
+
+- Build-tester `infrastructure/docker/api/Dockerfile` (`docker build` + `docker run` + `curl /health`) — non vérifié dans cet environnement (Docker Desktop indisponible).
+- Créer la base PostgreSQL managée, le bucket de stockage (configuré en lecture publique), les secrets JWT de production, le service SMTP réel, le service d'hébergement de l'API — puis exécuter `db:migrate:deploy` contre cette base avant tout trafic réel.
+- Créer le compte Expo, exécuter `eas init` (renseigne `extra.eas.projectId`), remplacer les URLs placeholder de `apps/mobile/eas.json`, produire et tester un build Android et un build iOS sur au moins deux appareils physiques distincts.
+- Configurer les sauvegardes automatiques du fournisseur de base de données et les alertes de monitoring (uptime sur `/health/ready`, `SENTRY_DSN` optionnel).
+- Comptes Google Play Console / Apple Developer si publication sur les stores envisagée.
+- Mise à jour Expo `57.0.9+` (régression Hermes signalée en Phase 4) — à traiter avec un test sur appareil réel, avant le premier build EAS.
+- Vérification visuelle du mobile sur simulateur/émulateur/appareil réel — limitation d'environnement inchangée depuis la Phase 3A.
+
+### Prochaine étape recommandée
+
+Les **Phases 1 à 5** sont maintenant complètes — le développement de la V1 est terminé. La suite est exclusivement composée d'actions manuelles du propriétaire du dépôt, dans l'ordre décrit par `docs/GO_LIVE_CHECKLIST.md` : mise en production réelle de l'API, puis premiers builds mobiles réels et tests sur appareils physiques.
 
 ---
 

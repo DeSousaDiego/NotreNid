@@ -2,9 +2,11 @@
 
 Application mobile Expo (Expo Router, TypeScript strict). Fait partie du monorepo `notre-nid` : voir le [README principal](../../README.md) pour l'installation complète.
 
-## Statut (Phase 1 — Fondation)
+## Statut
 
-Squelette Expo Router fonctionnel avec un unique écran de bienvenue. Le système de thème, la navigation à cinq destinations et les écrans métier (collection, ajout, profil, ...) seront construits en Phase 3, conformément à `docs/NOTRE_NID_PRD.md`.
+Application complète (phases 1 à 5 terminées — voir `docs/PHASE_STATUS.md`) : thème « Notre Nid », navigation à cinq destinations (Accueil/Collection/Ajouter/Recherche/Profil), authentification, tous les écrans métier (collection, détail, ajout/modification, membres, invitations, catégories, archives, exports).
+
+Génération d'un build installable (Android/iOS) : voir [docs/MOBILE_RELEASE.md](../../docs/MOBILE_RELEASE.md). Configuration EAS : [eas.json](eas.json).
 
 ## Commandes
 

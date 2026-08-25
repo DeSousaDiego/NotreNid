@@ -1,0 +1,4 @@
+# Les scripts shell doivent toujours conserver des fins de ligne LF, quelle que soit la
+# plateforme de checkout (core.autocrlf) — un script bash avec des CRLF échoue de façon
+# confuse une fois exécuté sur Linux/macOS (voir infrastructure/scripts/backup-postgres.sh).
+*.sh text eol=lf

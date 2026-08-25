@@ -10,9 +10,9 @@ Ce document décrit l'ordre des phases, leurs dépendances, leurs critères de s
    - **Phase 3A — Fondations mobiles et parcours de consultation** ✅ terminée
    - **Phase 3B — Mutations, administration et finalisation mobile** ✅ terminée
 4. **Phase 4 — Qualité** ✅ terminée
-5. **Phase 5 — Livraison**
+5. **Phase 5 — Livraison** ✅ terminée
 
-Les Phases 1 à 4 sont **terminées** et validées.
+Les Phases 1 à 5 sont **terminées** et validées. Le développement de la V1 est complet ; la mise en production réelle reste une action manuelle du propriétaire du dépôt — voir `docs/GO_LIVE_CHECKLIST.md`.
 
 Chaque phase dépend de la précédente. Aucune phase ne doit démarrer avant que la précédente ait ses commandes de validation vertes (lint, typecheck, tests, builds).
 
@@ -123,13 +123,22 @@ La Phase 3 est découpée en deux sous-phases afin de réduire les risques et de
 
 ---
 
-## Phase 5 — Livraison
+## Phase 5 — Livraison ✅
 
-**Contenu** : Dockerfile multi-stage de production, stratégies de déploiement documentées (`docs/DEPLOYMENT.md`), sauvegardes (`docs/BACKUP_AND_RESTORE.md`), configuration EAS et guide de build mobile (`docs/MOBILE_RELEASE.md`), documents restants de la section 25 du PRD (`ARCHITECTURE.md`, `API.md`, `OPERATIONS.md`, `ROADMAP.md`, `DECISIONS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`), checklist finale (`docs/GO_LIVE_CHECKLIST.md`).
+**Statut** : terminée et validée — voir `docs/PHASE_STATUS.md` pour le détail complet.
 
-**Dépendances** : Phases 2 à 4 terminées.
+**Contenu** : driver de stockage S3-compatible (comble un écart avec la section 10 du PRD, `STORAGE_DRIVER=s3` était déclaré mais non implémenté depuis la Phase 2), Dockerfile multi-stage de production (`infrastructure/docker/api/Dockerfile`, cibles `runtime`/`migrate`), script de sauvegarde PostgreSQL (`infrastructure/scripts/backup-postgres.sh`), commande `db:migrate:deploy`, stratégies de déploiement documentées (`docs/DEPLOYMENT.md`), sauvegardes (`docs/BACKUP_AND_RESTORE.md`), configuration EAS (`apps/mobile/eas.json`) et guide de build mobile (`docs/MOBILE_RELEASE.md`), documents restants de la section 25 du PRD (`docs/ARCHITECTURE.md`, `docs/API.md`, `docs/OPERATIONS.md`, `docs/ROADMAP.md`, `docs/DECISIONS.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`), checklist finale (`docs/GO_LIVE_CHECKLIST.md`).
 
-**Opérations nécessitant systématiquement une intervention humaine** (non automatisables par Claude Code) : achat de nom de domaine, création de la base de données managée, création du service d'hébergement API, création du bucket de stockage, création des secrets de production, création du compte Expo, choix des identifiants Android/iOS, création des comptes Google Play / Apple Developer, configuration des sauvegardes et alertes de production, premier build mobile réel, tests sur appareils physiques, acceptation des coûts des services choisis.
+**Dépendances** : Phases 2 à 4 terminées (c'est le cas).
+
+**Critères de sortie** (tous validés) :
+
+- ✅ `pnpm format:check`/`lint`/`typecheck`/`test`/`build` verts sur tout le monorepo (158 tests unitaires : 46 API + 8 api-client + 104 mobile — 12 nouveaux tests pour le driver de stockage S3/local).
+- ✅ `pnpm --filter @notre-nid/api exec prisma validate` : schéma valide (inchangé).
+- ⚠️ `docker build -f infrastructure/docker/api/Dockerfile .` **non vérifié** dans l'environnement d'implémentation : le moteur Docker Desktop renvoyait une erreur `500 Internal Server Error` de façon persistante — voir `docs/PHASE_STATUS.md`. Chaque commande du Dockerfile a en revanche été rejouée manuellement hors Docker (déploiement `pnpm deploy --prod`, régénération du client Prisma, démarrage réel de `dist/main.js`, vérification `/health` et `/health/ready`) — un bug réel a été trouvé et corrigé grâce à cette vérification. Le build Docker lui-même reste à exécuter avant tout déploiement réel (commande dans `docs/GO_LIVE_CHECKLIST.md`).
+- ⚠️ Aucun build EAS produit (aucun compte Expo dans cet environnement) — voir `docs/MOBILE_RELEASE.md`.
+
+**Opérations nécessitant systématiquement une intervention humaine** (non automatisables par Claude Code) : achat de nom de domaine, création de la base de données managée, création du service d'hébergement API, création du bucket de stockage, création des secrets de production, création du compte Expo, choix des identifiants Android/iOS, création des comptes Google Play / Apple Developer, configuration des sauvegardes et alertes de production, premier build mobile réel, tests sur appareils physiques, acceptation des coûts des services choisis — détail complet avec valeurs et commandes exactes dans `docs/GO_LIVE_CHECKLIST.md`.
 
 ---
 

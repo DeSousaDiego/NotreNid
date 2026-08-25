@@ -4,7 +4,7 @@ Application mobile de gestion de collection partagée pour un couple (livres, CD
 
 ## Statut du projet
 
-Les **Phases 1 à 4** sont terminées et validées (lint, format, typecheck, tests, build verts sur tout le monorepo — voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)). La **Phase 5 — Livraison** n'a pas démarré. Voir [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail complet de l'état actuel.
+Les **Phases 1 à 5** sont terminées et validées (lint, format, typecheck, tests, build verts sur tout le monorepo — voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)). Le développement de la V1 est complet ; la mise en production réelle reste à effectuer manuellement, voir [docs/GO_LIVE_CHECKLIST.md](docs/GO_LIVE_CHECKLIST.md). Voir [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour le détail complet de l'état actuel.
 
 Ce qui existe aujourd'hui :
 
@@ -16,6 +16,7 @@ Ce qui existe aujourd'hui :
 - un schéma Prisma complet avec sa première migration, et un script de seed idempotent (2 comptes de démonstration, 1 household, 3 catégories, 4 items) ;
 - un client API typé (`packages/api-client`) et des types de domaine partagés (`packages/shared`), miroir exact des réponses de l'API, avec une vérification de cohérence compilée contre le contrat OpenAPI ;
 - une CI GitHub Actions (`.github/workflows/ci.yml`) : install, format, lint, typecheck, build, tests unitaires + e2e contre PostgreSQL/Mailpit réels, validation Prisma, fraîcheur du contrat OpenAPI et des types générés ;
+- un driver de stockage S3-compatible (AWS S3/Supabase Storage/MinIO) en plus du driver local, sélectionnable par `STORAGE_DRIVER` ; une image Docker de production multi-stage (`infrastructure/docker/api/Dockerfile`) et une configuration EAS (`apps/mobile/eas.json`) prêtes pour la livraison ;
 - une application mobile Expo (Expo Router, TypeScript strict) avec : système de thème « Notre Nid », design system de 18 composants, authentification (SecureStore, restauration/rafraîchissement de session), sélection de household, écrans Accueil/Collection/Détail/Recherche, et un Profil restructuré en pile de navigation (membres, invitations, catégories, archives, rejoindre un foyer), chacun avec ses propres tests de rendu ; ajout/modification d'item en 3 étapes (catégorie → métadonnées → propriétaires/couverture/récapitulatif), upload/remplacement/suppression de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports JSON/CSV avec partage natif ;
 - un environnement Docker local (PostgreSQL, Mailpit, MinIO optionnel).
 
@@ -24,7 +25,7 @@ Ce qui existe aujourd'hui :
 - **Mobile** : Expo (SDK 57), Expo Router, React Native, TypeScript strict, TanStack Query, React Hook Form + Zod, Expo SecureStore.
 - **API** : Node.js LTS, NestJS 11, REST, class-validator, Argon2, JWT (access + refresh révocable via driver PostgreSQL propre).
 - **Base de données** : PostgreSQL 16, Prisma ORM (driver adapter `@prisma/adapter-pg`, requis par Prisma 7).
-- **Stockage** : local en développement (validation réelle du type de fichier par signature binaire), S3-compatible/Supabase Storage prévu en production (Phase 5).
+- **Stockage** : local en développement, S3-compatible/Supabase Storage en production (`STORAGE_DRIVER`, voir `apps/api/src/uploads/storage/`) — validation réelle du type de fichier par signature binaire dans les deux cas.
 - **Emails** : Mailpit en développement (capture SMTP locale), réel via `nodemailer`.
 - **Tests** : Jest (API : unitaire + e2e via Supertest contre PostgreSQL réel ; `api-client` : unitaire ; mobile : `jest-expo` + `@testing-library/react-native`, composants/hooks/providers/écrans).
 - **CI** : GitHub Actions (`.github/workflows/ci.yml`) — install, format, lint, typecheck, build, tests (services PostgreSQL + Mailpit), validation Prisma, fraîcheur du contrat OpenAPI.
@@ -56,7 +57,7 @@ Voir [.env.example](.env.example) pour la liste complète et commentée. Points 
 - `DATABASE_URL` : connexion PostgreSQL (doit correspondre aux identifiants de `docker-compose.yml` en local).
 - `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL` / `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL` : secrets et durées de vie des tokens — secrets de développement uniquement, à régénérer avant toute mise en production.
 - `MOBILE_PUBLIC_API_URL` : seule variable destinée à être embarquée dans le bundle mobile ; ne doit jamais contenir de secret.
-- `STORAGE_DRIVER=local` : stockage local des images en développement (`apps/api/storage/uploads/`, ignoré par Git) ; un driver S3-compatible sera ajouté en Phase 5.
+- `STORAGE_DRIVER=local|s3` : stockage local en développement (`apps/api/storage/uploads/`, ignoré par Git) ou S3-compatible en production (AWS S3, Supabase Storage, MinIO) — voir `docs/DEPLOYMENT.md`.
 - `SMTP_HOST` / `SMTP_PORT` : par défaut, Mailpit local (`localhost:1025`) — les emails d'invitation y sont capturés (interface web sur `http://localhost:8025`).
 
 ## Base de données
@@ -117,8 +118,11 @@ packages/
   api-client/      Client HTTP typé consommé par le mobile (auth, households, catégories, items, invitations, uploads, exports, stats)
   config/          tsconfig de base partagé
   eslint-config/    Configuration ESLint (flat config) partagée
-docs/              Documentation (PRD, plan d'implémentation, statut des phases, ...)
-docker-compose.yml  PostgreSQL, Mailpit, MinIO (profil optionnel)
+docs/              Documentation (PRD, plan d'implémentation, statut des phases, déploiement, ...)
+infrastructure/
+  docker/api/       Dockerfile de production multi-stage (cibles runtime et migrate)
+  scripts/          Script de sauvegarde PostgreSQL (pg_dump)
+docker-compose.yml  PostgreSQL, Mailpit, MinIO (profil optionnel) — développement local
 ```
 
 ## Scripts disponibles (racine)
@@ -135,14 +139,14 @@ docker-compose.yml  PostgreSQL, Mailpit, MinIO (profil optionnel)
 | `pnpm test` | Tests unitaires (packages qui en définissent) |
 | `pnpm db:generate` | Génère le client Prisma |
 
-Scripts spécifiques à l'API (`pnpm --filter @notre-nid/api run <script>`) : `db:migrate`, `db:seed`, `db:reset`, `test:e2e`, `export:openapi` (régénère `docs/openapi.json` depuis les contrôleurs réels).
+Scripts spécifiques à l'API (`pnpm --filter @notre-nid/api run <script>`) : `db:migrate` (développement, interactif), `db:migrate:deploy` (production, non interactif — voir `docs/DEPLOYMENT.md`), `db:seed`, `db:reset`, `test:e2e`, `export:openapi` (régénère `docs/openapi.json` depuis les contrôleurs réels).
 
 Scripts spécifiques au client API (`pnpm --filter @notre-nid/api-client run <script>`) : `generate:types` (régénère `src/generated/schema.d.ts` depuis `docs/openapi.json` via `openapi-typescript`) — à relancer après `export:openapi` chaque fois qu'une route change ; la CI échoue si l'un des deux fichiers générés n'est pas à jour.
 
 ## Tests
 
 ```bash
-pnpm --filter @notre-nid/api run test         # 34 tests unitaires (Jest)
+pnpm --filter @notre-nid/api run test         # 46 tests unitaires (Jest)
 pnpm --filter @notre-nid/api run test:e2e     # 14 tests d'intégration (Supertest, PostgreSQL + Mailpit réels requis)
 pnpm --filter @notre-nid/api-client run test  # 8 tests unitaires (client HTTP : auth, rafraîchissement, erreurs, FormData, texte brut)
 pnpm --filter @notre-nid/mobile run test      # 104 tests (composants, hooks de mutation, schéma du formulaire d'item, écrans)
@@ -154,11 +158,13 @@ Couverture mobile actuelle : composants de consultation et d'administration (`Bu
 
 ## Déploiement
 
-Non applicable à ce stade (Phase 5). Aucun déploiement, migration de production ou opération destructive n'est effectué sans autorisation explicite du propriétaire du dépôt.
+Deux stratégies documentées dans [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) : hébergeurs managés (Railway/Render/Fly + base PostgreSQL managée + stockage S3-compatible — recommandé) ou VPS + Docker Compose + reverse proxy. Image de production : [infrastructure/docker/api/Dockerfile](infrastructure/docker/api/Dockerfile) (cibles `runtime` et `migrate`). Procédure complète, avec valeurs et commandes exactes : [docs/GO_LIVE_CHECKLIST.md](docs/GO_LIVE_CHECKLIST.md).
+
+Aucun déploiement, migration de production ou opération destructive n'est effectué sans autorisation explicite du propriétaire du dépôt — le code et la documentation de cette phase préparent la mise en production sans l'exécuter.
 
 ## Génération mobile
 
-Non applicable à ce stade (Phase 5, voir `docs/MOBILE_RELEASE.md` à venir).
+Configuration EAS prête ([apps/mobile/eas.json](apps/mobile/eas.json), profils `development`/`preview`/`production`). Procédure complète (compte Expo, builds Android/iOS, soumission aux stores) : [docs/MOBILE_RELEASE.md](docs/MOBILE_RELEASE.md).
 
 ## Sécurité
 
@@ -171,20 +177,21 @@ Non applicable à ce stade (Phase 5, voir `docs/MOBILE_RELEASE.md` à venir).
 - Uploads : validation du type réel par signature binaire (pas l'extension ni le `Content-Type` déclaré), taille maximale, noms de fichiers non prédictibles.
 - Logs structurés (JSON en production, lisibles en développement) sans donnée sensible, log d'accès par requête corrélé à un `requestId` propagé de bout en bout (en-tête `x-request-id`, inclus dans chaque réponse d'erreur).
 - Aucun secret réel n'est commité ; `.env.example` ne contient que des valeurs de développement explicitement fictives ; la CI utilise des secrets JWT placeholder dédiés, jamais les secrets de développement ou de production.
-- `SECURITY.md` détaillé sera créé en Phase 5 ; les règles permanentes en vigueur sont dans [CLAUDE.md](CLAUDE.md).
+- Détail complet et procédure de signalement d'une vulnérabilité : [SECURITY.md](SECURITY.md) ; les règles permanentes en vigueur sont dans [CLAUDE.md](CLAUDE.md).
 
 ## Sauvegardes
 
-Non applicable à ce stade (Phase 5, voir `docs/BACKUP_AND_RESTORE.md` à venir).
+Sauvegardes automatiques du fournisseur de base de données managée (recommandé) ou script manuel [infrastructure/scripts/backup-postgres.sh](infrastructure/scripts/backup-postgres.sh) (`pg_dump`, sans secret en dur). Procédure complète de sauvegarde et de restauration : [docs/BACKUP_AND_RESTORE.md](docs/BACKUP_AND_RESTORE.md).
 
 ## Limitations connues
 
 - **Vérification visuelle du mobile sur simulateur/émulateur non réalisée**, en Phase 3 comme en Phase 4 (pas de simulateur iOS sous Windows, pas d'émulateur Android démarré). De plus, `npx expo start`/`expo export` rencontrent un bug de résolution de module Metro spécifique à cet environnement (Windows + pnpm + monorepo) qui empêche de servir le bundle applicatif — voir `docs/PHASE_STATUS.md` pour la reproduction complète. Tous les parcours de mutation ont néanmoins été vérifiés par des appels HTTP réels contre l'API et PostgreSQL réels, en plus des tests automatisés. À vérifier manuellement (appareil réel ou machine macOS/Linux) avant la livraison.
-- Quelques paquets Expo (`expo`, `expo-router`, `expo-constants`, `expo-linking`, `expo-system-ui`, `react-native`) sont en léger retard sur les derniers correctifs SDK 57 : une tentative de mise à jour a provoqué une régression du bundler Metro et a été annulée (voir `docs/PHASE_STATUS.md`). `expo-doctor` signale désormais aussi une régression mémoire connue de Hermes V1 affectant `expo@57.0.8` (corrigée en `57.0.9+`) — non appliquée dans cette session pour la même raison (impossible de vérifier visuellement une mise à jour Expo dans cet environnement), à traiter avant la Phase 5 avec un test sur appareil réel.
+- Quelques paquets Expo (`expo`, `expo-router`, `expo-constants`, `expo-linking`, `expo-system-ui`, `react-native`) sont en léger retard sur les derniers correctifs SDK 57 : une tentative de mise à jour a provoqué une régression du bundler Metro et a été annulée (voir `docs/PHASE_STATUS.md`). `expo-doctor` signale désormais aussi une régression mémoire connue de Hermes V1 affectant `expo@57.0.8` (corrigée en `57.0.9+`) — non appliquée dans cette session pour la même raison (impossible de vérifier visuellement une mise à jour Expo dans cet environnement), à traiter avant le premier build EAS réel (`docs/MOBILE_RELEASE.md`) avec un test sur appareil réel.
 - Recherche full-text PostgreSQL et client API entièrement généré depuis OpenAPI (actuellement manuscrit, avec une vérification de cohérence compilée contre le contrat) : prévus/évalués pour une phase future si le besoin se confirme.
-- Stockage d'images local uniquement pour l'instant (pas de driver S3, prévu Phase 5).
 - `prisma migrate reset` n'exécute pas automatiquement le seed dans cette version : relancer `pnpm --filter @notre-nid/api run db:seed` manuellement après un reset.
+- **`docker build` sur `infrastructure/docker/api/Dockerfile` non vérifié dans cet environnement** : le moteur Docker Desktop renvoyait une erreur `500 Internal Server Error` au moment de la Phase 5 (voir `docs/PHASE_STATUS.md`). En compensation, chaque commande du Dockerfile a été rejouée manuellement hors Docker (`pnpm deploy --prod`, régénération du client Prisma, `node dist/main.js`, `curl /health` et `/health/ready`) — un vrai bug d'assemblage a été trouvé et corrigé de cette façon (client Prisma absent du répertoire déployé). `docker build` lui-même **reste à exécuter avant tout déploiement réel** — commande dans `docs/GO_LIVE_CHECKLIST.md`.
+- Aucun build EAS (mobile) n'a été produit — aucun compte Expo/Apple/Google n'existe dans cet environnement. Voir `docs/MOBILE_RELEASE.md`.
 
 ## Roadmap
 
-Voir la section « Roadmap future » de [docs/NOTRE_NID_PRD.md](docs/NOTRE_NID_PRD.md#27-roadmap-future) (scan ISBN, wishlist, prêts, tags, mode offline-first, etc.) et [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) pour les phases 3 à 5.
+Voir [docs/ROADMAP.md](docs/ROADMAP.md) (scan ISBN, wishlist, prêts, tags, mode offline-first, application web, etc. — aucune de ces fonctionnalités n'est implémentée dans la V1) et [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) pour l'historique des phases 1 à 5.

@@ -1,0 +1,32 @@
+# Contexte de build Docker (voir infrastructure/docker/api/Dockerfile) — construit depuis la
+# racine du monorepo, car pnpm doit voir l'intégralité du workspace pour honorer
+# --frozen-lockfile (le lockfile référence tous les packages, pas seulement apps/api).
+node_modules/
+**/node_modules/
+.pnpm-store/
+.git/
+.github/
+.husky/
+.vscode/
+.claude/
+
+docs/
+*.md
+
+# Builds et caches locaux (reconstruits dans l'image).
+dist/
+build/
+coverage/
+*.tsbuildinfo
+apps/mobile/.expo/
+apps/mobile/.expo-shared/
+apps/mobile/web-build/
+
+# Stockage local de développement.
+apps/api/storage/uploads/*
+!apps/api/storage/uploads/.gitkeep
+
+# Secrets locaux — ne doivent jamais entrer dans une image Docker.
+.env
+.env.local
+.env.*.local
