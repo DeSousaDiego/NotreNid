@@ -116,7 +116,7 @@ La Phase 3 est découpée en deux sous-phases afin de réduire les risques et de
 
 - ✅ `pnpm lint`/`typecheck`/`format:check`/`test`/`build` verts sur tout le monorepo (146 tests unitaires : 34 API + 8 api-client + 104 mobile).
 - ✅ `pnpm --filter @notre-nid/api run test:e2e` vert (14 tests, dont le nouveau test de rate limiting) contre PostgreSQL et Mailpit réels.
-- ✅ CI GitHub Actions ajoutée et cohérente avec les commandes de validation locales (non encore observée verte sur une pull request réelle, la CI n'ayant pas encore tourné sur GitHub au moment de cette session — à confirmer à la prochaine pull request).
+- ✅ CI GitHub Actions ajoutée et cohérente avec les commandes de validation locales. **Confirmée verte en Phase 5** : les 5 premières exécutions réelles sur GitHub avaient toutes échoué (deux bugs de configuration préexistants, sans rapport avec le code métier — voir Phase 5 dans `docs/PHASE_STATUS.md`), corrigés durant la Phase 5 ; l'exécution sur le commit `43e059b` s'est terminée avec succès.
 - ✅ Couverture des règles d'autorisation et d'isolation déjà testée explicitement depuis la Phase 2, complétée par le test de rate limiting.
 
 **Limite connue signalée, non corrigée** : `expo-doctor` (mobile) signale une régression mémoire connue de Hermes V1 dans `expo@57.0.8` (corrigée en `57.0.9+`) — non appliquée par prudence, cet environnement ne permettant pas de vérifier visuellement une mise à jour Expo (voir Phase 3A/3B pour la régression Metro déjà rencontrée lors d'une tentative similaire). À traiter avant la Phase 5, avec un test sur appareil réel.
