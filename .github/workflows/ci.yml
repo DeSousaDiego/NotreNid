@@ -68,6 +68,17 @@ jobs:
       - name: Validate Prisma schema
         run: pnpm --filter @notre-nid/api exec prisma validate
 
+      # Build BEFORE lint/typecheck/test: packages/shared and packages/api-client are
+      # consumed by apps/mobile (and packages/api-client by nothing else) through their
+      # package.json "main"/"types" fields, which point at dist/ — not src/. On a fresh
+      # checkout (no dist/ yet), ESLint's import/no-unresolved and tsc both fail to resolve
+      # `@notre-nid/shared`/`@notre-nid/api-client`, and apps/mobile's Jest config has no
+      # moduleNameMapper override either, so tests fail the same way. Discovered on the CI
+      # run that first got past "Set up pnpm" (see docs/PHASE_STATUS.md) — a local dev
+      # environment with dist/ already built from a previous run never surfaces this.
+      - name: Build
+        run: pnpm build
+
       - name: Format check
         run: pnpm format:check
 
@@ -88,9 +99,6 @@ jobs:
 
       - name: Verify the demo seed runs cleanly
         run: pnpm --filter @notre-nid/api run db:seed
-
-      - name: Build
-        run: pnpm build
 
       - name: Export OpenAPI contract and check it is up to date
         run: |
