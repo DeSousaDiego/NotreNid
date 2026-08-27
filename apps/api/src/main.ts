@@ -28,10 +28,16 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
   app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
   app.useBodyParser('urlencoded', { limit: JSON_BODY_LIMIT, extended: true });
+
   // Stockage local des images (Phase 1/2) : servi hors préfixe /api pour des URLs simples.
-  app.useStaticAssets(path.resolve(process.cwd(), 'storage', 'uploads'), { prefix: '/uploads' });
+  app.useStaticAssets(path.resolve(process.cwd(), 'storage', 'uploads'), {
+    prefix: '/uploads',
+  });
+
   app.setGlobalPrefix(API_PREFIX);
+
   app.useGlobalFilters(new HttpExceptionFilter());
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -44,6 +50,7 @@ async function bootstrap(): Promise<void> {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : false,
   });
@@ -53,7 +60,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const port = configService.get<number>('PORT') ?? 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 }
 
 void bootstrap();
