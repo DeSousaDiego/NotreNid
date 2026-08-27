@@ -22,10 +22,10 @@ Chaque étape indique : l'objectif, les valeurs nécessaires, où les renseigner
 
 - **Objectif** : disposer d'une base PostgreSQL 16 accessible depuis l'hébergeur de l'API.
 - **Options** : Neon, Supabase ou l'addon PostgreSQL de Railway (voir `docs/DEPLOYMENT.md`).
-- **Valeur produite** : `DATABASE_URL` (format `postgresql://user:password@host:5432/db?schema=public`, ajouter `?sslmode=require` si exigé par le fournisseur).
+- **Valeur produite** : `DATABASE_URL` (format `postgresql://user:password@host:5432/db?schema=public`, ajouter `?sslmode=verify-full` si exigé par le fournisseur).
 - **Où la renseigner** : variable d'environnement `DATABASE_URL` de l'hébergeur de l'API (jamais dans un fichier commité).
 - **Vérifier** : `psql "$DATABASE_URL" -c "SELECT 1;"` depuis une machine autorisée à s'y connecter.
-- **Erreurs fréquentes** : oublier `?sslmode=require` (connexion refusée par certains fournisseurs) ; IP non autorisée dans les règles réseau du fournisseur.
+- **Erreurs fréquentes** : oublier `?sslmode=verify-full` (connexion refusée par certains fournisseurs) ; IP non autorisée dans les règles réseau du fournisseur.
 
 ### 2. Créer le bucket de stockage des images
 
