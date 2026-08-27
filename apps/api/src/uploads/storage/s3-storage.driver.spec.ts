@@ -30,30 +30,101 @@ describe('S3StorageDriver', () => {
     mockSend.mockReset();
   });
 
-  it('uploads and returns a path-style public URL when a custom endpoint is configured (MinIO/Supabase Storage)', async () => {
-    mockSend.mockResolvedValueOnce({});
-    const driver = buildDriver();
-
-    const result = await driver.save({
-      buffer: Buffer.from('fake-image'),
-      filename: 'abc.jpg',
-      contentType: 'image/jpeg',
-    });
-
-    expect(result).toEqual({ id: 'abc.jpg', url: 'http://localhost:9000/test-bucket/abc.jpg' });
+  describe('required configuration', () => {
+    it.each(['STORAGE_BUCKET', 'STORAGE_ACCESS_KEY', 'STORAGE_SECRET_KEY'])(
+      'throws at construction time when %s is missing',
+      (missingKey) => {
+        expect(() => buildDriver({ [missingKey]: undefined as unknown as string })).toThrow();
+      },
+    );
   });
 
-  it('falls back to a virtual-hosted-style URL against real AWS S3 (no custom endpoint)', async () => {
-    mockSend.mockResolvedValueOnce({});
-    const driver = buildDriver({ STORAGE_ENDPOINT: '' });
+  describe('public URL resolution', () => {
+    it('uploads and returns a path-style public URL when a custom endpoint is configured, no STORAGE_PUBLIC_URL (MinIO/Supabase Storage — legacy behavior preserved)', async () => {
+      mockSend.mockResolvedValueOnce({});
+      const driver = buildDriver();
 
-    const result = await driver.save({
+      const result = await driver.save({
+        buffer: Buffer.from('fake-image'),
+        filename: 'abc.jpg',
+        contentType: 'image/jpeg',
+      });
+
+      expect(result).toEqual({ id: 'abc.jpg', url: 'http://localhost:9000/test-bucket/abc.jpg' });
+    });
+
+    it('falls back to a virtual-hosted-style URL against real AWS S3 (no endpoint, no STORAGE_PUBLIC_URL)', async () => {
+      mockSend.mockResolvedValueOnce({});
+      const driver = buildDriver({ STORAGE_ENDPOINT: '' });
+
+      const result = await driver.save({
+        buffer: Buffer.from('fake-image'),
+        filename: 'abc.jpg',
+        contentType: 'image/jpeg',
+      });
+
+      expect(result.url).toBe('https://test-bucket.s3.eu-west-3.amazonaws.com/abc.jpg');
+    });
+
+    it('uses STORAGE_PUBLIC_URL directly (no bucket segment) when set, e.g. Cloudflare R2 where the authenticated endpoint is never public', async () => {
+      mockSend.mockResolvedValueOnce({});
+      const driver = buildDriver({
+        STORAGE_ENDPOINT: 'https://abcd1234.r2.cloudflarestorage.com',
+        STORAGE_PUBLIC_URL: 'https://pub-abcd1234.r2.dev',
+      });
+
+      const result = await driver.save({
+        buffer: Buffer.from('fake-image'),
+        filename: 'abc.jpg',
+        contentType: 'image/jpeg',
+      });
+
+      expect(result.url).toBe('https://pub-abcd1234.r2.dev/abc.jpg');
+    });
+
+    it('strips a trailing slash from STORAGE_PUBLIC_URL', async () => {
+      mockSend.mockResolvedValueOnce({});
+      const driver = buildDriver({ STORAGE_PUBLIC_URL: 'https://pub-abcd1234.r2.dev/' });
+
+      const result = await driver.save({
+        buffer: Buffer.from('fake-image'),
+        filename: 'abc.jpg',
+        contentType: 'image/jpeg',
+      });
+
+      expect(result.url).toBe('https://pub-abcd1234.r2.dev/abc.jpg');
+    });
+
+    it('prefers STORAGE_PUBLIC_URL over the endpoint-derived path-style URL when both are set', async () => {
+      mockSend.mockResolvedValueOnce({});
+      const driver = buildDriver({
+        STORAGE_ENDPOINT: 'http://localhost:9000',
+        STORAGE_PUBLIC_URL: 'https://cdn.example.test',
+      });
+
+      const result = await driver.save({
+        buffer: Buffer.from('fake-image'),
+        filename: 'abc.jpg',
+        contentType: 'image/jpeg',
+      });
+
+      expect(result.url).toBe('https://cdn.example.test/abc.jpg');
+    });
+  });
+
+  it('sends the upload to the configured bucket regardless of the public URL source', async () => {
+    mockSend.mockResolvedValueOnce({});
+    const driver = buildDriver({ STORAGE_PUBLIC_URL: 'https://cdn.example.test' });
+
+    await driver.save({
       buffer: Buffer.from('fake-image'),
       filename: 'abc.jpg',
       contentType: 'image/jpeg',
     });
 
-    expect(result.url).toBe('https://test-bucket.s3.eu-west-3.amazonaws.com/abc.jpg');
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({ input: expect.objectContaining({ Bucket: 'test-bucket' }) }),
+    );
   });
 
   it('throws NOT_FOUND when removing an object that does not exist', async () => {

@@ -23,13 +23,13 @@ Adaptée à ce projet : coût faible, pas de serveur à administrer, sauvegardes
 | --- | --- | --- |
 | API | Railway, Render ou Fly.io | Déploiement à partir de l'image Docker (`infrastructure/docker/api/Dockerfile`, cible `runtime`) ou du buildpack natif du service. |
 | PostgreSQL | Neon, Supabase ou l'addon PostgreSQL de Railway | Préférer une base managée à un PostgreSQL auto-hébergé pour un petit projet personnel nécessitant de la fiabilité (sauvegardes automatiques, haute disponibilité gérées par le fournisseur). |
-| Stockage images | Supabase Storage ou AWS S3 | `STORAGE_DRIVER=s3` (voir `apps/api/src/uploads/storage/s3-storage.driver.ts`) — fonctionne avec tout stockage compatible S3. |
+| Stockage images | Supabase Storage, AWS S3 ou Cloudflare R2 | `STORAGE_DRIVER=s3` (voir `apps/api/src/uploads/storage/s3-storage.driver.ts`) — fonctionne avec tout stockage compatible S3. Avec R2, `STORAGE_PUBLIC_URL` est obligatoire (voir ci-dessous). |
 | Mobile | EAS Build (Expo) | Voir `docs/MOBILE_RELEASE.md`. |
 
 ### Étapes (résumé — détail avec valeurs exactes dans `docs/GO_LIVE_CHECKLIST.md`)
 
 1. Créer la base PostgreSQL managée → obtenir `DATABASE_URL`.
-2. Créer le bucket de stockage (Supabase Storage ou S3) → obtenir `STORAGE_BUCKET`, `STORAGE_ENDPOINT` (si non-AWS), `STORAGE_REGION`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`. **Configurer le bucket en lecture publique** pour les couvertures d'items (l'API génère des URLs publiques directes, pas d'URL signée — voir `docs/DECISIONS.md`).
+2. Créer le bucket de stockage (Supabase Storage, S3 ou Cloudflare R2) → obtenir `STORAGE_BUCKET`, `STORAGE_ENDPOINT` (si non-AWS — l'endpoint S3 **authentifié**, jamais l'URL publique), `STORAGE_REGION`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`. **Configurer le bucket en lecture publique** pour les couvertures d'items (l'API génère des URLs publiques directes, pas d'URL signée — voir `docs/DECISIONS.md`), puis renseigner `STORAGE_PUBLIC_URL` avec la base d'URL réellement publique de ce bucket (domaine personnalisé, ou URL `*.r2.dev` pour R2) — **indispensable avec R2**, dont l'endpoint authentifié (`*.r2.cloudflarestorage.com`) n'est jamais accessible publiquement. Sur AWS S3/MinIO/Supabase Storage classiques, `STORAGE_PUBLIC_URL` peut rester vide (l'API retombe sur le comportement historique, dérivé de `STORAGE_ENDPOINT`/`STORAGE_BUCKET`).
 3. Générer des secrets JWT dédiés à la production (`openssl rand -hex 32`, deux valeurs distinctes pour `JWT_ACCESS_SECRET` et `JWT_REFRESH_SECRET`) — **jamais** réutiliser les valeurs de développement ou de CI.
 4. Configurer un service SMTP réel (ex. Resend, Postmark, SMTP du fournisseur d'hébergement) → `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_FROM`. Mailpit ne doit **jamais** être utilisé en production.
 5. Créer le service d'hébergement de l'API, y renseigner toutes les variables de `.env.example` (voir tableau ci-dessous), pointer sur `infrastructure/docker/api/Dockerfile` (cible `runtime`) ou configurer le buildpack Node du fournisseur avec `pnpm --filter @notre-nid/api run build` puis `pnpm --filter @notre-nid/api run start:prod`.
@@ -92,6 +92,8 @@ Voir [.env.example](../.env.example) pour la liste complète et commentée. Poin
 | `CORS_ORIGINS` | Restreindre strictement (l'app mobile n'envoie pas d'origine `Origin` de navigateur — cette liste protège une éventuelle future app web, voir `docs/ROADMAP.md`). |
 | `API_PUBLIC_URL` | URL HTTPS publique réelle de l'API (utilisée pour construire les URLs d'images en `STORAGE_DRIVER=local` — à éviter en production, voir ci-dessous). |
 | `STORAGE_DRIVER` | `s3` en production — `local` perd toutes les images au moindre redéploiement (filesystem de conteneur éphémère). |
+| `STORAGE_ENDPOINT` | L'endpoint S3 **authentifié** (utilisé par le SDK pour l'upload/la suppression) — jamais une URL destinée à être publique. Sur Cloudflare R2, c'est `https://<account-id>.r2.cloudflarestorage.com`, qui **n'est pas** accessible publiquement. |
+| `STORAGE_PUBLIC_URL` | Base d'URL réellement publique utilisée pour afficher une couverture (domaine personnalisé, ou URL `*.r2.dev` pour R2) — **obligatoire avec R2** (sans elle, l'API construirait par erreur des URLs d'image à partir de `STORAGE_ENDPOINT`, inaccessibles). Optionnelle sur AWS S3/MinIO/Supabase Storage classiques, où l'endpoint sert historiquement aussi de base publique. |
 | `SMTP_*` | Service SMTP réel, jamais Mailpit. |
 | `SENTRY_DSN` | Optionnel — voir `docs/OPERATIONS.md` pour la configuration du monitoring. |
 

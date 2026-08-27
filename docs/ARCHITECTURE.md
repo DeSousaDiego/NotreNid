@@ -97,12 +97,14 @@ flowchart LR
     Upload[POST /households/:id/uploads] --> Validate["Validation :\ntaille ≤ 10 Mo\nsignature binaire réelle\n(magic bytes, jamais l'extension)"]
     Validate --> Driver{STORAGE_DRIVER}
     Driver -->|local| Local["Disque conteneur\napps/api/storage/uploads/\n(développement uniquement)"]
-    Driver -->|s3| S3["Bucket S3-compatible\n(AWS S3 / Supabase Storage / MinIO)"]
+    Driver -->|s3| S3["Bucket S3-compatible\n(AWS S3 / Supabase Storage / MinIO / R2)"]
     Local --> URL[URL publique retournée]
     S3 --> URL
 ```
 
 Le driver actif est sélectionné à l'exécution par `STORAGE_DRIVER` (`apps/api/src/uploads/uploads.module.ts`), derrière l'interface commune `StorageDriver` (`apps/api/src/uploads/storage/storage-driver.interface.ts`). Le nom de fichier stocké est toujours un UUID généré côté serveur (jamais le nom fourni par le client), et `UploadsService.remove` revalide ce format avant toute suppression, indépendamment du driver actif. Voir `docs/DEPLOYMENT.md` pour la configuration du bucket en production.
+
+Le driver S3 distingue strictement deux variables : `STORAGE_ENDPOINT` (l'endpoint S3 authentifié utilisé par le SDK pour l'upload/la suppression) et `STORAGE_PUBLIC_URL` (la base d'URL réellement publique retournée au client) — nécessaires sur Cloudflare R2, où ces deux endpoints sont distincts (l'endpoint authentifié `*.r2.cloudflarestorage.com` n'est jamais public), et confondues par défaut (comportement historique préservé) sur AWS S3/MinIO/Supabase Storage, où `STORAGE_PUBLIC_URL` reste optionnelle.
 
 ## Dépendances externes
 

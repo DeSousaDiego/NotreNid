@@ -67,7 +67,9 @@ ls apps/api/storage/uploads/
 curl -I "<url-retournée-par-l'API-lors-de-l'upload>"   # doit répondre 200
 ```
 
-En cas d'échec d'upload en production avec `STORAGE_DRIVER=s3`, vérifier dans l'ordre : les identifiants (`STORAGE_ACCESS_KEY`/`STORAGE_SECRET_KEY`), l'existence et la politique de lecture publique du bucket (`STORAGE_BUCKET`), puis l'endpoint (`STORAGE_ENDPOINT` — doit rester vide pour AWS S3 réel, renseigné pour Supabase Storage/MinIO).
+En cas d'échec d'upload en production avec `STORAGE_DRIVER=s3`, vérifier dans l'ordre : les identifiants (`STORAGE_ACCESS_KEY`/`STORAGE_SECRET_KEY`), l'existence et la politique de lecture publique du bucket (`STORAGE_BUCKET`), puis l'endpoint (`STORAGE_ENDPOINT` — doit rester vide pour AWS S3 réel, renseigné pour Supabase Storage/MinIO/R2).
+
+Si les couvertures s'uploadent avec succès mais **ne s'affichent jamais** dans l'app (image cassée), le problème est presque toujours `STORAGE_PUBLIC_URL` : cette variable (distincte de `STORAGE_ENDPOINT`) doit contenir la base d'URL réellement publique du bucket. Sur Cloudflare R2 en particulier, `STORAGE_ENDPOINT` (`*.r2.cloudflarestorage.com`) n'est **jamais** accessible publiquement — l'oubli de `STORAGE_PUBLIC_URL` (ou son renseignement avec la même valeur que `STORAGE_ENDPOINT`) produit exactement ce symptôme. Vérifier avec `curl -I` directement sur l'URL retournée par l'API lors de l'upload (voir ci-dessus) : `403`/timeout indique un problème de `STORAGE_PUBLIC_URL` ou de politique de lecture publique du bucket.
 
 ## Révoquer des sessions
 

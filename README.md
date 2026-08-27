@@ -16,7 +16,7 @@ Ce qui existe aujourd'hui :
 - un schéma Prisma complet avec sa première migration, et un script de seed idempotent (2 comptes de démonstration, 1 household, 3 catégories, 4 items) ;
 - un client API typé (`packages/api-client`) et des types de domaine partagés (`packages/shared`), miroir exact des réponses de l'API, avec une vérification de cohérence compilée contre le contrat OpenAPI ;
 - une CI GitHub Actions (`.github/workflows/ci.yml`) : install, format, lint, typecheck, build, tests unitaires + e2e contre PostgreSQL/Mailpit réels, validation Prisma, fraîcheur du contrat OpenAPI et des types générés ;
-- un driver de stockage S3-compatible (AWS S3/Supabase Storage/MinIO) en plus du driver local, sélectionnable par `STORAGE_DRIVER` ; une image Docker de production multi-stage (`infrastructure/docker/api/Dockerfile`) et une configuration EAS (`apps/mobile/eas.json`) prêtes pour la livraison ;
+- un driver de stockage S3-compatible (AWS S3/Supabase Storage/MinIO/Cloudflare R2) en plus du driver local, sélectionnable par `STORAGE_DRIVER` ; une image Docker de production multi-stage (`infrastructure/docker/api/Dockerfile`) et une configuration EAS (`apps/mobile/eas.json`) prêtes pour la livraison ;
 - une application mobile Expo (Expo Router, TypeScript strict) avec : système de thème « Notre Nid », design system de 18 composants, authentification (SecureStore, restauration/rafraîchissement de session), sélection de household, écrans Accueil/Collection/Détail/Recherche, et un Profil restructuré en pile de navigation (membres, invitations, catégories, archives, rejoindre un foyer), chacun avec ses propres tests de rendu ; ajout/modification d'item en 3 étapes (catégorie → métadonnées → propriétaires/couverture/récapitulatif), upload/remplacement/suppression de couverture, archivage/restauration, gestion des membres et invitations, gestion des catégories personnalisées, exports JSON/CSV avec partage natif ;
 - un environnement Docker local (PostgreSQL, Mailpit, MinIO optionnel).
 
@@ -57,7 +57,7 @@ Voir [.env.example](.env.example) pour la liste complète et commentée. Points 
 - `DATABASE_URL` : connexion PostgreSQL (doit correspondre aux identifiants de `docker-compose.yml` en local).
 - `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL` / `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL` : secrets et durées de vie des tokens — secrets de développement uniquement, à régénérer avant toute mise en production.
 - `MOBILE_PUBLIC_API_URL` : seule variable destinée à être embarquée dans le bundle mobile ; ne doit jamais contenir de secret.
-- `STORAGE_DRIVER=local|s3` : stockage local en développement (`apps/api/storage/uploads/`, ignoré par Git) ou S3-compatible en production (AWS S3, Supabase Storage, MinIO) — voir `docs/DEPLOYMENT.md`.
+- `STORAGE_DRIVER=local|s3` : stockage local en développement (`apps/api/storage/uploads/`, ignoré par Git) ou S3-compatible en production (AWS S3, Supabase Storage, MinIO, Cloudflare R2) — voir `docs/DEPLOYMENT.md`. En `s3`, `STORAGE_ENDPOINT` (l'endpoint authentifié) et `STORAGE_PUBLIC_URL` (l'URL réellement publique) sont deux notions distinctes — **obligatoire de renseigner `STORAGE_PUBLIC_URL` avec Cloudflare R2**, dont l'endpoint n'est jamais public.
 - `SMTP_HOST` / `SMTP_PORT` : par défaut, Mailpit local (`localhost:1025`) — les emails d'invitation y sont capturés (interface web sur `http://localhost:8025`).
 
 ## Base de données

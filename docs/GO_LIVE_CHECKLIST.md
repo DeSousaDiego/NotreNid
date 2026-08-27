@@ -30,12 +30,13 @@ Chaque étape indique : l'objectif, les valeurs nécessaires, où les renseigner
 ### 2. Créer le bucket de stockage des images
 
 - **Objectif** : stockage persistant des couvertures d'items (`STORAGE_DRIVER=s3` — jamais `local` en production, voir `docs/DEPLOYMENT.md`).
-- **Options** : Supabase Storage ou AWS S3.
-- **Valeurs produites** : `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ENDPOINT` (vide pour AWS S3 réel, URL de l'endpoint pour Supabase Storage), `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`.
+- **Options** : Supabase Storage, AWS S3 ou Cloudflare R2.
+- **Valeurs produites** : `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ENDPOINT` (vide pour AWS S3 réel, URL de l'endpoint **authentifié** pour Supabase Storage/R2 — ex. `https://<account-id>.r2.cloudflarestorage.com`), `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, et `STORAGE_PUBLIC_URL` (base d'URL réellement publique du bucket — domaine personnalisé ou URL `*.r2.dev` pour R2).
 - **Où les renseigner** : variables d'environnement de l'hébergeur de l'API.
 - **Configuration requise** : bucket en **lecture publique** (l'API génère des URLs publiques directes, voir `docs/DECISIONS.md`) — politique bucket de type « lecture publique des objets », écriture restreinte aux identifiants ci-dessus.
-- **Vérifier** : uploader un fichier de test via la console du fournisseur, confirmer que son URL publique répond `200` sans authentification.
-- **Erreurs fréquentes** : bucket créé en privé (les couvertures d'items ne s'afficheront jamais dans l'app) ; région du bucket différente de `STORAGE_REGION` renseignée.
+- **⚠️ Avec Cloudflare R2** : `STORAGE_PUBLIC_URL` est **obligatoire**. L'endpoint S3 authentifié (`*.r2.cloudflarestorage.com`, renseigné dans `STORAGE_ENDPOINT`) n'est **jamais** accessible publiquement — seul sert aux opérations d'upload/suppression. Activer l'accès public du bucket (sous-domaine `*.r2.dev` fourni par Cloudflare, ou un domaine personnalisé mappé au bucket) et renseigner cette URL dans `STORAGE_PUBLIC_URL`, distincte de `STORAGE_ENDPOINT`.
+- **Vérifier** : uploader un fichier de test via la console du fournisseur, confirmer que son URL publique (celle renseignée dans `STORAGE_PUBLIC_URL`, pas `STORAGE_ENDPOINT`) répond `200` sans authentification.
+- **Erreurs fréquentes** : bucket créé en privé (les couvertures d'items ne s'afficheront jamais dans l'app) ; région du bucket différente de `STORAGE_REGION` renseignée ; **sur R2, utiliser l'endpoint `*.r2.cloudflarestorage.com` comme `STORAGE_PUBLIC_URL`** (erreur courante — cet endpoint est authentifié, pas public, les images ne s'afficheraient jamais).
 
 ### 3. Générer les secrets JWT de production
 
