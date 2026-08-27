@@ -39,12 +39,23 @@ export class AppLogger implements LoggerService {
   }
 
   private write(level: string, message: unknown, context?: string, trace?: string): void {
+    // `Error` (et ses sous-classes) n'ont ni `message` ni `stack` en propriété énumérable :
+    // JSON.stringify(error) renvoie systématiquement "{}", masquant silencieusement la cause
+    // réelle. Nest lui-même journalise ainsi les erreurs fatales de démarrage (voir
+    // @nestjs/core/errors/exception-handler.js : `logger.error(exception)`, sans `trace`
+    // séparée) — les extraire explicitement ici est donc nécessaire, pas seulement pour les
+    // erreurs applicatives qui passent déjà `trace` en paramètre séparé.
+    const resolvedMessage =
+      message instanceof Error ? `${message.name}: ${message.message}` : message;
+    const resolvedTrace = trace ?? (message instanceof Error ? message.stack : undefined);
+
     const entry: LogEntry = {
       level,
-      message: typeof message === 'string' ? message : JSON.stringify(message),
+      message:
+        typeof resolvedMessage === 'string' ? resolvedMessage : JSON.stringify(resolvedMessage),
       context,
       timestamp: new Date().toISOString(),
-      trace,
+      trace: resolvedTrace,
     };
 
     if (this.isProduction) {
@@ -57,9 +68,9 @@ export class AppLogger implements LoggerService {
     const prefix = `[${entry.timestamp}] ${level.toUpperCase()}${context ? ` [${context}]` : ''}`;
     // eslint-disable-next-line no-console
     console.log(`${prefix} ${entry.message}`);
-    if (trace) {
+    if (entry.trace) {
       // eslint-disable-next-line no-console
-      console.log(trace);
+      console.log(entry.trace);
     }
   }
 }

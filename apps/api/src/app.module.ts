@@ -20,13 +20,17 @@ import { PrismaModule } from './prisma/prisma.module';
 import { StatsModule } from './stats/stats.module';
 import { UploadsModule } from './uploads/uploads.module';
 
-// Le monorepo garde un unique .env à la racine (voir README) : l'API est
-// toujours démarrée avec process.cwd() = apps/api (pnpm --filter / nest start).
+// Le monorepo garde un unique .env à la racine (voir README). Résolu depuis __dirname (et
+// non process.cwd()) : dist/app.module.js vit toujours à la même profondeur sous apps/api,
+// quel que soit le répertoire depuis lequel le processus est lancé (pnpm --filter, nest
+// start, `node apps/api/dist/main.js` depuis la racine, ou toute autre invocation). Sans
+// secret réel à charger en production (pas de .env dans l'image Docker/l'hébergeur), un
+// chemin qui ne résout aucun fichier ne casse rien : ConfigModule retombe sur process.env.
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: path.resolve(process.cwd(), '../../.env'),
+      envFilePath: path.resolve(__dirname, '../../../.env'),
     }),
     // Limite globale par défaut, appliquée à toutes les routes non couvertes par un
     // @Throttle() plus spécifique (voir AuthController pour les limites renforcées).
