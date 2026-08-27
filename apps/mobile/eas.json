@@ -19,7 +19,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACER-PAR-URL-API-STAGING.example.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://notre-nid-api.onrender.com/api/v1"
       },
       "android": {
         "buildType": "apk"
@@ -28,7 +28,7 @@
     "production": {
       "distribution": "store",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACER-PAR-URL-API-PRODUCTION.example.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://notre-nid-api.onrender.com/api/v1"
       },
       "android": {
         "buildType": "app-bundle"
