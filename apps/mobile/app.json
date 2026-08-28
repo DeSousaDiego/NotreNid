@@ -38,6 +38,7 @@
       "expo-image",
       "expo-font",
       "expo-sharing",
+      "expo-updates",
       [
         "expo-image-picker",
         {
@@ -55,6 +56,12 @@
         "projectId": "51422070-7f84-4cd2-888e-357ca6456336"
       }
     },
-    "owner": "diegodesousas-team"
+    "owner": "diegodesousas-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/51422070-7f84-4cd2-888e-357ca6456336"
+    }
   }
 }

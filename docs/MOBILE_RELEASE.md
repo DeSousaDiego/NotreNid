@@ -109,7 +109,17 @@ Prérequis :
 
 ## 13. Publier une mise à jour
 
-**Non configuré dans cette V1** : `expo-updates` (mécanisme d'EAS Update permettant de pousser une mise à jour JS sans repasser par la validation des stores) n'est pas installé dans `apps/mobile/package.json`. Toute modification, même mineure, nécessite aujourd'hui un nouveau build complet (étapes 9-10) et une nouvelle soumission (étape 12). Ajouter `expo-updates` et configurer des canaux de mise à jour est une évolution possible, non prioritaire pour une V1 à deux utilisateurs — voir `docs/ROADMAP.md`.
+`expo-updates` est installé et configuré (`apps/mobile/app.json` : `updates.url`, `runtimeVersion.policy: "appVersion"` ; `apps/mobile/eas.json` : un canal EAS Update par profil de build — `development`/`preview`/`production`). Permet de pousser une mise à jour JS/assets sans repasser par la validation des stores, **à condition** de ne modifier que du code JavaScript (voir limite ci-dessous).
+
+```bash
+cd apps/mobile
+npx eas-cli update --channel preview --message "Description du changement"
+# ou --channel production pour pousser vers les utilisateurs de la version store
+```
+
+- Les appareils déjà installés téléchargent la mise à jour au prochain lancement de l'app (comportement par défaut d'`expo-updates`), sans passer par le Play Store/App Store.
+- **`runtimeVersion.policy: "appVersion"`** : une mise à jour publiée sur un canal n'est proposée qu'aux installations dont `apps/mobile/app.json` `version` correspond exactement à la version du build. Après tout changement de code **natif** (nouveau module natif, changement de plugin de configuration, changement de `version`) : produire un **nouveau build complet** (étapes 9-10) — `eas update` ne peut jamais remplacer un changement natif, uniquement le bundle JS/les assets.
+- Vérifier qu'une mise à jour a bien été reçue : `npx eas-cli update:list --channel <canal>` ; sur l'appareil, forcer une nouvelle vérification en relançant complètement l'app (pas juste revenir au premier plan).
 
 ## 14. Vérifier la compatibilité entre version mobile et version API
 
@@ -123,6 +133,7 @@ Prérequis :
 | --- | --- |
 | `apps/mobile/app.json` (identifiants, icônes, splash) | ✅ prêt dans le dépôt |
 | `apps/mobile/eas.json` (profils development/preview/production) | ✅ prêt dans le dépôt (URLs `preview`/`production` à remplacer, voir étape 6) |
+| `expo-updates` (mises à jour OTA, un canal par profil) | ✅ prêt dans le dépôt — voir étape 13 |
 | Compte Expo, `eas init` (`projectId`) | ⏳ manuel — étapes 1-4 |
 | Compte Apple Developer / Google Play Console | ⏳ manuel — étape 12 |
 | Premier build (tout profil) | ⏳ manuel — nécessite les étapes précédentes |
