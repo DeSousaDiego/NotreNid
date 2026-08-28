@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme';
 
@@ -31,6 +32,10 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const theme = useTheme();
+  // Comme BottomSheet : une hauteur en % résolue contre un parent absolument
+  // positionné est indéterminée, d'où useWindowDimensions plutôt qu'un pourcentage.
+  const { height: windowHeight } = useWindowDimensions();
+  const maxDialogHeight = windowHeight * 0.8;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -39,22 +44,31 @@ export function ConfirmDialog({
         style={styles.backdrop}
         onPress={loading ? undefined : onCancel}
       />
-      <View style={styles.centerer}>
+      <SafeAreaView style={styles.centerer} pointerEvents="box-none">
         <View
           style={[
             styles.dialog,
             {
+              maxHeight: maxDialogHeight,
               backgroundColor: theme.colors.surface,
               borderRadius: theme.radii.lg,
               padding: theme.spacing.lg,
-              gap: theme.spacing.md,
             },
             theme.elevation.medium,
           ]}
         >
-          <AppText variant="section">{title}</AppText>
-          {message ? <AppText variant="body">{message}</AppText> : null}
-          <View style={{ flexDirection: 'row', gap: theme.spacing.sm, justifyContent: 'flex-end' }}>
+          <ScrollView style={styles.scrollArea} contentContainerStyle={{ gap: theme.spacing.md }}>
+            <AppText variant="section">{title}</AppText>
+            {message ? <AppText variant="body">{message}</AppText> : null}
+          </ScrollView>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: theme.spacing.sm,
+              justifyContent: 'flex-end',
+              marginTop: theme.spacing.md,
+            }}
+          >
             <Button label={cancelLabel} variant="ghost" onPress={onCancel} disabled={loading} />
             <Button
               label={confirmLabel}
@@ -64,7 +78,7 @@ export function ConfirmDialog({
             />
           </View>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -87,5 +101,10 @@ const styles = StyleSheet.create({
   dialog: {
     width: '100%',
     maxWidth: 400,
+  },
+  // flexShrink permet au ScrollView de céder de la place aux boutons plutôt que de
+  // déborder silencieusement au-delà de maxHeight (même piège que BottomSheet).
+  scrollArea: {
+    flexShrink: 1,
   },
 });

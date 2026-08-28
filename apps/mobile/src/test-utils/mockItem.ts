@@ -7,6 +7,7 @@ export function mockItem(overrides: Partial<Item> = {}): Item {
     title: 'Les Misérables',
     description: null,
     condition: 'GOOD',
+    rating: null,
     coverImageUrl: null,
     notes: null,
     customMetadata: null,

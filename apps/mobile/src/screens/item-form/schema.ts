@@ -1,6 +1,14 @@
 import type { CreateItemInput, UpdateItemInput } from '@notre-nid/api-client';
-import { ITEM_CONDITIONS, type Category, type Item } from '@notre-nid/shared';
+import {
+  ITEM_CONDITIONS,
+  ITEM_RATING_VALUES,
+  type Category,
+  type Item,
+  type ItemRating,
+} from '@notre-nid/shared';
 import { z } from 'zod';
+
+const RATING_VALUES_SET: readonly number[] = ITEM_RATING_VALUES;
 
 /**
  * Toutes les métadonnées sont conservées comme chaînes de caractères dans le
@@ -31,6 +39,11 @@ export const itemFormSchema = z.object({
   categoryId: z.string().min(1, 'Choisissez une catégorie.'),
   title: z.string().min(1, 'Le titre est requis.').max(200, 'Le titre est trop long.'),
   condition: z.enum(ITEM_CONDITIONS, { message: 'Choisissez un état.' }),
+  rating: z
+    .number()
+    .refine((value) => RATING_VALUES_SET.includes(value), { message: 'Note invalide.' })
+    .nullable()
+    .optional(),
   description: z.string().max(2000, 'La description est trop longue.').optional(),
   notes: z.string().max(2000, 'Les notes sont trop longues.').optional(),
   ownerIds: z.array(z.string()).min(1, 'Sélectionnez au moins un propriétaire.'),
@@ -45,6 +58,7 @@ export const EMPTY_ITEM_FORM_VALUES: ItemFormValues = {
   categoryId: '',
   title: '',
   condition: 'GOOD',
+  rating: null,
   description: '',
   notes: '',
   ownerIds: [],
@@ -89,6 +103,7 @@ export function itemToFormValues(item: Item): ItemFormValues {
     categoryId: item.category.id,
     title: item.title,
     condition: item.condition,
+    rating: item.rating,
     description: item.description ?? '',
     notes: item.notes ?? '',
     ownerIds: item.owners.map((owner) => owner.id),
@@ -136,6 +151,10 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
     categoryId: values.categoryId,
     title: values.title.trim(),
     condition: values.condition,
+    // `.refine` valide déjà que la valeur appartient à ITEM_RATING_VALUES ; Zod ne
+    // dérive pas un type littéral d'un `.refine` sur `z.number()` comme il le fait
+    // pour `z.enum` (condition ci-dessus), d'où cette assertion ponctuelle.
+    rating: (values.rating ?? undefined) as ItemRating | undefined,
     description: toOptionalString(values.description),
     notes: toOptionalString(values.notes),
     ownerIds: values.ownerIds,

@@ -57,6 +57,34 @@ describe('itemFormSchema', () => {
     };
     expect(itemFormSchema.safeParse(values).success).toBe(true);
   });
+
+  const validBase: ItemFormValues = {
+    ...EMPTY_ITEM_FORM_VALUES,
+    categoryId: 'category-book',
+    title: 'Dune',
+    ownerIds: ['user-1'],
+  };
+
+  it('accepts every half-star rating from 0.5 to 5', () => {
+    for (const rating of [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]) {
+      expect(itemFormSchema.safeParse({ ...validBase, rating }).success).toBe(true);
+    }
+  });
+
+  it('accepts a null or absent rating (no note)', () => {
+    expect(itemFormSchema.safeParse({ ...validBase, rating: null }).success).toBe(true);
+    expect(itemFormSchema.safeParse(validBase).success).toBe(true);
+  });
+
+  it('rejects a rating off the half-star grid', () => {
+    expect(itemFormSchema.safeParse({ ...validBase, rating: 3.7 }).success).toBe(false);
+  });
+
+  it('rejects a rating outside the 0.5–5 range', () => {
+    expect(itemFormSchema.safeParse({ ...validBase, rating: -1 }).success).toBe(false);
+    expect(itemFormSchema.safeParse({ ...validBase, rating: 5.5 }).success).toBe(false);
+    expect(itemFormSchema.safeParse({ ...validBase, rating: 0 }).success).toBe(false);
+  });
 });
 
 describe('buildItemPayload', () => {
@@ -74,6 +102,12 @@ describe('buildItemPayload', () => {
     expect(payload.description).toBeUndefined();
     expect(payload.notes).toBeUndefined();
     expect(payload.coverImageUrl).toBeUndefined();
+    expect(payload.rating).toBeUndefined();
+  });
+
+  it('passes a set rating through, and omits it when null (no note)', () => {
+    expect(buildItemPayload({ ...baseValues, rating: 4.5 }, BOOK_CATEGORY).rating).toBe(4.5);
+    expect(buildItemPayload({ ...baseValues, rating: null }, BOOK_CATEGORY).rating).toBeUndefined();
   });
 
   it('builds book metadata with numeric fields parsed and blanks dropped', () => {
@@ -153,6 +187,11 @@ describe('buildItemPayload', () => {
 });
 
 describe('itemToFormValues', () => {
+  it('maps an existing rated item back into form values', () => {
+    const item = mockItem({ rating: 3.5 });
+    expect(itemToFormValues(item).rating).toBe(3.5);
+  });
+
   it('maps an existing book item back into form values', () => {
     const item = mockItem({
       book: {

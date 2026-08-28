@@ -13,6 +13,7 @@ import {
   LoadingSkeleton,
   OwnerAvatarGroup,
   ScreenContainer,
+  StarRating,
   useToast,
 } from '../../../components';
 import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations';
@@ -110,6 +111,15 @@ export default function ItemDetailScreen() {
               <ConditionBadge condition={item.condition} />
             </View>
           </View>
+
+          {item.rating ? (
+            <View style={{ gap: theme.spacing.xs }}>
+              <AppText variant="label" color="textMuted">
+                Note
+              </AppText>
+              <StarRating value={item.rating} readOnly />
+            </View>
+          ) : null}
 
           <View style={{ gap: theme.spacing.xs }}>
             <AppText variant="label" color="textMuted">

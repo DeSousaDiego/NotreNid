@@ -22,7 +22,7 @@ export class InvitationsController {
   @HouseholdRoles(HouseholdRole.OWNER, HouseholdRole.ADMIN)
   @ApiOperation({
     summary:
-      "Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). En développement, le jeton d'acceptation est renvoyé en clair.",
+      "Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). Le jeton d'acceptation est toujours renvoyé en clair au demandeur (pour partage manuel du lien) ; `emailDelivered` indique si l'email a réellement pu être envoyé.",
   })
   @ApiResponse({ status: 201, description: 'Invitation créée.' })
   @ApiStandardErrors(400, 401, 403, 404)

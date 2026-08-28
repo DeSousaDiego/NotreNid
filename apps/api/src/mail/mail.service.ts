@@ -24,31 +24,50 @@ export class MailService {
     });
   }
 
+  /**
+   * Ne lève jamais : un échec d'envoi ne doit pas faire échouer la création de
+   * l'invitation, déjà persistée en base à ce stade (voir InvitationsService.create).
+   * L'appelant décide de l'UX à partir de `delivered`.
+   */
   async sendInvitationEmail(params: {
     to: string;
     householdName: string;
     invitationToken: string;
-  }): Promise<void> {
+  }): Promise<{ delivered: boolean }> {
     const { to, householdName, invitationToken } = params;
 
-    // En développement, sans service email externe configuré, on trace toujours
-    // le lien/le jeton d'invitation dans les logs (voir docs/NOTRE_NID_PRD.md section 7).
-    this.logger.log(
-      `Invitation pour ${to} au foyer "${householdName}" — jeton : ${invitationToken}`,
-    );
+    // En développement, sans service email externe configuré, on trace le lien/le
+    // jeton d'invitation dans les logs (voir docs/NOTRE_NID_PRD.md section 7).
+    // Ne jamais faire cela en production : le jeton ne doit pas finir dans des logs
+    // agrégés externes.
+    if (this.configService.get<string>('NODE_ENV') !== 'production') {
+      this.logger.log(
+        `Invitation pour ${to} au foyer "${householdName}" — jeton : ${invitationToken}`,
+      );
+    }
 
-    await this.transporter.sendMail({
-      from: this.from,
-      to,
-      subject: `Invitation à rejoindre le foyer « ${householdName} » sur Notre Nid`,
-      text: [
-        `Vous avez été invité·e à rejoindre le foyer « ${householdName} » sur Notre Nid.`,
-        '',
-        `Code d'invitation : ${invitationToken}`,
-        '',
-        "Utilisez ce code dans l'application pour rejoindre le foyer.",
-      ].join('\n'),
-    });
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to,
+        subject: `Invitation à rejoindre le foyer « ${householdName} » sur Notre Nid`,
+        text: [
+          `Vous avez été invité·e à rejoindre le foyer « ${householdName} » sur Notre Nid.`,
+          '',
+          `Code d'invitation : ${invitationToken}`,
+          '',
+          "Utilisez ce code dans l'application pour rejoindre le foyer.",
+        ].join('\n'),
+      });
+      return { delivered: true };
+    } catch (error) {
+      this.logger.warn(
+        `Échec de l'envoi de l'email d'invitation à ${to} : ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return { delivered: false };
+    }
   }
 
   private hasCredentials(): boolean {

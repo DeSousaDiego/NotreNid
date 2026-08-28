@@ -4,6 +4,10 @@ import type { PublicUser } from './user';
 export const ITEM_CONDITIONS = ['NEW', 'VERY_GOOD', 'GOOD', 'FAIR', 'POOR'] as const;
 export type ItemCondition = (typeof ITEM_CONDITIONS)[number];
 
+/** Notes autorisées pour `Item.rating` : demi-étoiles de 0,5 à 5. `null`/absent = pas de note. */
+export const ITEM_RATING_VALUES = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5] as const;
+export type ItemRating = (typeof ITEM_RATING_VALUES)[number];
+
 export interface BookMetadata {
   itemId: string;
   author: string | null;
@@ -40,6 +44,7 @@ export interface Item {
   title: string;
   description: string | null;
   condition: ItemCondition;
+  rating: ItemRating | null;
   coverImageUrl: string | null;
   notes: string | null;
   customMetadata: Record<string, unknown> | null;

@@ -22,7 +22,7 @@ export class InvitationsService {
     householdId: string,
     invitedById: string,
     email: string,
-  ): Promise<PublicInvitation & { token: string }> {
+  ): Promise<PublicInvitation & { token: string; emailDelivered: boolean }> {
     const household = await this.prisma.household.findUniqueOrThrow({ where: { id: householdId } });
 
     const rawToken = randomBytes(32).toString('hex');
@@ -49,13 +49,13 @@ export class InvitationsService {
       },
     });
 
-    await this.mailService.sendInvitationEmail({
+    const { delivered } = await this.mailService.sendInvitationEmail({
       to: invitation.email,
       householdName: household.name,
       invitationToken: rawToken,
     });
 
-    return { ...toPublicInvitation(invitation), token: rawToken };
+    return { ...toPublicInvitation(invitation), token: rawToken, emailDelivered: delivered };
   }
 
   async listForHousehold(householdId: string): Promise<PublicInvitation[]> {

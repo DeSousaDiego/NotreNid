@@ -96,6 +96,7 @@ export class ItemsService {
           title: dto.title,
           description: dto.description,
           condition: dto.condition,
+          rating: dto.rating,
           notes: dto.notes,
           coverImageUrl: dto.coverImageUrl,
           customMetadata: category.isSystem
@@ -157,6 +158,7 @@ export class ItemsService {
           title: dto.title ?? existing.title,
           description: dto.description ?? existing.description,
           condition: dto.condition ?? existing.condition,
+          rating: dto.rating ?? existing.rating,
           notes: dto.notes ?? existing.notes,
           coverImageUrl: dto.coverImageUrl ?? existing.coverImageUrl,
           customMetadata: category.isSystem
@@ -334,6 +336,7 @@ export class ItemsService {
       title: item.title,
       description: item.description,
       condition: item.condition,
+      rating: item.rating,
       coverImageUrl: item.coverImageUrl,
       notes: item.notes,
       customMetadata: item.customMetadata,

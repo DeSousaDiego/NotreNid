@@ -31,7 +31,7 @@ describe('InvitationsService', () => {
       },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     };
-    mailService = { sendInvitationEmail: jest.fn().mockResolvedValue(undefined) };
+    mailService = { sendInvitationEmail: jest.fn().mockResolvedValue({ delivered: true }) };
     service = new InvitationsService(
       prisma as unknown as PrismaService,
       mailService as unknown as MailService,
@@ -39,12 +39,25 @@ describe('InvitationsService', () => {
   });
 
   it('never returns tokenHash from create(), and returns the raw token instead', async () => {
+    mailService.sendInvitationEmail.mockResolvedValue({ delivered: true });
     const result = await service.create('h1', 'u1', 'sam@example.com');
 
     expect(result).not.toHaveProperty('tokenHash');
     expect(typeof result.token).toBe('string');
     expect(result.token).not.toBe(invitationRow.tokenHash);
     expect(result.id).toBe('inv-1');
+    expect(result.emailDelivered).toBe(true);
+  });
+
+  it('still creates and returns the invitation when the email fails to send', async () => {
+    mailService.sendInvitationEmail.mockResolvedValue({ delivered: false });
+
+    const result = await service.create('h1', 'u1', 'sam@example.com');
+
+    expect(prisma.householdInvitation.create).toHaveBeenCalled();
+    expect(result.id).toBe('inv-1');
+    expect(typeof result.token).toBe('string');
+    expect(result.emailDelivered).toBe(false);
   });
 
   it('never returns tokenHash from listForHousehold()', async () => {

@@ -41,6 +41,15 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
     const asset = result.assets[0];
     setLocalPreviewUri(asset.uri);
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[useCoverPicker] asset picked', {
+        uriScheme: asset.uri.split(':')[0],
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        hasHouseholdId: Boolean(householdId),
+      });
+    }
+
     try {
       const uploaded = await uploadMutation.mutateAsync({
         uri: asset.uri,
@@ -50,6 +59,13 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
       setUploadedId(uploaded.id);
       onChange(uploaded.url);
     } catch (uploadError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[useCoverPicker] upload failed', {
+          errorType:
+            uploadError instanceof Error ? uploadError.constructor.name : typeof uploadError,
+          message: uploadError instanceof Error ? uploadError.message : String(uploadError),
+        });
+      }
       setLocalPreviewUri(null);
       setError(getErrorMessage(uploadError));
     }

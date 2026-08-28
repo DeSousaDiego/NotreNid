@@ -2,7 +2,7 @@ import type { Category } from '@notre-nid/shared';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { View } from 'react-native';
 
-import { AppText, Select, TextField } from '../../components';
+import { AppText, CategoryPicker, Select, StarRating, TextField } from '../../components';
 import { CONDITION_OPTIONS } from '../../constants/condition';
 import { useTheme } from '../../theme';
 
@@ -25,13 +25,13 @@ export function StepBasics({ control, errors, categories }: StepBasicsProps) {
         name="categoryId"
         render={({ field }) => (
           <View>
-            <Select
-              label="Catégorie"
+            <AppText variant="label" color="textMuted" style={{ marginBottom: 4 }}>
+              Catégorie
+            </AppText>
+            <CategoryPicker
+              categories={categories}
               value={field.value || undefined}
-              onChange={(value) => field.onChange(value ?? '')}
-              allowClear={false}
-              placeholder="Choisissez une catégorie"
-              options={categories.map((category) => ({ value: category.id, label: category.name }))}
+              onChange={field.onChange}
             />
             {errors.categoryId ? (
               <AppText variant="helper" color="danger" style={{ marginTop: 4 }}>
@@ -74,6 +74,19 @@ export function StepBasics({ control, errors, categories }: StepBasicsProps) {
                 {errors.condition.message}
               </AppText>
             ) : null}
+          </View>
+        )}
+      />
+
+      <Controller
+        control={control}
+        name="rating"
+        render={({ field }) => (
+          <View>
+            <AppText variant="label" color="textMuted" style={{ marginBottom: 4 }}>
+              Note (optionnelle)
+            </AppText>
+            <StarRating value={field.value} onChange={field.onChange} />
           </View>
         )}
       />

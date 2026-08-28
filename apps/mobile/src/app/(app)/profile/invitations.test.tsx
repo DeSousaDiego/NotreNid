@@ -124,11 +124,12 @@ describe('InvitationsScreen', () => {
     expect(mockApiClient.invitations.create).not.toHaveBeenCalled();
   });
 
-  it('creates an invitation and displays the development token', async () => {
+  it('creates an invitation and displays the shareable link when the email was delivered', async () => {
     (mockApiClient.invitations.list as jest.Mock).mockResolvedValue([]);
     (mockApiClient.invitations.create as jest.Mock).mockResolvedValue({
       id: 'inv-3',
       token: 'raw-dev-token',
+      emailDelivered: true,
     });
     const view = await renderScreen(<InvitationsScreen />);
 
@@ -144,6 +145,29 @@ describe('InvitationsScreen', () => {
       ),
     );
     await waitFor(() => expect(view.getByText('raw-dev-token')).toBeTruthy());
+    expect(view.getByText('Cette invitation a aussi été envoyée par email.')).toBeTruthy();
+  });
+
+  it('still shows the token to share manually when the invitation email fails to send', async () => {
+    (mockApiClient.invitations.list as jest.Mock).mockResolvedValue([]);
+    (mockApiClient.invitations.create as jest.Mock).mockResolvedValue({
+      id: 'inv-4',
+      token: 'raw-fallback-token',
+      emailDelivered: false,
+    });
+    const view = await renderScreen(<InvitationsScreen />);
+
+    await waitFor(() => expect(view.getByText('Aucune invitation en attente')).toBeTruthy());
+
+    await fireEvent.changeText(view.getByLabelText('Inviter par email'), 'sam@example.com');
+    await fireEvent.press(view.getByRole('button', { name: "Envoyer l'invitation" }));
+
+    await waitFor(() => expect(view.getByText('raw-fallback-token')).toBeTruthy());
+    expect(
+      view.getByText(
+        "L'email n'a pas pu être envoyé. Partagez ce code manuellement avec la personne invitée.",
+      ),
+    ).toBeTruthy();
   });
 
   it('revokes an invitation after confirming the destructive dialog', async () => {

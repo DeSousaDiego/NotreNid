@@ -116,6 +116,11 @@ model Item {
   title          String
   description    String?
   condition      ItemCondition
+  /// Note sur 5, par pas de 0,5 (0.5, 1, 1.5 ... 5). `null` = pas de note. Ces valeurs sont
+  /// représentables exactement en IEEE754 (pas de perte de précision) ; `@IsIn` valide les 10
+  /// valeurs autorisées par égalité stricte côté API, et un CHECK côté base (voir la migration
+  /// associée) est une seconde ligne de défense contre toute écriture hors validation applicative.
+  rating         Float?
   coverImageUrl  String?
   notes          String?
   customMetadata Json?

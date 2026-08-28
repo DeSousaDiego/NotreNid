@@ -8,10 +8,16 @@ import {
   type ReactNode,
 } from 'react';
 import { Animated, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
+
+// `useSafeAreaInsets` exige un <SafeAreaProvider> ancêtre (absent à la racine de
+// cette app) ; `SafeAreaView` s'appuie sur un module natif indépendant du contexte
+// React et fonctionne donc seule, comme déjà utilisé dans BottomSheet/ScreenContainer.
+const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 
 export type ToastVariant = 'info' | 'success' | 'error';
 
@@ -61,7 +67,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {toast ? (
-        <Animated.View
+        <AnimatedSafeAreaView
+          edges={['bottom', 'left', 'right']}
           accessibilityLiveRegion="polite"
           style={[
             styles.container,
@@ -71,14 +78,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               borderRadius: theme.radii.md,
               paddingHorizontal: theme.spacing.lg,
               paddingVertical: theme.spacing.md,
-              bottom: theme.spacing.xxl,
+              bottom: theme.spacing.md,
             },
           ]}
         >
           <AppText variant="label" color="onPrimary">
             {toast.message}
           </AppText>
-        </Animated.View>
+        </AnimatedSafeAreaView>
       ) : null}
     </ToastContext.Provider>
   );

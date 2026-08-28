@@ -45,6 +45,36 @@ describe('useUploads', () => {
     appendSpy.mockRestore();
   });
 
+  it('useUploadCover rejects without calling the API when no household is selected', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = await renderHook(() => useUploadCover(null), { wrapper });
+
+    await act(async () => {
+      await expect(
+        result.current.mutateAsync({
+          uri: 'file:///tmp/cover.jpg',
+          name: 'cover.jpg',
+          type: 'image/jpeg',
+        }),
+      ).rejects.toThrow();
+    });
+
+    expect(mockApiClient.uploads.upload).not.toHaveBeenCalled();
+  });
+
+  it('useDeleteUpload rejects without calling the API when no household is selected', async () => {
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = await renderHook(() => useDeleteUpload(null), { wrapper });
+
+    await act(async () => {
+      await expect(result.current.mutateAsync('file-1')).rejects.toThrow();
+    });
+
+    expect(mockApiClient.uploads.remove).not.toHaveBeenCalled();
+  });
+
   it('useDeleteUpload forwards the upload id', async () => {
     (mockApiClient.uploads.remove as jest.Mock).mockResolvedValue(undefined);
     const { wrapper } = createQueryWrapper();

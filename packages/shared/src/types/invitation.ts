@@ -12,7 +12,12 @@ export interface HouseholdInvitation {
   createdAt: string;
 }
 
-/** Renvoyé uniquement par `POST /households/:householdId/invitations` (jeton en clair, développement uniquement). */
+/**
+ * Renvoyé uniquement par `POST /households/:householdId/invitations`. Le jeton en
+ * clair est toujours inclus (pour permettre à l'inviteur de partager le lien
+ * manuellement) ; `emailDelivered` indique si l'envoi de l'email a réellement abouti.
+ */
 export interface HouseholdInvitationWithToken extends HouseholdInvitation {
   token: string;
+  emailDelivered: boolean;
 }

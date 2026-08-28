@@ -47,6 +47,7 @@ export default function InvitationsScreen() {
   const revokeInvitation = useRevokeInvitation(householdId);
 
   const [lastToken, setLastToken] = useState<string | null>(null);
+  const [lastEmailDelivered, setLastEmailDelivered] = useState(false);
   const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
 
   const currentRole = households.find((h) => h.id === householdId)?.role;
@@ -66,8 +67,14 @@ export default function InvitationsScreen() {
     try {
       const invitation = await createInvitation.mutateAsync(email);
       setLastToken(invitation.token);
+      setLastEmailDelivered(invitation.emailDelivered);
       reset({ email: '' });
-      showToast('Invitation envoyée.', 'success');
+      showToast(
+        invitation.emailDelivered
+          ? 'Invitation envoyée par email.'
+          : "Invitation créée, mais l'email n'a pas pu être envoyé. Partagez le lien ci-dessous.",
+        invitation.emailDelivered ? 'success' : 'error',
+      );
     } catch (error) {
       showToast(getErrorMessage(error), 'error');
     }
@@ -136,14 +143,15 @@ export default function InvitationsScreen() {
             }}
           >
             <AppText variant="label" color="textMuted">
-              Jeton d’invitation (développement)
+              Lien d’invitation
             </AppText>
             <AppText variant="body" selectable>
               {lastToken}
             </AppText>
-            <AppText variant="helper" color="textMuted">
-              En production, ce jeton est envoyé par email — ici il est affiché pour vous permettre
-              de le partager manuellement.
+            <AppText variant="helper" color={lastEmailDelivered ? 'textMuted' : 'danger'}>
+              {lastEmailDelivered
+                ? 'Cette invitation a aussi été envoyée par email.'
+                : "L'email n'a pas pu être envoyé. Partagez ce code manuellement avec la personne invitée."}
             </AppText>
           </View>
         ) : null}

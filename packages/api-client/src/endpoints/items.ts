@@ -4,6 +4,7 @@ import type {
   DvdMetadata,
   Item,
   ItemCondition,
+  ItemRating,
   ItemsQueryParams,
   PaginatedResult,
 } from '@notre-nid/shared';
@@ -16,6 +17,7 @@ export interface ItemInput {
   categoryId: string;
   title: string;
   condition: ItemCondition;
+  rating?: ItemRating;
   description?: string;
   notes?: string;
   coverImageUrl?: string;

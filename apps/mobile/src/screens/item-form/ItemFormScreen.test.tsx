@@ -96,7 +96,7 @@ describe('ItemFormScreen', () => {
     (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
     const view = await renderScreen(<ItemFormScreen mode="create" />);
 
-    await waitFor(() => expect(view.getByText('Choisissez une catégorie')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
 
@@ -108,10 +108,9 @@ describe('ItemFormScreen', () => {
     (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
     const view = await renderScreen(<ItemFormScreen mode="create" />);
 
-    await waitFor(() => expect(view.getByText('Choisissez une catégorie')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
 
-    await fireEvent.press(view.getByLabelText('Catégorie : Choisissez une catégorie'));
-    await fireEvent.press(view.getByText('Livre'));
+    await fireEvent.press(view.getByLabelText('Livre'));
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
@@ -143,12 +142,12 @@ describe('ItemFormScreen', () => {
     expect(
       view.getByText('Impossible de joindre le service. Vérifiez votre connexion et réessayez.'),
     ).toBeTruthy();
-    expect(view.queryByText('Choisissez une catégorie')).toBeNull();
+    expect(view.queryByText('Livre')).toBeNull();
 
     (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
     await fireEvent.press(view.getByRole('button', { name: 'Réessayer' }));
 
-    await waitFor(() => expect(view.getByText('Choisissez une catégorie')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
   });
 
   it('shows a retryable error state instead of silently emptying the owner picker when the members request fails', async () => {
@@ -156,6 +155,6 @@ describe('ItemFormScreen', () => {
     const view = await renderScreen(<ItemFormScreen mode="create" />);
 
     await waitFor(() => expect(view.getByText('Membres indisponibles')).toBeTruthy());
-    expect(view.queryByText('Choisissez une catégorie')).toBeNull();
+    expect(view.queryByText('Livre')).toBeNull();
   });
 });

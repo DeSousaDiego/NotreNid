@@ -5,6 +5,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsEnum,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -17,6 +18,7 @@ import {
 import { BookMetadataDto } from './book-metadata.dto';
 import { CdMetadataDto } from './cd-metadata.dto';
 import { DvdMetadataDto } from './dvd-metadata.dto';
+import { ITEM_RATING_VALUES, type ItemRatingValue } from '../item-rating.constants';
 
 export class CreateItemDto {
   @ApiProperty()
@@ -38,6 +40,14 @@ export class CreateItemDto {
   @ApiProperty({ enum: ItemCondition })
   @IsEnum(ItemCondition)
   condition!: ItemCondition;
+
+  @ApiPropertyOptional({
+    enum: ITEM_RATING_VALUES,
+    description: 'Note sur 5, par pas de 0,5. Absente = pas de note.',
+  })
+  @IsOptional()
+  @IsIn(ITEM_RATING_VALUES)
+  rating?: ItemRatingValue;
 
   @ApiPropertyOptional()
   @IsOptional()
