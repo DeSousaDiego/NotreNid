@@ -11,7 +11,8 @@
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "pnpm --filter \"@notre-nid/api-client...\" --if-present run build"
   },
   "dependencies": {
     "@expo-google-fonts/nunito-sans": "^0.4.2",
