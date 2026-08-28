@@ -9,6 +9,11 @@ import {
 
 import FiltersScreen from './filters';
 
+// expo-image's module-level analytics-integration probing isn't compatible with
+// this jest environment; the components barrel pulls it in via ItemCard even
+// though this screen never renders one (see docs/PHASE_STATUS.md Phase 3B).
+jest.mock('expo-image', () => ({ Image: () => null }));
+
 const mockApiClient = createMockApiClient();
 
 jest.mock('../../../providers/AuthProvider', () => ({
