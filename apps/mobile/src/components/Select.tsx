@@ -61,10 +61,19 @@ export function Select<T extends string>({
         <Ionicons name="chevron-down" size={theme.iconSizes.sm} color={theme.colors.textMuted} />
       </Pressable>
 
-      <BottomSheet visible={open} onClose={() => setOpen(false)} title={label}>
+      <BottomSheet visible={open} onClose={() => setOpen(false)} title={label} scrollable={false}>
         <FlatList
           data={allowClear ? [{ value: undefined, label: placeholder }, ...options] : options}
           keyExtractor={(item) => item.value ?? '__clear__'}
+          ListEmptyComponent={
+            <AppText
+              variant="body"
+              color="textMuted"
+              style={{ paddingVertical: theme.spacing.md, textAlign: 'center' }}
+            >
+              Aucune option disponible pour le moment.
+            </AppText>
+          }
           renderItem={({ item }) => {
             const isSelected = item.value === value;
             return (

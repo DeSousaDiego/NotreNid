@@ -108,6 +108,33 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
     );
   }
 
+  // Sans catégories, l'étape 1 est bloquante (impossible de choisir une catégorie, donc
+  // impossible de continuer) — une erreur réseau ne doit jamais se traduire silencieusement
+  // par un sélecteur vide sans explication.
+  if (categoriesQuery.isError) {
+    return (
+      <ScreenContainer>
+        <ErrorState
+          title="Catégories indisponibles"
+          message={getErrorMessage(categoriesQuery.error)}
+          onRetry={() => void categoriesQuery.refetch()}
+        />
+      </ScreenContainer>
+    );
+  }
+
+  if (membersQuery.isError) {
+    return (
+      <ScreenContainer>
+        <ErrorState
+          title="Membres indisponibles"
+          message={getErrorMessage(membersQuery.error)}
+          onRetry={() => void membersQuery.refetch()}
+        />
+      </ScreenContainer>
+    );
+  }
+
   const goNext = async () => {
     clearErrors();
     if (step === 0) {

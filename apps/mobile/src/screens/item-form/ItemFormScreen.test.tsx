@@ -1,3 +1,4 @@
+import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
@@ -132,5 +133,29 @@ describe('ItemFormScreen', () => {
       }),
     );
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/collection'));
+  });
+
+  it('shows a retryable error state instead of a blank category picker when the categories request fails', async () => {
+    (mockApiClient.categories.list as jest.Mock).mockRejectedValue(new NetworkError());
+    const view = await renderScreen(<ItemFormScreen mode="create" />);
+
+    await waitFor(() => expect(view.getByText('Catégories indisponibles')).toBeTruthy());
+    expect(
+      view.getByText('Impossible de joindre le service. Vérifiez votre connexion et réessayez.'),
+    ).toBeTruthy();
+    expect(view.queryByText('Choisissez une catégorie')).toBeNull();
+
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
+    await fireEvent.press(view.getByRole('button', { name: 'Réessayer' }));
+
+    await waitFor(() => expect(view.getByText('Choisissez une catégorie')).toBeTruthy());
+  });
+
+  it('shows a retryable error state instead of silently emptying the owner picker when the members request fails', async () => {
+    (mockApiClient.households.listMembers as jest.Mock).mockRejectedValue(new NetworkError());
+    const view = await renderScreen(<ItemFormScreen mode="create" />);
+
+    await waitFor(() => expect(view.getByText('Membres indisponibles')).toBeTruthy());
+    expect(view.queryByText('Choisissez une catégorie')).toBeNull();
   });
 });
