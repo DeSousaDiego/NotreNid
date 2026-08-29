@@ -26,19 +26,32 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
 
   const pickImage = async () => {
     setError(null);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setError('Accédez à vos photos depuis les réglages pour choisir une couverture.');
+    let asset: ImagePicker.ImagePickerAsset;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError('Accédez à vos photos depuis les réglages pour choisir une couverture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      asset = result.assets[0];
+    } catch (pickerError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[useCoverPicker] picker failed', {
+          errorType:
+            pickerError instanceof Error ? pickerError.constructor.name : typeof pickerError,
+          message: pickerError instanceof Error ? pickerError.message : String(pickerError),
+        });
+      }
+      setError(getErrorMessage(pickerError));
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
     setLocalPreviewUri(asset.uri);
 
     if (process.env.NODE_ENV !== 'production') {
