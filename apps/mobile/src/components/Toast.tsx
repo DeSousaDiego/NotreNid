@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -53,6 +54,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     },
     [opacity],
   );
+
+  useEffect(() => {
+    return () => {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    };
+  }, []);
 
   const value = useMemo(() => ({ showToast }), [showToast]);
 
