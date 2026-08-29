@@ -620,7 +620,7 @@
             "bearer": []
           }
         ],
-        "summary": "Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). En développement, le jeton d'acceptation est renvoyé en clair.",
+        "summary": "Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). Le jeton d'acceptation est toujours renvoyé en clair au demandeur (pour partage manuel du lien) ; `emailDelivered` indique si l'email a réellement pu être envoyé.",
         "tags": [
           "invitations"
         ]
@@ -1771,6 +1771,22 @@
               "POOR"
             ]
           },
+          "rating": {
+            "type": "number",
+            "enum": [
+              0.5,
+              1,
+              1.5,
+              2,
+              2.5,
+              3,
+              3.5,
+              4,
+              4.5,
+              5
+            ],
+            "description": "Note sur 5, par pas de 0,5. Absente = pas de note."
+          },
           "notes": {
             "type": "string"
           },
@@ -1827,6 +1843,22 @@
               "FAIR",
               "POOR"
             ]
+          },
+          "rating": {
+            "type": "number",
+            "enum": [
+              0.5,
+              1,
+              1.5,
+              2,
+              2.5,
+              3,
+              3.5,
+              4,
+              4.5,
+              5
+            ],
+            "description": "Note sur 5, par pas de 0,5. Absente = pas de note."
           },
           "notes": {
             "type": "string"

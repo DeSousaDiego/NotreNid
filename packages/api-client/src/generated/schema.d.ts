@@ -239,7 +239,7 @@ export interface paths {
         /** Liste les invitations en attente du household (réservé à OWNER/ADMIN). */
         get: operations["InvitationsController_list"];
         put?: never;
-        /** Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). En développement, le jeton d'acceptation est renvoyé en clair. */
+        /** Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). Le jeton d'acceptation est toujours renvoyé en clair au demandeur (pour partage manuel du lien) ; `emailDelivered` indique si l'email a réellement pu être envoyé. */
         post: operations["InvitationsController_create"];
         delete?: never;
         options?: never;
@@ -547,6 +547,11 @@ export interface components {
             description?: string;
             /** @enum {string} */
             condition: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
+            /**
+             * @description Note sur 5, par pas de 0,5. Absente = pas de note.
+             * @enum {number}
+             */
+            rating?: 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
             notes?: string;
             coverImageUrl?: string;
             /** @description IDs des membres propriétaires (au moins un) */
@@ -564,6 +569,11 @@ export interface components {
             description?: string;
             /** @enum {string} */
             condition?: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
+            /**
+             * @description Note sur 5, par pas de 0,5. Absente = pas de note.
+             * @enum {number}
+             */
+            rating?: 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
             notes?: string;
             coverImageUrl?: string;
             /** @description IDs des membres propriétaires (au moins un) */
