@@ -69,11 +69,35 @@ describe('useCoverPicker', () => {
     expect(mockApiClient.uploads.upload).not.toHaveBeenCalled();
   });
 
-  it('still uploads normally when the picker succeeds', async () => {
+  it('does nothing and sets no error when the user cancels the picker', async () => {
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({ canceled: true, assets: null });
+    const onChange = jest.fn();
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = await renderHook(
+      () => useCoverPicker({ householdId: HOUSEHOLD_ID, value: '', onChange }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.pickImage();
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.previewUri).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(mockApiClient.uploads.upload).not.toHaveBeenCalled();
+  });
+
+  it('uploads a JPEG asset and calls onChange with the remote URL, even without fileName/mimeType from the picker', async () => {
     ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
     ImagePicker.launchImageLibraryAsync.mockResolvedValue({
       canceled: false,
-      assets: [{ uri: 'file:///tmp/cover.jpg', fileName: 'cover.jpg', mimeType: 'image/jpeg' }],
+      // Android peut ne fournir ni fileName ni mimeType (voir docs/NOTRE_NID_PRD.md
+      // section 6) — le nouveau flux ne dépend plus de ces champs (dérivés de l'URI
+      // par `File`), donc ce cas doit fonctionner comme les autres.
+      assets: [{ uri: 'file:///tmp/1000043961.jpg', fileName: null, mimeType: null }],
     });
     (mockApiClient.uploads.upload as jest.Mock).mockResolvedValue({
       id: 'file-1',
@@ -93,5 +117,32 @@ describe('useCoverPicker', () => {
 
     expect(result.current.error).toBeNull();
     expect(onChange).toHaveBeenCalledWith('http://api.test/uploads/file-1.jpg');
+    expect(mockApiClient.uploads.upload).toHaveBeenCalledWith(HOUSEHOLD_ID, expect.any(FormData));
+  });
+
+  it('surfaces a user-facing error and clears the local preview when the upload itself fails', async () => {
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/cover.jpg', fileName: 'cover.jpg', mimeType: 'image/jpeg' }],
+    });
+    (mockApiClient.uploads.upload as jest.Mock).mockRejectedValue(
+      new Error('Formats acceptés : JPEG, PNG, WebP.'),
+    );
+    const onChange = jest.fn();
+    const { wrapper } = createQueryWrapper();
+
+    const { result } = await renderHook(
+      () => useCoverPicker({ householdId: HOUSEHOLD_ID, value: '', onChange }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.pickImage();
+    });
+
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.previewUri).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

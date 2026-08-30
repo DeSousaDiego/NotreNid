@@ -45,3 +45,7 @@ Champs communs sur `Item` (titre, description, état, notes) + tables spécialis
 ## Pas de client API généré depuis OpenAPI (Phase 4)
 
 `packages/api-client` reste manuscrit ; une vérification compilée (`packages/api-client/src/contract.ts`, types générés via `openapi-typescript`) détecte toute dérive avec le contrat réel sans réécrire un client déjà validé et testé depuis la Phase 3A — voir `docs/PHASE_STATUS.md` (Phase 4) pour le détail.
+
+## Upload d'image mobile : `expo-file-system` `File`, jamais `{ uri, name, type }`
+
+Le SDK Expo installé (57) remplace le `fetch` global par sa propre implémentation « Winter » (`expo/src/winter/fetch`), qui ne sait plus sérialiser la pseudo-partie `FormData` historique de React Native (`{ uri, name, type }`) — elle lève `Unsupported FormDataPart implementation` (confirmé en lisant le code source installé, pas la documentation : `expo/src/winter/fetch/convertFormData.ts` n'accepte qu'une chaîne, un vrai `Blob`, ou tout objet exposant `.bytes()`). `useUploads.ts` construit donc systématiquement un `expo-file-system` `File` (qui expose `.bytes()` et dérive nom/type MIME de l'URI elle-même, sans dépendre de `fileName`/`mimeType` — souvent absents côté Android) avant de l'ajouter au `FormData`. Ne jamais revenir à la pseudo-partie `{ uri, name, type }` pour un upload de fichier local sur mobile.

@@ -1,31 +1,8 @@
-import { ApiError, NetworkError } from '@notre-nid/api-client';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 
 import { useDeleteUpload, useUploadCover } from '../../hooks/useUploads';
 import { getErrorMessage } from '../../lib/errorMessage';
-
-/**
- * DIAGNOSTIC TEMPORAIRE (bug d'upload de couverture sur build preview) : les
- * `console.warn` gardés par `NODE_ENV !== 'production'` ne s'exécutent jamais
- * dans un bundle JS de production (preview/production EAS), donc invisibles
- * même avec un appareil branché. Cette fonction rend la cause technique
- * exacte visible directement dans l'UI (voir `setError` ci-dessous). À
- * retirer une fois la cause du bug confirmée — ne jamais logguer/afficher
- * tokens, secrets, ni contenu binaire.
- */
-function describeUploadErrorForDebug(error: unknown): string {
-  if (error instanceof ApiError) {
-    return `API ${error.statusCode} ${error.code}: ${error.message}`;
-  }
-  if (error instanceof NetworkError) {
-    const cause = error.cause;
-    if (cause instanceof Error) return `fetch ${cause.name}: ${cause.message}`;
-    return `fetch: ${String(cause)}`;
-  }
-  if (error instanceof Error) return `${error.name}: ${error.message}`;
-  return String(error);
-}
 
 export interface UseCoverPickerOptions {
   householdId: string | null;
@@ -80,18 +57,12 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[useCoverPicker] asset picked', {
         uriScheme: asset.uri.split(':')[0],
-        fileName: asset.fileName,
-        mimeType: asset.mimeType,
         hasHouseholdId: Boolean(householdId),
       });
     }
 
     try {
-      const uploaded = await uploadMutation.mutateAsync({
-        uri: asset.uri,
-        name: asset.fileName ?? 'cover.jpg',
-        type: asset.mimeType ?? 'image/jpeg',
-      });
+      const uploaded = await uploadMutation.mutateAsync({ uri: asset.uri });
       setUploadedId(uploaded.id);
       onChange(uploaded.url);
     } catch (uploadError) {
@@ -103,11 +74,7 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
         });
       }
       setLocalPreviewUri(null);
-      // DIAGNOSTIC TEMPORAIRE : détail technique ajouté au message affiché — retirer
-      // `debugDetail` une fois la cause confirmée (voir describeUploadErrorForDebug).
-      const debugDetail = describeUploadErrorForDebug(uploadError);
-      const assetSummary = `uri=${asset.uri.split(':')[0]}://… name=${asset.fileName ?? '∅'} type=${asset.mimeType ?? '∅'} size=${asset.fileSize ?? '∅'}`;
-      setError(`${getErrorMessage(uploadError)} [DEBUG: ${debugDetail} | ${assetSummary}]`);
+      setError(getErrorMessage(uploadError));
     }
   };
 

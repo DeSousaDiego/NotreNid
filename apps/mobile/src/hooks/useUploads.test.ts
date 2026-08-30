@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native';
+import { File } from 'expo-file-system';
 
 import { createMockApiClient } from '../test-utils/mockApiClient';
 import { createQueryWrapper } from '../test-utils/queryWrapper';
@@ -18,7 +19,10 @@ describe('useUploads', () => {
     jest.clearAllMocks();
   });
 
-  it('useUploadCover builds a FormData with the local file and uploads it', async () => {
+  it('useUploadCover wraps the local URI in a real File (Blob-compatible) and uploads it', async () => {
+    // Expo's global fetch only recognizes string, Blob, or `.bytes()`-capable parts in a
+    // FormData — the historical React Native `{ uri, name, type }` object throws
+    // "Unsupported FormDataPart implementation" (see useUploads.ts for the full story).
     (mockApiClient.uploads.upload as jest.Mock).mockResolvedValue({
       id: 'file-1',
       url: 'http://api.test/uploads/file-1.jpg',
@@ -29,18 +33,13 @@ describe('useUploads', () => {
     const { result } = await renderHook(() => useUploadCover(HOUSEHOLD_ID), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync({
-        uri: 'file:///tmp/cover.jpg',
-        name: 'cover.jpg',
-        type: 'image/jpeg',
-      });
+      await result.current.mutateAsync({ uri: 'file:///tmp/cover.jpg' });
     });
 
-    expect(appendSpy).toHaveBeenCalledWith('file', {
-      uri: 'file:///tmp/cover.jpg',
-      name: 'cover.jpg',
-      type: 'image/jpeg',
-    });
+    expect(appendSpy).toHaveBeenCalledWith('file', expect.any(File));
+    const [, uploadedPart] = appendSpy.mock.calls[0] as [string, File];
+    expect(uploadedPart.uri).toBe('file:///tmp/cover.jpg');
+    expect(uploadedPart.name).toBe('cover.jpg');
     expect(mockApiClient.uploads.upload).toHaveBeenCalledWith(HOUSEHOLD_ID, expect.any(FormData));
     appendSpy.mockRestore();
   });
@@ -51,13 +50,7 @@ describe('useUploads', () => {
     const { result } = await renderHook(() => useUploadCover(null), { wrapper });
 
     await act(async () => {
-      await expect(
-        result.current.mutateAsync({
-          uri: 'file:///tmp/cover.jpg',
-          name: 'cover.jpg',
-          type: 'image/jpeg',
-        }),
-      ).rejects.toThrow();
+      await expect(result.current.mutateAsync({ uri: 'file:///tmp/cover.jpg' })).rejects.toThrow();
     });
 
     expect(mockApiClient.uploads.upload).not.toHaveBeenCalled();

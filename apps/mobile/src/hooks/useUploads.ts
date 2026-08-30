@@ -1,12 +1,11 @@
 import type { UploadResult } from '@notre-nid/api-client';
 import { useMutation } from '@tanstack/react-query';
+import { File } from 'expo-file-system';
 
 import { useApiClient } from '../providers/AuthProvider';
 
 export interface LocalImageFile {
   uri: string;
-  name: string;
-  type: string;
 }
 
 export function useUploadCover(householdId: string | null) {
@@ -24,20 +23,18 @@ export function useUploadCover(householdId: string | null) {
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[useUploadCover] uploading', {
           uriScheme: file.uri.split(':')[0],
-          hasName: Boolean(file.name),
-          type: file.type,
           householdId,
         });
       }
       const formData = new FormData();
-      // React Native's FormData accepts { uri, name, type } for files, but the
-      // global type here resolves to the DOM FormData (lib "DOM"), which only
-      // types `Blob` — the RN runtime supports both.
-      formData.append('file', {
-        uri: file.uri,
-        name: file.name,
-        type: file.type,
-      } as unknown as Blob);
+      // Le fetch global installé par Expo (voir docs/DECISIONS.md) ne sait plus
+      // sérialiser la pseudo-partie React Native historique `{ uri, name, type }` —
+      // il lève "Unsupported FormDataPart implementation" (confirmé en lisant
+      // expo/src/winter/fetch/convertFormData.ts : seuls string, Blob et tout objet
+      // exposant .bytes() sont reconnus). Un vrai `File` expose `.bytes()`, et dérive
+      // nom/type MIME directement de l'URI — donc correct même si le picker ne
+      // fournit ni fileName ni mimeType.
+      formData.append('file', new File(file.uri));
       return apiClient.uploads.upload(householdId, formData);
     },
   });
