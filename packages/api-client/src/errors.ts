@@ -21,12 +21,17 @@ export class ApiError extends Error {
  * Échec de connexion réseau (API injoignable, hors ligne, timeout), distinct
  * d'une erreur applicative renvoyée par l'API. Voir docs/NOTRE_NID_PRD.md
  * section 4.10 pour le message affiché à l'utilisateur.
+ *
+ * `cause` porte l'erreur `fetch` d'origine (jamais affichée par défaut, voir
+ * `getErrorMessage`) — sans elle, la cause d'un échec réseau bas niveau
+ * (URI illisible, body malformé, etc.) était silencieusement perdue.
  */
 export class NetworkError extends Error {
   constructor(
     message = 'Impossible de joindre le service. Vérifiez votre connexion et réessayez.',
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, cause !== undefined ? { cause } : undefined);
     this.name = 'NetworkError';
   }
 }

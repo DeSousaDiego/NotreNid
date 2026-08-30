@@ -82,12 +82,16 @@ describe('createHttpClient', () => {
     );
   });
 
-  it('wraps a fetch failure in a NetworkError', async () => {
+  it('wraps a fetch failure in a NetworkError, preserving the original error as `cause`', async () => {
     const tokenStorage = createMemoryTokenStorage({ accessToken: 'a', refreshToken: 'r' });
-    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    const originalError = new TypeError('Failed to fetch');
+    fetchMock.mockRejectedValue(originalError);
 
     const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage });
-    await expect(http.request('/me')).rejects.toBeInstanceOf(NetworkError);
+    const error = await http.request('/me').catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect((error as NetworkError).cause).toBe(originalError);
   });
 
   it('refreshes once on 401 and retries the original request', async () => {

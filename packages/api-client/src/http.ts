@@ -56,8 +56,11 @@ export function createHttpClient(config: ApiClientConfig) {
             ? JSON.stringify(options.body)
             : undefined,
       });
-    } catch {
-      throw new NetworkError();
+    } catch (error) {
+      // `cause` porte l'erreur `fetch` d'origine, jamais affichée par défaut
+      // (voir NetworkError) — nécessaire pour diagnostiquer un échec bas
+      // niveau (ex. upload multipart) sans la perdre silencieusement.
+      throw new NetworkError(undefined, error);
     }
   }
 
