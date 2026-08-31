@@ -7,6 +7,7 @@
 export const APP_NAME = 'Notre Nid' as const;
 
 export * from './countries';
+export * from './invitation-code';
 export * from './types/api-error';
 export * from './types/auth';
 export * from './types/category';

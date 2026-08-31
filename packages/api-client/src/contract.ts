@@ -46,7 +46,7 @@ export type ApiClientContractChecks = [
   // Invitations
   ExpectTrue<MethodExists<'/households/{householdId}/invitations', 'post'>>,
   ExpectTrue<MethodExists<'/households/{householdId}/invitations', 'get'>>,
-  ExpectTrue<MethodExists<'/invitations/{token}/accept', 'post'>>,
+  ExpectTrue<MethodExists<'/invitations/accept', 'post'>>,
   ExpectTrue<MethodExists<'/invitations/{invitationId}/revoke', 'post'>>,
 
   // Catégories

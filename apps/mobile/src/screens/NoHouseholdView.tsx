@@ -1,14 +1,23 @@
+import { normalizeInvitationCode } from '@notre-nid/shared';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { View } from 'react-native';
 import { z } from 'zod';
 
-import { AppText, Button, ScreenContainer, TextField, useToast } from '../components';
+import {
+  AppText,
+  Button,
+  InvitationCodeField,
+  ScreenContainer,
+  TextField,
+  useToast,
+} from '../components';
 import { useAcceptInvitation } from '../hooks/useInvitations';
 import { useCreateHousehold } from '../hooks/useHouseholdMutations';
 import { getErrorMessage } from '../lib/errorMessage';
 import { useAuth } from '../providers/AuthProvider';
+import { useHousehold } from '../providers/HouseholdProvider';
 import { useTheme } from '../theme';
 
 const createSchema = z.object({
@@ -17,7 +26,7 @@ const createSchema = z.object({
 type CreateFormValues = z.infer<typeof createSchema>;
 
 const joinSchema = z.object({
-  token: z.string().min(1, 'Le jeton d’invitation est requis.'),
+  code: z.string().min(1, "Le code d'invitation est requis."),
 });
 type JoinFormValues = z.infer<typeof joinSchema>;
 
@@ -31,6 +40,7 @@ export function NoHouseholdView() {
   const theme = useTheme();
   const { showToast } = useToast();
   const { logout } = useAuth();
+  const { selectHousehold } = useHousehold();
   const createHousehold = useCreateHousehold();
   const acceptInvitation = useAcceptInvitation();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -41,7 +51,7 @@ export function NoHouseholdView() {
   });
   const joinForm = useForm<JoinFormValues>({
     resolver: zodResolver(joinSchema),
-    defaultValues: { token: '' },
+    defaultValues: { code: '' },
   });
 
   const onCreate = createForm.handleSubmit(async ({ name }) => {
@@ -54,11 +64,12 @@ export function NoHouseholdView() {
     }
   });
 
-  const onJoin = joinForm.handleSubmit(async ({ token }) => {
+  const onJoin = joinForm.handleSubmit(async ({ code }) => {
     setSubmitError(null);
     try {
-      await acceptInvitation.mutateAsync(token.trim());
-      showToast('Vous avez rejoint le foyer.', 'success');
+      const result = await acceptInvitation.mutateAsync(normalizeInvitationCode(code));
+      selectHousehold(result.householdId);
+      showToast(`Bienvenue dans ${result.householdName} 🌿`, 'success');
     } catch (error) {
       setSubmitError(getErrorMessage(error));
     }
@@ -101,16 +112,13 @@ export function NoHouseholdView() {
           <AppText variant="section">Rejoindre un foyer</AppText>
           <Controller
             control={joinForm.control}
-            name="token"
+            name="code"
             render={({ field }) => (
-              <TextField
-                label="Jeton d'invitation"
+              <InvitationCodeField
                 value={field.value}
                 onChangeText={field.onChange}
                 onBlur={field.onBlur}
-                errorMessage={joinForm.formState.errors.token?.message}
-                autoCapitalize="none"
-                autoCorrect={false}
+                errorMessage={joinForm.formState.errors.code?.message}
               />
             )}
           />

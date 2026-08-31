@@ -80,18 +80,19 @@ describe('Households / Invitations / Items (e2e)', () => {
 
       const householdId = await createHousehold(alex.accessToken, 'Foyer e2e');
 
-      // Alex invite Sam.
+      // Alex generates an invitation code (no email required).
       const invitation = await request(server())
         .post(`/api/v1/households/${householdId}/invitations`)
         .set('Authorization', `Bearer ${alex.accessToken}`)
-        .send({ email: sam.email });
+        .send({});
       expect(invitation.status).toBe(201);
-      expect(typeof invitation.body.token).toBe('string');
+      expect(typeof invitation.body.code).toBe('string');
 
-      // Sam accepts using the raw token.
+      // Sam accepts using the raw code.
       const accept = await request(server())
-        .post(`/api/v1/invitations/${invitation.body.token}/accept`)
-        .set('Authorization', `Bearer ${sam.accessToken}`);
+        .post(`/api/v1/invitations/accept`)
+        .set('Authorization', `Bearer ${sam.accessToken}`)
+        .send({ code: invitation.body.code });
       expect(accept.status).toBe(201);
 
       // Sam is now a MEMBER and can list the household's members.

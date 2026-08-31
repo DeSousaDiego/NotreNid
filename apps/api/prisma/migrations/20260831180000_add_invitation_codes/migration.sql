@@ -1,0 +1,38 @@
+-- Bloc 2 — invitation par code (docs/NOTRE_NID_PRD.md).
+--
+-- IMPORTANT — ordre de déploiement : cette migration doit être appliquée AVANT de déployer
+-- le nouveau backend, pas après ni en parallèle. Le nouveau backend crée des invitations
+-- avec `email: null` (violerait NOT NULL sans le premier ALTER ci-dessous) et lit/écrit
+-- `revokedAt` (colonne inexistante sans le second ALTER) — voir docs/DECISIONS.md pour le
+-- détail. Dans l'autre sens, l'ancien backend reste indifférent à cette migration une fois
+-- appliquée (il fournit toujours un email non nul et ne référence jamais `revokedAt`).
+--
+-- Volontairement additive uniquement (aucune donnée détruite) : la colonne physique
+-- "tokenHash" n'est PAS renommée. Le modèle Prisma expose ce champ sous le nom métier
+-- `codeHash` via `@map("tokenHash")` (voir schema.prisma) — seul le nom au niveau
+-- ORM/TypeScript change, jamais la colonne en base. Ce choix évite spécifiquement toute
+-- fenêtre d'incompatibilité liée à CE renommage (l'ancien backend n'a jamais besoin que la
+-- colonne s'appelle autrement) ; il ne dispense pas du respect de l'ordre ci-dessus pour le
+-- reste de la migration.
+--
+-- Les valeurs "tokenHash" déjà présentes restent en base sous leur nom d'origine, mais
+-- deviennent silencieusement orphelines pour le nouveau backend : elles ont été calculées
+-- avec l'ancien algorithme (SHA-256 simple d'un jeton aléatoire de 64 caractères hex) alors
+-- que la vérification applicative utilise désormais HMAC-SHA256 avec une clé dérivée de
+-- JWT_ACCESS_SECRET sur un code normalisé de 8 caractères — aucune valeur existante ne peut
+-- donc jamais correspondre à un nouveau calcul de hash. Aucune conversion n'est possible (le
+-- jeton en clair n'a jamais été persisté) ; ces invitations pré-existantes expirent
+-- naturellement au plus tard 7 jours après leur création (INVITATION_TTL_MS) : aucune
+-- suppression explicite n'est nécessaire.
+--
+-- L'email n'est plus jamais requis pour créer une invitation (le code seul suffit) ; il
+-- reste possible en complément optionnel (notification best-effort, voir MailService).
+-- Rendre la colonne nullable est backward-compatible : l'ancien backend continue de fournir
+-- systématiquement une valeur non nulle, donc rien ne peut jamais violer NOT NULL après coup.
+ALTER TABLE "household_invitations" ALTER COLUMN "email" DROP NOT NULL;
+
+-- Révocation douce : remplace la suppression physique de la ligne (ancien comportement de
+-- InvitationsService.revoke), pour pouvoir afficher un statut honnête ("révoquée") plutôt
+-- que de la faire disparaître silencieusement de l'historique. Colonne nullable ajoutée à la
+-- fin de la table : invisible et sans effet pour l'ancien backend, qui ne la référence pas.
+ALTER TABLE "household_invitations" ADD COLUMN "revokedAt" TIMESTAMP(3);

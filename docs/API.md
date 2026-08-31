@@ -37,7 +37,7 @@ Ce document explique la structure générale ; pour le détail exact d'une route
 | Santé | `/health`, `/health/ready` | Liveness / readiness (vérifie réellement PostgreSQL) — sans authentification. |
 | Authentification | `/auth/*` | Inscription, connexion, refresh, déconnexion (simple/globale), profil courant. |
 | Households | `/households/*` | CRUD, membres, rôles, `leave`. |
-| Invitations | `/households/:id/invitations`, `/invitations/:token/accept`, `/invitations/:id/revoke` | Création, liste, acceptation par jeton, révocation. |
+| Invitations | `/households/:id/invitations`, `/invitations/accept`, `/invitations/:id/revoke` | Génération d'un code (email facultatif), liste, acceptation par code, révocation. |
 | Catégories | `/households/:id/categories/*` | Catégories système (lecture seule) + personnalisées (OWNER/ADMIN). |
 | Items | `/households/:id/items/*` | CRUD, recherche, filtres, tri, pagination, archivage/restauration (suppression logique). |
 | Uploads | `/households/:id/uploads` | Upload/suppression d'une image de couverture. |

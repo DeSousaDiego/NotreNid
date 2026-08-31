@@ -44,6 +44,7 @@ Toujours précédé d'une sauvegarde (`docs/BACKUP_AND_RESTORE.md`) pour toute m
 2. La renseigner dans la configuration de la plateforme d'hébergement (jamais dans un fichier commité).
 3. Redéployer/redémarrer l'API pour qu'elle prenne effet.
 4. **Effet de bord attendu pour `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET`** : tous les tokens émis avec l'ancien secret deviennent invalides — tous les utilisateurs sont déconnectés et doivent se reconnecter. Communiquer ce point avant une rotation planifiée (voir aussi « Révoquer des sessions » ci-dessous, qui a le même effet mais de façon ciblée).
+5. **Effet de bord supplémentaire pour `JWT_ACCESS_SECRET` spécifiquement** : le hash des codes d'invitation actifs (`HouseholdInvitation.codeHash`) est un HMAC dont la clé est dérivée de ce secret (voir `docs/DECISIONS.md`). Une rotation invalide donc silencieusement tout code d'invitation actif au moment du changement — la personne invitée doit demander un nouveau code après la rotation. Sans conséquence si aucune invitation n'est en attente à ce moment-là.
 
 ## Restaurer une base de données
 

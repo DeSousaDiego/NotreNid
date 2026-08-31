@@ -10,6 +10,7 @@ export { CountrySelect } from './CountrySelect';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { IconButton } from './IconButton';
+export { InvitationCodeField } from './InvitationCodeField';
 export { ItemCard } from './ItemCard';
 export { ItemCardSkeleton, LoadingSkeleton } from './LoadingSkeleton';
 export { OwnerAvatarGroup } from './OwnerAvatarGroup';

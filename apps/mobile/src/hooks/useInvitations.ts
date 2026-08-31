@@ -14,12 +14,13 @@ export function useInvitations(householdId: string | null) {
   });
 }
 
+/** `email` est facultatif (Bloc 2) : le code d'invitation suffit, sans SMTP. */
 export function useCreateInvitation(householdId: string | null) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (email: string) => apiClient.invitations.create(householdId as string, email),
+    mutationFn: (email?: string) => apiClient.invitations.create(householdId as string, email),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: queryKeys.invitations(householdId as string),
@@ -42,13 +43,17 @@ export function useRevokeInvitation(householdId: string | null) {
   });
 }
 
-/** Rejoindre un household via un jeton d'invitation (docs/NOTRE_NID_PRD.md section 2, point 6). */
+/**
+ * Rejoindre un household via un code d'invitation (docs/NOTRE_NID_PRD.md, Bloc 2). Résout
+ * avec `{ householdId, householdName, role }` : à l'appelant de sélectionner ce household
+ * (`useHousehold().selectHousehold`) pour y faire entrer l'utilisateur sans redémarrage.
+ */
 export function useAcceptInvitation() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (token: string) => apiClient.invitations.accept(token),
+    mutationFn: (code: string) => apiClient.invitations.accept(code),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.households });
     },

@@ -76,14 +76,30 @@ model HouseholdMember {
 }
 
 model HouseholdInvitation {
-  id           String    @id @default(uuid())
-  householdId  String
-  email        String
-  tokenHash    String    @unique
-  invitedById  String
-  expiresAt    DateTime
-  acceptedAt   DateTime?
-  createdAt    DateTime  @default(now())
+  id          String    @id @default(uuid())
+  householdId String
+  /// Facultatif depuis le Bloc 2 (invitation par code) : plus jamais requis pour créer une
+  /// invitation. Conservé pour un envoi email best-effort optionnel, et pour une future
+  /// invitation ciblée (voir docs/DECISIONS.md).
+  email       String?
+  /// Hash HMAC-SHA256 (clé dérivée de JWT_ACCESS_SECRET, jamais stockée en base — une
+  /// rotation de ce secret invalide donc tous les codes actifs, voir docs/OPERATIONS.md)
+  /// du code normalisé à 8 caractères (voir apps/api/src/invitations/invitation-code.util.ts).
+  /// `@map` volontaire vers la colonne physique `tokenHash` (nom hérité, pré-Bloc 2) :
+  /// renomme uniquement au niveau Prisma/TypeScript, jamais la colonne elle-même — la
+  /// migration associée ne fait donc aucun `RENAME` pour ce champ. Attention : cela ne
+  /// dispense PAS d'appliquer la migration avant de déployer ce backend — `email` nullable
+  /// et `revokedAt` (ci-dessous) sont deux ajouts dont ce code dépend réellement. Voir
+  /// docs/DECISIONS.md pour la portée exacte de cette compatibilité.
+  codeHash    String    @unique @map("tokenHash")
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  /// Révocation douce (Bloc 2) : remplace l'ancienne suppression physique de la ligne,
+  /// pour permettre d'afficher un statut honnête (« révoquée ») plutôt que de la faire
+  /// simplement disparaître.
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
 
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
   invitedBy User      @relation("InvitationInvitedBy", fields: [invitedById], references: [id])

@@ -23,7 +23,7 @@ describe('MailService', () => {
     const result = await service.sendInvitationEmail({
       to: 'sam@example.com',
       householdName: 'Le Nid',
-      invitationToken: 'raw-token',
+      invitationCode: 'raw-token',
     });
 
     expect(result).toEqual({ delivered: true });
@@ -40,7 +40,7 @@ describe('MailService', () => {
       service.sendInvitationEmail({
         to: 'sam@example.com',
         householdName: 'Le Nid',
-        invitationToken: 'raw-token',
+        invitationCode: 'raw-token',
       }),
     ).resolves.toEqual({ delivered: false });
   });
@@ -62,12 +62,12 @@ describe('MailService', () => {
     await devService.sendInvitationEmail({
       to: 'sam@example.com',
       householdName: 'Le Nid',
-      invitationToken: 'secret-token',
+      invitationCode: 'secret-token',
     });
     await prodService.sendInvitationEmail({
       to: 'sam@example.com',
       householdName: 'Le Nid',
-      invitationToken: 'secret-token',
+      invitationCode: 'secret-token',
     });
 
     expect(devLoggerSpy).toHaveBeenCalledWith(expect.stringContaining('secret-token'));

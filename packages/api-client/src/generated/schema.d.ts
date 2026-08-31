@@ -239,7 +239,7 @@ export interface paths {
         /** Liste les invitations en attente du household (réservé à OWNER/ADMIN). */
         get: operations["InvitationsController_list"];
         put?: never;
-        /** Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). Le jeton d'acceptation est toujours renvoyé en clair au demandeur (pour partage manuel du lien) ; `emailDelivered` indique si l'email a réellement pu être envoyé. */
+        /** Génère un nouveau code d'invitation pour ce household (réservé à OWNER/ADMIN). Un seul code est actif à la fois : en créer un nouveau révoque silencieusement le précédent. Le code en clair n'est renvoyé qu'ici (jamais par la liste) — à charge pour le demandeur de le partager. L'email est facultatif : s'il est fourni, une notification best-effort est tentée en plus (`emailDelivered` en rend compte). */
         post: operations["InvitationsController_create"];
         delete?: never;
         options?: never;
@@ -247,7 +247,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/invitations/{token}/accept": {
+    "/invitations/accept": {
         parameters: {
             query?: never;
             header?: never;
@@ -256,7 +256,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Accepte une invitation par son jeton (l'email du compte connecté doit correspondre à l'invitation). */
+        /** Rejoint un household grâce à un code d'invitation. Le code est normalisé côté serveur (casse, séparateurs, préfixe d'affichage) avant vérification. */
         post: operations["InvitationsPublicController_accept"];
         delete?: never;
         options?: never;
@@ -491,8 +491,18 @@ export interface components {
             role: "OWNER" | "ADMIN" | "MEMBER";
         };
         CreateInvitationDto: {
-            /** @example sam@example.com */
-            email: string;
+            /**
+             * @description Facultatif (Bloc 2) : le code d'invitation suffit à rejoindre le foyer. Si renseigné, une notification email best-effort est tentée en complément, sans jamais bloquer la création de l'invitation si l'envoi échoue.
+             * @example sam@example.com
+             */
+            email?: string;
+        };
+        AcceptInvitationDto: {
+            /**
+             * @description Code d'invitation à 8 caractères. Accepté avec ou sans séparateurs/préfixe d'affichage (« NID- »), insensible à la casse : normalisé côté serveur avant vérification. Un format invalide est rejeté avant toute recherche en base (évite de transformer cet endpoint en oracle de test de codes).
+             * @example NID-7K4P-2Q9D
+             */
+            code: string;
         };
         CategoryFieldSchemaDto: {
             /** @example edition */
@@ -1301,7 +1311,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Invitation créée. */
+            /** @description Invitation créée avec son code en clair. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1342,12 +1352,14 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                token: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInvitationDto"];
+            };
+        };
         responses: {
             /** @description Invitation acceptée, utilisateur ajouté au household. */
             201: {

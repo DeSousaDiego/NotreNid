@@ -32,17 +32,17 @@ export class MailService {
   async sendInvitationEmail(params: {
     to: string;
     householdName: string;
-    invitationToken: string;
+    invitationCode: string;
   }): Promise<{ delivered: boolean }> {
-    const { to, householdName, invitationToken } = params;
+    const { to, householdName, invitationCode } = params;
 
-    // En développement, sans service email externe configuré, on trace le lien/le
-    // jeton d'invitation dans les logs (voir docs/NOTRE_NID_PRD.md section 7).
-    // Ne jamais faire cela en production : le jeton ne doit pas finir dans des logs
-    // agrégés externes.
+    // En développement, sans service email externe configuré, on trace le code
+    // d'invitation dans les logs (voir docs/NOTRE_NID_PRD.md section 7).
+    // Ne jamais faire cela en production : le code ne doit pas finir dans des logs
+    // agrégés externes (voir aussi InvitationsService, qui ne le journalise jamais).
     if (this.configService.get<string>('NODE_ENV') !== 'production') {
       this.logger.log(
-        `Invitation pour ${to} au foyer "${householdName}" — jeton : ${invitationToken}`,
+        `Invitation pour ${to} au foyer "${householdName}" — code : ${invitationCode}`,
       );
     }
 
@@ -54,9 +54,9 @@ export class MailService {
         text: [
           `Vous avez été invité·e à rejoindre le foyer « ${householdName} » sur Notre Nid.`,
           '',
-          `Code d'invitation : ${invitationToken}`,
+          `Code d'invitation : ${invitationCode}`,
           '',
-          "Utilisez ce code dans l'application pour rejoindre le foyer.",
+          "Ouvrez l'application Notre Nid, choisissez « Rejoindre un foyer » et saisissez ce code.",
         ].join('\n'),
       });
       return { delivered: true };

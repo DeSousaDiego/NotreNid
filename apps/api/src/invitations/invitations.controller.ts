@@ -22,9 +22,13 @@ export class InvitationsController {
   @HouseholdRoles(HouseholdRole.OWNER, HouseholdRole.ADMIN)
   @ApiOperation({
     summary:
-      "Invite un utilisateur à rejoindre le household par email (réservé à OWNER/ADMIN). Le jeton d'acceptation est toujours renvoyé en clair au demandeur (pour partage manuel du lien) ; `emailDelivered` indique si l'email a réellement pu être envoyé.",
+      "Génère un nouveau code d'invitation pour ce household (réservé à OWNER/ADMIN). Un seul " +
+      'code est actif à la fois : en créer un nouveau révoque silencieusement le précédent. ' +
+      "Le code en clair n'est renvoyé qu'ici (jamais par la liste) — à charge pour le " +
+      "demandeur de le partager. L'email est facultatif : s'il est fourni, une notification " +
+      'best-effort est tentée en plus (`emailDelivered` en rend compte).',
   })
-  @ApiResponse({ status: 201, description: 'Invitation créée.' })
+  @ApiResponse({ status: 201, description: 'Invitation créée avec son code en clair.' })
   @ApiStandardErrors(400, 401, 403, 404)
   create(
     @Param('householdId') householdId: string,

@@ -43,7 +43,7 @@ describe('useInvitations', () => {
   it('useCreateInvitation forwards the email and invalidates the invitations list', async () => {
     (mockApiClient.invitations.create as jest.Mock).mockResolvedValue({
       id: 'inv-1',
-      token: 'raw-token',
+      code: '7K4P2Q9D',
     });
     const { queryClient, wrapper } = createQueryWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
@@ -75,18 +75,22 @@ describe('useInvitations', () => {
     expect(mockApiClient.invitations.revoke).toHaveBeenCalledWith('inv-1');
   });
 
-  it('useAcceptInvitation forwards the raw token and invalidates the households list', async () => {
-    (mockApiClient.invitations.accept as jest.Mock).mockResolvedValue({});
+  it('useAcceptInvitation forwards the raw code and invalidates the households list', async () => {
+    (mockApiClient.invitations.accept as jest.Mock).mockResolvedValue({
+      householdId: 'h1',
+      householdName: 'Le Nid',
+      role: 'MEMBER',
+    });
     const { queryClient, wrapper } = createQueryWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
     const { result } = await renderHook(() => useAcceptInvitation(), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync('raw-token');
+      await result.current.mutateAsync('7K4P2Q9D');
     });
 
-    expect(mockApiClient.invitations.accept).toHaveBeenCalledWith('raw-token');
+    expect(mockApiClient.invitations.accept).toHaveBeenCalledWith('7K4P2Q9D');
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['households'] }));
   });
 });
