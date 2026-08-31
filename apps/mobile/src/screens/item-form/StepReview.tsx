@@ -1,4 +1,4 @@
-import type { Category, HouseholdMember } from '@notre-nid/shared';
+import { getCountryName, type Category, type HouseholdMember } from '@notre-nid/shared';
 import { Image } from 'expo-image';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { ActivityIndicator, Pressable, View } from 'react-native';
@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AppText, Chip, ConditionBadge } from '../../components';
 import { useTheme } from '../../theme';
 
+import { countryLabelForSlug } from './metadataFields';
 import type { ItemFormValues } from './schema';
 import { useCoverPicker } from './useCoverPicker';
 
@@ -109,6 +110,12 @@ export function StepReview({
               .join(', ') || '—'
           }
         />
+        {values.countryCodes.length > 0 ? (
+          <SummaryRow
+            label={category ? countryLabelForSlug(category.slug) : 'Pays'}
+            value={values.countryCodes.map((code) => getCountryName(code) ?? code).join(', ')}
+          />
+        ) : null}
       </View>
     </View>
   );

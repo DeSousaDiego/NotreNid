@@ -135,6 +135,7 @@ model Item {
   createdBy     User          @relation("ItemCreatedBy", fields: [createdById], references: [id])
   updatedBy     User          @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
   owners        ItemOwner[]
+  countries     ItemCountry[]
   bookMetadata  BookMetadata?
   cdMetadata    CdMetadata?
   dvdMetadata   DvdMetadata?
@@ -154,6 +155,26 @@ model ItemOwner {
 
   @@unique([itemId, userId])
   @@map("item_owners")
+}
+
+model ItemCountry {
+  id          String   @id @default(uuid())
+  itemId      String
+  /// Code ISO 3166-1 alpha-2 en majuscules (ex. "FR", "BE"). Validé contre la liste
+  /// complète côté API (`@IsIn`, voir apps/api/src/items/iso-country-codes.constant.ts) ;
+  /// le CHECK ci-dessous (migration associée) n'en valide que le format, en seconde
+  /// ligne de défense (même logique que `Item.rating`, voir schema.prisma ci-dessus).
+  countryCode String
+  createdAt   DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, countryCode])
+  /// Future carte du monde (comptage d'items par pays, filtrable par catégorie via la
+  /// relation `item`) : cet index accélère les regroupements/filtres par `countryCode`
+  /// sans remettre en cause l'unicité `(itemId, countryCode)` ci-dessus.
+  @@index([countryCode])
+  @@map("item_countries")
 }
 
 model BookMetadata {

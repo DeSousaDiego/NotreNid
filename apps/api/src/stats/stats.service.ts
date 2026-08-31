@@ -34,6 +34,7 @@ export class StatsService {
       where: { id: { in: byCategory.map((c) => c.categoryId) } },
     });
     const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+    const categorySlugById = new Map(categories.map((c) => [c.id, c.slug]));
 
     const countByOwner = new Map<
       string,
@@ -54,6 +55,7 @@ export class StatsService {
       countByCategory: byCategory.map((c) => ({
         categoryId: c.categoryId,
         categoryName: categoryNameById.get(c.categoryId) ?? 'Inconnue',
+        categorySlug: categorySlugById.get(c.categoryId) ?? '',
         count: c._count._all,
       })),
       countByOwner: Array.from(countByOwner.values()),

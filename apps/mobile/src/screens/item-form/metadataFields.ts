@@ -51,3 +51,14 @@ export function metadataFieldsForSlug(slug: string): MetadataFieldConfig[] | nul
   if (slug === 'dvd') return DVD_FIELDS;
   return null;
 }
+
+/**
+ * Libellé du champ pays (générique sur `Item`, voir docs/NOTRE_NID_PRD.md — Bloc 1, point
+ * 1C), adapté à la catégorie pour rester parlant (ex. « Pays de l'artiste » pour un CD).
+ */
+export function countryLabelForSlug(slug: string): string {
+  if (slug === 'book') return "Pays d'origine";
+  if (slug === 'cd') return "Pays de l'artiste";
+  if (slug === 'dvd') return 'Pays de production';
+  return 'Pays';
+}

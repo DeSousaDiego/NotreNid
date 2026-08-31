@@ -39,6 +39,11 @@ export function StarRating({
     onChange?.(value === tapped ? null : tapped);
   };
 
+  // Zone tactile 44×44 uniquement lorsque les étoiles sont réellement pressables
+  // (section 4.6) : en lecture seule (ex. carte compacte de la collection), la
+  // cellule se réduit à la taille de l'icône pour permettre un affichage compact.
+  const cellSize = editable ? CELL_SIZE : iconSize;
+
   const stars = Array.from({ length: STAR_COUNT }, (_, index) => {
     const starCeiling = index + 1;
     const filled = (value ?? 0) >= starCeiling;
@@ -48,7 +53,7 @@ export function StarRating({
     const fullValue = starCeiling;
 
     return (
-      <View key={index} style={styles.cell}>
+      <View key={index} style={[styles.cell, { width: cellSize, height: cellSize }]}>
         <Ionicons name={iconName} size={iconSize} color={theme.colors.accent} />
         {editable ? (
           <View style={styles.touchOverlay} pointerEvents="box-none">
@@ -91,8 +96,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   cell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -184,12 +184,24 @@ describe('buildItemPayload', () => {
     const payload = buildItemPayload(values, CUSTOM_CATEGORY);
     expect(payload.customMetadata).toEqual({ edition: 'Collector' });
   });
+
+  it('passes the selected country codes through, and an empty array when none is set', () => {
+    expect(buildItemPayload(baseValues, BOOK_CATEGORY).countryCodes).toEqual([]);
+    expect(
+      buildItemPayload({ ...baseValues, countryCodes: ['FR', 'BE'] }, BOOK_CATEGORY).countryCodes,
+    ).toEqual(['FR', 'BE']);
+  });
 });
 
 describe('itemToFormValues', () => {
   it('maps an existing rated item back into form values', () => {
     const item = mockItem({ rating: 3.5 });
     expect(itemToFormValues(item).rating).toBe(3.5);
+  });
+
+  it('maps an existing item’s country codes back into form values', () => {
+    const item = mockItem({ countryCodes: ['JP'] });
+    expect(itemToFormValues(item).countryCodes).toEqual(['JP']);
   });
 
   it('maps an existing book item back into form values', () => {

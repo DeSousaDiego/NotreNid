@@ -29,4 +29,18 @@ describe('ItemCard', () => {
 
     expect(view.queryByText('Victor Hugo')).toBeNull();
   });
+
+  it('affiche la note lorsqu’elle est renseignée', async () => {
+    const item = mockItem({ rating: 3.5 });
+    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
+
+    expect(view.getByLabelText('Note : 3.5 sur 5')).toBeTruthy();
+  });
+
+  it('n’affiche aucune étoile lorsque la note est absente', async () => {
+    const item = mockItem({ rating: null });
+    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
+
+    expect(view.queryByLabelText(/Note :/)).toBeNull();
+  });
 });

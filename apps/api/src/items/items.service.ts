@@ -14,6 +14,7 @@ import type { UpdateItemDto } from './dto/update-item.dto';
 const ITEM_INCLUDE = {
   category: true,
   owners: { include: { user: true } },
+  countries: true,
   bookMetadata: true,
   cdMetadata: true,
   dvdMetadata: true,
@@ -105,6 +106,9 @@ export class ItemsService {
           createdById: userId,
           updatedById: userId,
           owners: { create: dto.ownerIds.map((ownerId) => ({ userId: ownerId })) },
+          countries: dto.countryCodes
+            ? { create: dto.countryCodes.map((countryCode) => ({ countryCode })) }
+            : undefined,
           bookMetadata: dto.book ? { create: dto.book } : undefined,
           cdMetadata: dto.cd ? { create: dto.cd } : undefined,
           dvdMetadata: dto.dvd ? { create: dto.dvd } : undefined,
@@ -150,6 +154,9 @@ export class ItemsService {
       if (dto.ownerIds) {
         await tx.itemOwner.deleteMany({ where: { itemId } });
       }
+      if (dto.countryCodes) {
+        await tx.itemCountry.deleteMany({ where: { itemId } });
+      }
 
       const item = await tx.item.update({
         where: { id: itemId },
@@ -169,6 +176,9 @@ export class ItemsService {
           updatedById: userId,
           owners: dto.ownerIds
             ? { create: dto.ownerIds.map((ownerId) => ({ userId: ownerId })) }
+            : undefined,
+          countries: dto.countryCodes
+            ? { create: dto.countryCodes.map((countryCode) => ({ countryCode })) }
             : undefined,
           bookMetadata: dto.book ? { upsert: { create: dto.book, update: dto.book } } : undefined,
           cdMetadata: dto.cd ? { upsert: { create: dto.cd, update: dto.cd } } : undefined,
@@ -340,6 +350,7 @@ export class ItemsService {
       coverImageUrl: item.coverImageUrl,
       notes: item.notes,
       customMetadata: item.customMetadata,
+      countryCodes: item.countries.map((c) => c.countryCode).sort(),
       archivedAt: item.archivedAt,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,

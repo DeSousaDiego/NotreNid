@@ -561,6 +561,14 @@ export interface components {
             dvd?: components["schemas"]["DvdMetadataDto"];
             /** @description Métadonnées pour une catégorie personnalisée */
             customMetadata?: Record<string, never>;
+            /**
+             * @description Codes pays ISO 3166-1 alpha-2 (facultatif, plusieurs valeurs possibles — ex. coproduction). Absent = ne pas modifier ; tableau vide = aucun pays.
+             * @example [
+             *       "FR",
+             *       "BE"
+             *     ]
+             */
+            countryCodes?: string[];
         };
         UpdateItemDto: {
             categoryId?: string;
@@ -583,6 +591,14 @@ export interface components {
             dvd?: components["schemas"]["DvdMetadataDto"];
             /** @description Métadonnées pour une catégorie personnalisée */
             customMetadata?: Record<string, never>;
+            /**
+             * @description Codes pays ISO 3166-1 alpha-2 (facultatif, plusieurs valeurs possibles — ex. coproduction). Absent = ne pas modifier ; tableau vide = aucun pays.
+             * @example [
+             *       "FR",
+             *       "BE"
+             *     ]
+             */
+            countryCodes?: string[];
         };
     };
     responses: never;

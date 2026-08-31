@@ -48,6 +48,7 @@ export const itemFormSchema = z.object({
   notes: z.string().max(2000, 'Les notes sont trop longues.').optional(),
   ownerIds: z.array(z.string()).min(1, 'Sélectionnez au moins un propriétaire.'),
   coverImageUrl: z.string().optional(),
+  countryCodes: z.array(z.string()),
   metadata: metadataGroupSchema,
   customMetadata: z.record(z.string(), z.string()),
 });
@@ -63,6 +64,7 @@ export const EMPTY_ITEM_FORM_VALUES: ItemFormValues = {
   notes: '',
   ownerIds: [],
   coverImageUrl: '',
+  countryCodes: [],
   metadata: {},
   customMetadata: {},
 };
@@ -108,6 +110,9 @@ export function itemToFormValues(item: Item): ItemFormValues {
     notes: item.notes ?? '',
     ownerIds: item.owners.map((owner) => owner.id),
     coverImageUrl: item.coverImageUrl ?? '',
+    // `?? []` : filet contre un déploiement OTA arrivant avant celui de l'API (ce champ
+    // serait alors absent d'une réponse encore émise par l'ancienne version de l'API).
+    countryCodes: item.countryCodes ?? [],
     metadata,
     customMetadata,
   };
@@ -159,6 +164,7 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
     notes: toOptionalString(values.notes),
     ownerIds: values.ownerIds,
     coverImageUrl: toOptionalString(values.coverImageUrl),
+    countryCodes: values.countryCodes,
   };
 
   if (category.slug === 'book') {

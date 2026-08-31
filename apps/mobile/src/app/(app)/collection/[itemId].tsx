@@ -1,3 +1,4 @@
+import { getCountryName } from '@notre-nid/shared';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -20,6 +21,7 @@ import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations'
 import { useItem } from '../../../hooks/useItem';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
+import { countryLabelForSlug } from '../../../screens/item-form/metadataFields';
 import { useTheme } from '../../../theme';
 
 function formatDate(value: string): string {
@@ -127,6 +129,17 @@ export default function ItemDetailScreen() {
             </AppText>
             <OwnerAvatarGroup owners={item.owners} max={6} />
           </View>
+
+          {(item.countryCodes ?? []).length > 0 ? (
+            <View style={{ gap: theme.spacing.xs }}>
+              <AppText variant="label" color="textMuted">
+                {countryLabelForSlug(item.category.slug)}
+              </AppText>
+              <AppText variant="body">
+                {item.countryCodes.map((code) => getCountryName(code) ?? code).join(', ')}
+              </AppText>
+            </View>
+          ) : null}
 
           {item.description ? (
             <View style={{ gap: theme.spacing.xs }}>

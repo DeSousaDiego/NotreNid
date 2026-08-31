@@ -22,6 +22,8 @@ export interface ItemInput {
   notes?: string;
   coverImageUrl?: string;
   ownerIds: string[];
+  /** Codes pays ISO 3166-1 alpha-2. Absent = ne pas modifier ; tableau vide = aucun pays. */
+  countryCodes?: string[];
   book?: MetadataInput<BookMetadata>;
   cd?: MetadataInput<CdMetadata>;
   dvd?: MetadataInput<DvdMetadata>;

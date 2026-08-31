@@ -1,8 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ItemCondition } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
+  ArrayUnique,
   IsArray,
   IsEnum,
   IsIn,
@@ -18,6 +19,7 @@ import {
 import { BookMetadataDto } from './book-metadata.dto';
 import { CdMetadataDto } from './cd-metadata.dto';
 import { DvdMetadataDto } from './dvd-metadata.dto';
+import { ISO_COUNTRY_CODES } from '../iso-country-codes.constant';
 import { ITEM_RATING_VALUES, type ItemRatingValue } from '../item-rating.constants';
 
 export class CreateItemDto {
@@ -91,4 +93,20 @@ export class CreateItemDto {
   @IsOptional()
   @IsObject()
   customMetadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['FR', 'BE'],
+    description:
+      'Codes pays ISO 3166-1 alpha-2 (facultatif, plusieurs valeurs possibles — ' +
+      'ex. coproduction). Absent = ne pas modifier ; tableau vide = aucun pays.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? v.toUpperCase() : v)) : value,
+  )
+  @IsIn(ISO_COUNTRY_CODES, { each: true })
+  countryCodes?: string[];
 }

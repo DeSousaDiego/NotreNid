@@ -6,6 +6,7 @@ export { CategoryPicker } from './CategoryPicker';
 export { Chip } from './Chip';
 export { ConditionBadge } from './ConditionBadge';
 export { ConfirmDialog } from './ConfirmDialog';
+export { CountrySelect } from './CountrySelect';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { IconButton } from './IconButton';

@@ -48,6 +48,8 @@ export interface Item {
   coverImageUrl: string | null;
   notes: string | null;
   customMetadata: Record<string, unknown> | null;
+  /** Codes ISO 3166-1 alpha-2, triés. Tableau vide = aucun pays renseigné. */
+  countryCodes: string[];
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;

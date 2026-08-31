@@ -10,6 +10,7 @@ import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
 import { ConditionBadge } from './ConditionBadge';
 import { OwnerAvatarGroup } from './OwnerAvatarGroup';
+import { StarRating } from './StarRating';
 
 export interface ItemCardProps {
   item: Item;
@@ -87,6 +88,14 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
           <CategoryBadge name={item.category.name} slug={item.category.slug} />
           <ConditionBadge condition={item.condition} />
         </View>
+        {item.rating ? (
+          <StarRating
+            value={item.rating}
+            readOnly
+            size={theme.iconSizes.sm}
+            accessibilityLabel={`Note : ${item.rating} sur 5`}
+          />
+        ) : null}
         <View style={{ marginTop: 4 }}>
           <OwnerAvatarGroup owners={item.owners} />
         </View>

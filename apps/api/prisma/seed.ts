@@ -89,6 +89,7 @@ async function main() {
         createdById: alex.id,
         updatedById: alex.id,
         owners: { create: [{ userId: alex.id }] },
+        countries: { create: [{ countryCode: 'US' }] },
         bookMetadata: {
           create: { author: 'Frank Herbert', publisher: 'Chilton Books', publicationYear: 1965 },
         },
@@ -104,6 +105,7 @@ async function main() {
         createdById: sam.id,
         updatedById: sam.id,
         owners: { create: [{ userId: sam.id }] },
+        countries: { create: [{ countryCode: 'FR' }] },
         cdMetadata: { create: { artist: 'Daft Punk', releaseYear: 2001 } },
       },
     });
@@ -117,6 +119,7 @@ async function main() {
         createdById: alex.id,
         updatedById: alex.id,
         owners: { create: [{ userId: alex.id }, { userId: sam.id }] },
+        countries: { create: [{ countryCode: 'JP' }] },
         dvdMetadata: { create: { director: 'Hayao Miyazaki', releaseYear: 2001 } },
       },
     });

@@ -1812,6 +1812,17 @@
           "customMetadata": {
             "type": "object",
             "description": "Métadonnées pour une catégorie personnalisée"
+          },
+          "countryCodes": {
+            "example": [
+              "FR",
+              "BE"
+            ],
+            "description": "Codes pays ISO 3166-1 alpha-2 (facultatif, plusieurs valeurs possibles — ex. coproduction). Absent = ne pas modifier ; tableau vide = aucun pays.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -1885,6 +1896,17 @@
           "customMetadata": {
             "type": "object",
             "description": "Métadonnées pour une catégorie personnalisée"
+          },
+          "countryCodes": {
+            "example": [
+              "FR",
+              "BE"
+            ],
+            "description": "Codes pays ISO 3166-1 alpha-2 (facultatif, plusieurs valeurs possibles — ex. coproduction). Absent = ne pas modifier ; tableau vide = aucun pays.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

@@ -85,6 +85,7 @@ describe('ItemsService', () => {
         updatedAt: new Date(),
         category: { id: 'cat1' },
         owners: [],
+        countries: [],
         bookMetadata: null,
         cdMetadata: null,
         dvdMetadata: null,
@@ -150,6 +151,7 @@ describe('ItemsService', () => {
       const updated = {
         ...existing,
         category: { id: 'cat1' },
+        countries: [],
         bookMetadata: null,
         cdMetadata: null,
         dvdMetadata: null,
@@ -180,6 +182,200 @@ describe('ItemsService', () => {
     });
   });
 
+  describe('countryCodes', () => {
+    const fakeUser = {
+      id: 'member-1',
+      email: 'a@a.com',
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      passwordHash: 'x',
+    };
+
+    it('attaches the given country codes on create', async () => {
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      prisma.householdMember.findMany.mockResolvedValue([{ userId: 'member-1' }]);
+      const txItem = {
+        id: 'item1',
+        householdId: 'h1',
+        title: 'Dune',
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        coverImageUrl: null,
+        notes: null,
+        customMetadata: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        category: { id: 'cat1' },
+        owners: [],
+        countries: [{ countryCode: 'FR' }, { countryCode: 'BE' }],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+      };
+      const itemCreate = jest.fn().mockResolvedValue(txItem);
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { create: typeof itemCreate };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) => fn({ item: { create: itemCreate }, auditLog: { create: auditLogCreate } }),
+      );
+
+      const result = await service.create('h1', 'member-1', {
+        categoryId: 'cat1',
+        title: 'Dune',
+        condition: ItemCondition.GOOD,
+        ownerIds: ['member-1'],
+        countryCodes: ['FR', 'BE'],
+      });
+
+      expect(itemCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            countries: { create: [{ countryCode: 'FR' }, { countryCode: 'BE' }] },
+          }),
+        }),
+      );
+      expect(result.countryCodes).toEqual(['BE', 'FR']);
+    });
+
+    it('replaces country codes on update when provided, deleting the previous set first', async () => {
+      const existing = {
+        id: 'item1',
+        householdId: 'h1',
+        categoryId: 'cat1',
+        title: 'Dune',
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        notes: null,
+        coverImageUrl: null,
+        customMetadata: null,
+        archivedAt: null,
+        owners: [],
+      };
+      prisma.item.findUnique.mockResolvedValue(existing);
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      const updated = {
+        ...existing,
+        category: { id: 'cat1' },
+        countries: [{ countryCode: 'JP' }],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const itemUpdate = jest.fn().mockResolvedValue(updated);
+      const itemCountryDeleteMany = jest.fn().mockResolvedValue({});
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { update: typeof itemUpdate };
+            itemCountry: { deleteMany: typeof itemCountryDeleteMany };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) =>
+          fn({
+            item: { update: itemUpdate },
+            itemCountry: { deleteMany: itemCountryDeleteMany },
+            auditLog: { create: auditLogCreate },
+          }),
+      );
+
+      const result = await service.update('h1', 'item1', 'u1', { countryCodes: ['JP'] });
+
+      expect(itemCountryDeleteMany).toHaveBeenCalledWith({ where: { itemId: 'item1' } });
+      expect(itemUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ countries: { create: [{ countryCode: 'JP' }] } }),
+        }),
+      );
+      expect(result.countryCodes).toEqual(['JP']);
+    });
+
+    it('leaves existing country codes untouched when omitted from the patch', async () => {
+      const existing = {
+        id: 'item1',
+        householdId: 'h1',
+        categoryId: 'cat1',
+        title: 'Dune',
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        notes: null,
+        coverImageUrl: null,
+        customMetadata: null,
+        archivedAt: null,
+        owners: [],
+      };
+      prisma.item.findUnique.mockResolvedValue(existing);
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      const updated = {
+        ...existing,
+        category: { id: 'cat1' },
+        countries: [{ countryCode: 'FR' }],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const itemUpdate = jest.fn().mockResolvedValue(updated);
+      const itemCountryDeleteMany = jest.fn().mockResolvedValue({});
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { update: typeof itemUpdate };
+            itemCountry: { deleteMany: typeof itemCountryDeleteMany };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) =>
+          fn({
+            item: { update: itemUpdate },
+            itemCountry: { deleteMany: itemCountryDeleteMany },
+            auditLog: { create: auditLogCreate },
+          }),
+      );
+
+      await service.update('h1', 'item1', 'u1', { title: 'Dune (nouvelle édition)' });
+
+      expect(itemCountryDeleteMany).not.toHaveBeenCalled();
+      expect(itemUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ countries: undefined }) }),
+      );
+    });
+  });
+
   describe('household isolation', () => {
     it('treats an item from another household as not found', async () => {
       prisma.item.findUnique.mockResolvedValue({ id: 'item1', householdId: 'other-household' });
@@ -204,6 +400,7 @@ describe('ItemsService', () => {
         updatedAt: new Date(),
         category: { id: 'cat1' },
         owners: [],
+        countries: [],
         bookMetadata: null,
         cdMetadata: null,
         dvdMetadata: null,
