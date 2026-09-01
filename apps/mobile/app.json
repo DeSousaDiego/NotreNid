@@ -12,10 +12,6 @@
     },
     "android": {
       "package": "com.notrenid.app",
-      "adaptiveIcon": {
-        "backgroundColor": "#FFF8E8",
-        "foregroundImage": "./assets/images/android-icon-foreground.png"
-      },
       "predictiveBackGestureEnabled": false
     },
     "web": {
