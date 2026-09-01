@@ -24,7 +24,34 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
   const [uploadedId, setUploadedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const pickImage = async () => {
+  const uploadAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    setLocalPreviewUri(asset.uri);
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[useCoverPicker] asset picked', {
+        uriScheme: asset.uri.split(':')[0],
+        hasHouseholdId: Boolean(householdId),
+      });
+    }
+
+    try {
+      const uploaded = await uploadMutation.mutateAsync({ uri: asset.uri });
+      setUploadedId(uploaded.id);
+      onChange(uploaded.url);
+    } catch (uploadError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[useCoverPicker] upload failed', {
+          errorType:
+            uploadError instanceof Error ? uploadError.constructor.name : typeof uploadError,
+          message: uploadError instanceof Error ? uploadError.message : String(uploadError),
+        });
+      }
+      setLocalPreviewUri(null);
+      setError(getErrorMessage(uploadError));
+    }
+  };
+
+  const pickFromLibrary = async () => {
     setError(null);
     let asset: ImagePicker.ImagePickerAsset;
     try {
@@ -52,30 +79,42 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
       return;
     }
 
-    setLocalPreviewUri(asset.uri);
+    await uploadAsset(asset);
+  };
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[useCoverPicker] asset picked', {
-        uriScheme: asset.uri.split(':')[0],
-        hasHouseholdId: Boolean(householdId),
-      });
-    }
-
+  const pickFromCamera = async () => {
+    setError(null);
+    let asset: ImagePicker.ImagePickerAsset;
     try {
-      const uploaded = await uploadMutation.mutateAsync({ uri: asset.uri });
-      setUploadedId(uploaded.id);
-      onChange(uploaded.url);
-    } catch (uploadError) {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setError(
+          permission.canAskAgain
+            ? 'La caméra est nécessaire pour prendre une photo de la couverture.'
+            : "La caméra est nécessaire pour prendre une photo de la couverture. Activez-la depuis les réglages de l'application.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      asset = result.assets[0];
+    } catch (pickerError) {
       if (process.env.NODE_ENV !== 'production') {
-        console.warn('[useCoverPicker] upload failed', {
+        console.warn('[useCoverPicker] camera failed', {
           errorType:
-            uploadError instanceof Error ? uploadError.constructor.name : typeof uploadError,
-          message: uploadError instanceof Error ? uploadError.message : String(uploadError),
+            pickerError instanceof Error ? pickerError.constructor.name : typeof pickerError,
+          message: pickerError instanceof Error ? pickerError.message : String(pickerError),
         });
       }
-      setLocalPreviewUri(null);
-      setError(getErrorMessage(uploadError));
+      setError(getErrorMessage(pickerError));
+      return;
     }
+
+    await uploadAsset(asset);
   };
 
   const removeImage = async () => {
@@ -95,7 +134,8 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
     isUploading: uploadMutation.isPending,
     isRemoving: deleteMutation.isPending,
     error,
-    pickImage,
+    pickFromLibrary,
+    pickFromCamera,
     removeImage,
   };
 }

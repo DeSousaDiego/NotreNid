@@ -1,9 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
 import { getCountryName, type Category, type HouseholdMember } from '@notre-nid/shared';
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { AppText, Chip, ConditionBadge } from '../../components';
+import { AppText, BottomSheet, Chip, ConditionBadge } from '../../components';
 import { useTheme } from '../../theme';
 
 import { countryLabelForSlug } from './metadataFields';
@@ -144,7 +146,16 @@ function CoverPickerField({
   onChange: (url: string) => void;
 }) {
   const theme = useTheme();
-  const { previewUri, isUploading, isRemoving, error, pickImage, removeImage } = useCoverPicker({
+  const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
+  const {
+    previewUri,
+    isUploading,
+    isRemoving,
+    error,
+    pickFromCamera,
+    pickFromLibrary,
+    removeImage,
+  } = useCoverPicker({
     householdId,
     value,
     onChange,
@@ -158,7 +169,7 @@ function CoverPickerField({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={previewUri ? 'Remplacer la couverture' : 'Ajouter une couverture'}
-        onPress={() => void pickImage()}
+        onPress={() => setSourceSheetOpen(true)}
         disabled={isUploading}
         style={{
           width: 120,
@@ -204,6 +215,62 @@ function CoverPickerField({
           {error}
         </AppText>
       ) : null}
+
+      <BottomSheet
+        visible={sourceSheetOpen}
+        onClose={() => setSourceSheetOpen(false)}
+        title="Ajouter une couverture"
+        scrollable={false}
+      >
+        <View style={{ gap: theme.spacing.xs }}>
+          <CoverSourceOption
+            icon="camera-outline"
+            label="Prendre une photo"
+            onPress={() => {
+              setSourceSheetOpen(false);
+              void pickFromCamera();
+            }}
+          />
+          <CoverSourceOption
+            icon="images-outline"
+            label="Choisir dans la galerie"
+            onPress={() => {
+              setSourceSheetOpen(false);
+              void pickFromLibrary();
+            }}
+          />
+        </View>
+      </BottomSheet>
     </View>
+  );
+}
+
+function CoverSourceOption({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={{
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        paddingVertical: theme.spacing.sm,
+      }}
+    >
+      <Ionicons name={icon} size={theme.iconSizes.md} color={theme.colors.primary} />
+      <AppText variant="body">{label}</AppText>
+    </Pressable>
   );
 }
