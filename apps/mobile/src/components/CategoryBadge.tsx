@@ -1,15 +1,19 @@
-import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 
-import { getCategoryIcon } from '../constants/category-icons';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
+import { CategoryIllustration } from './CategoryIllustration';
 
 export interface CategoryBadgeProps {
   name: string;
   slug: string;
 }
+
+// Fond du badge déjà clair (`theme.colors.background`) : contrairement à
+// CategoryPicker (carte sélectionnée en vert forêt plein), l'illustration n'a pas
+// besoin d'une tuile claire dédiée pour rester lisible ici.
+const ILLUSTRATION_SIZE = 18;
 
 export function CategoryBadge({ name, slug }: CategoryBadgeProps) {
   const theme = useTheme();
@@ -30,11 +34,7 @@ export function CategoryBadge({ name, slug }: CategoryBadgeProps) {
         borderColor: theme.colors.border,
       }}
     >
-      <Ionicons
-        name={getCategoryIcon(slug)}
-        size={theme.iconSizes.sm}
-        color={theme.colors.primary}
-      />
+      <CategoryIllustration slug={slug} size={ILLUSTRATION_SIZE} />
       <AppText variant="caption" color="primary">
         {name}
       </AppText>
