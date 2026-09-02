@@ -1488,6 +1488,89 @@
           "exports"
         ]
       }
+    },
+    "/users/me": {
+      "patch": {
+        "operationId": "UsersController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profil mis à jour."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Met à jour le profil de l'utilisateur authentifié (nom affiché).",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/users/me/avatar": {
+      "post": {
+        "operationId": "UsersController_updateAvatar",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Profil mis à jour avec la nouvelle photo."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remplace la photo de profil de l'utilisateur authentifié (JPEG/PNG/WebP, 10 Mo max).",
+        "tags": [
+          "users"
+        ]
+      },
+      "delete": {
+        "operationId": "UsersController_removeAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profil mis à jour sans photo."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire la photo de profil de l'utilisateur authentifié.",
+        "tags": [
+          "users"
+        ]
+      }
     }
   },
   "info": {
@@ -1921,6 +2004,18 @@
             }
           }
         }
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "example": "Alex"
+          }
+        },
+        "required": [
+          "displayName"
+        ]
       }
     }
   }

@@ -4,6 +4,25 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ce 
 
 ## [Non publié]
 
+### Bloc 4 — Simplification, refonte visuelle, profil, navigation
+
+#### Added
+
+- Édition du profil (nom affiché) et de la photo de profil (`PATCH /users/me`, `POST`/`DELETE /users/me/avatar`), jamais scopée household ; email reporté (pas de flux de vérification).
+- `Avatar` (photo avec repli initiales) réutilisé par `OwnerAvatarGroup` — la photo d'un propriétaire s'affiche enfin quand elle existe.
+- Restructuration de la navigation Expo Router : détail d'item et sous-pages Profil sortis du groupe d'onglets — tab bar masquée, bouton retour natif, sans changement de chemin de route.
+- Reset automatique du formulaire Ajouter à la sortie de l'écran (sans perte pendant la progression normale du wizard).
+- Refonte visuelle de l'écran détail (couverture centrée, sections ouvertes, bouton flottant « Modifier ») et de l'accueil (« Ajouts récents » en cartes avec couverture).
+
+#### Changed
+
+- Catégories personnalisées retirées du wizard d'ajout et de l'écran Profil > Catégories (devenu lecture seule) — V1 se limite à Livre/CD/DVD ; backend inchangé, future-proof.
+
+#### Fixed
+
+- Barre d'onglets restait visible sur le détail d'un item et les sous-pages Profil ; revenir sur l'onglet Profil rouvrait la dernière sous-page visitée au lieu de la racine.
+- Le formulaire Ajouter conservait les données du dernier item saisi lors d'une nouvelle visite.
+
 ### Phase 5 — Livraison
 
 #### Added

@@ -4,18 +4,14 @@ import { View } from 'react-native';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
+import { Avatar } from './Avatar';
 
 export interface OwnerAvatarGroupProps {
   owners: PublicUser[];
   max?: number;
 }
 
-function getInitials(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? '?';
-  const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
-  return `${first}${second}`.toUpperCase();
-}
+const AVATAR_SIZE = 28;
 
 /** Avatars des propriétaires : jamais uniquement la position/couleur, toujours un libellé accessible. */
 export function OwnerAvatarGroup({ owners, max = 3 }: OwnerAvatarGroupProps) {
@@ -30,27 +26,20 @@ export function OwnerAvatarGroup({ owners, max = 3 }: OwnerAvatarGroupProps) {
         <View
           key={owner.id}
           style={{
-            width: 28,
-            height: 28,
             borderRadius: theme.radii.full,
-            backgroundColor: theme.colors.primaryMuted,
-            alignItems: 'center',
-            justifyContent: 'center',
             borderWidth: 2,
             borderColor: theme.colors.surface,
             marginLeft: index === 0 ? 0 : -8,
           }}
         >
-          <AppText variant="caption" color="onPrimary" style={{ fontSize: 11, lineHeight: 13 }}>
-            {getInitials(owner.displayName)}
-          </AppText>
+          <Avatar displayName={owner.displayName} avatarUrl={owner.avatarUrl} size={AVATAR_SIZE} />
         </View>
       ))}
       {overflow > 0 ? (
         <View
           style={{
-            width: 28,
-            height: 28,
+            width: AVATAR_SIZE,
+            height: AVATAR_SIZE,
             borderRadius: theme.radii.full,
             backgroundColor: theme.colors.border,
             alignItems: 'center',

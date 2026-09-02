@@ -10,13 +10,13 @@ import {
   ItemCardSkeleton,
   ScreenContainer,
   SearchField,
-} from '../../../components';
-import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
-import { useItems } from '../../../hooks/useItems';
-import { getErrorMessage } from '../../../lib/errorMessage';
-import { useCollectionFilters } from '../../../providers/CollectionFiltersProvider';
-import { useHousehold } from '../../../providers/HouseholdProvider';
-import { useTheme } from '../../../theme';
+} from '../../../../components';
+import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
+import { useItems } from '../../../../hooks/useItems';
+import { getErrorMessage } from '../../../../lib/errorMessage';
+import { useCollectionFilters } from '../../../../providers/CollectionFiltersProvider';
+import { useHousehold } from '../../../../providers/HouseholdProvider';
+import { useTheme } from '../../../../theme';
 
 export default function CollectionScreen() {
   const theme = useTheme();

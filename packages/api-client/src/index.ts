@@ -11,3 +11,4 @@ export type { LoginInput, RegisterInput } from './endpoints/auth';
 export type { CreateCategoryInput, UpdateCategoryInput } from './endpoints/categories';
 export type { CreateItemInput, ItemInput, MetadataInput, UpdateItemInput } from './endpoints/items';
 export type { UploadResult } from './endpoints/uploads';
+export type { UpdateProfileInput } from './endpoints/users';

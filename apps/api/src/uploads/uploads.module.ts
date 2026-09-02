@@ -22,5 +22,6 @@ import { UploadsService } from './uploads.service';
       inject: [ConfigService],
     },
   ],
+  exports: [UploadsService],
 })
 export class UploadsModule {}

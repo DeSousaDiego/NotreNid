@@ -1,6 +1,6 @@
 import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import { ToastProvider } from '../../components';
@@ -33,10 +33,19 @@ jest.mock('../../providers/HouseholdProvider', () => ({
 
 const mockRouterReplace = jest.fn();
 const mockRouterBack = jest.fn();
+// `useFocusEffect` a besoin d'un vrai NavigationContainer pour se déclencher tout
+// seul ; ce test le simule en exécutant l'effet immédiatement et en exposant son
+// cleanup pour que les tests puissent le déclencher manuellement, comme le ferait
+// un vrai changement d'onglet (Bloc 4 — reset du formulaire Ajouter).
+let capturedFocusCleanup: (() => void) | undefined;
 jest.mock('expo-router', () => ({
   router: {
     replace: (...args: unknown[]) => mockRouterReplace(...args),
     back: () => mockRouterBack(),
+  },
+  useFocusEffect: (callback: () => (() => void) | void) => {
+    const cleanup = callback();
+    capturedFocusCleanup = typeof cleanup === 'function' ? cleanup : undefined;
   },
 }));
 
@@ -55,6 +64,18 @@ const BOOK_CATEGORY = {
   slug: 'book',
   icon: null,
   isSystem: true,
+  metadataSchema: null,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+const CUSTOM_CATEGORY = {
+  id: 'category-custom',
+  householdId: 'household-1',
+  name: 'Jeux de société',
+  slug: 'board-games',
+  icon: null,
+  isSystem: false,
   metadataSchema: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -88,6 +109,7 @@ function renderScreen(ui: ReactElement) {
 describe('ItemFormScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedFocusCleanup = undefined;
     (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
     (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
   });
@@ -156,5 +178,46 @@ describe('ItemFormScreen', () => {
 
     await waitFor(() => expect(view.getByText('Membres indisponibles')).toBeTruthy());
     expect(view.queryByText('Livre')).toBeNull();
+  });
+
+  it('only offers system categories in the picker, even if a custom one exists (Bloc 4)', async () => {
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([
+      BOOK_CATEGORY,
+      CUSTOM_CATEGORY,
+    ]);
+    const view = await renderScreen(<ItemFormScreen mode="create" />);
+
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+    expect(view.queryByText('Jeux de société')).toBeNull();
+  });
+
+  it('resets the form when the screen loses focus (leaving "Ajouter" without submitting)', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" />);
+
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('Livre'));
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+    expect(view.getByLabelText('Titre').props.value).toBe('Dune');
+
+    // Simule le blur de focus qu'Expo Router déclenche à un vrai changement d'onglet.
+    await act(async () => {
+      capturedFocusCleanup?.();
+    });
+
+    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe(''));
+  });
+
+  it('does not lose data moving between wizard steps internally (no focus loss)', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" />);
+
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('Livre'));
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByText('Auteur')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Précédent' }));
+
+    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
   });
 });

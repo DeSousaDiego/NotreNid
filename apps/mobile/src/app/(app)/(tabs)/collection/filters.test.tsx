@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
-import { ThemeProvider } from '../../../theme';
+import { ThemeProvider } from '../../../../theme';
 import {
   CollectionFiltersProvider,
   useCollectionFilters,
-} from '../../../providers/CollectionFiltersProvider';
+} from '../../../../providers/CollectionFiltersProvider';
 
 import FiltersScreen from './filters';
 
@@ -16,11 +16,11 @@ jest.mock('expo-image', () => ({ Image: () => null }));
 
 const mockApiClient = createMockApiClient();
 
-jest.mock('../../../providers/AuthProvider', () => ({
+jest.mock('../../../../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
 }));
 
-jest.mock('../../../providers/HouseholdProvider', () => ({
+jest.mock('../../../../providers/HouseholdProvider', () => ({
   useHousehold: () => ({
     householdId: 'household-1',
     households: [],

@@ -1,28 +1,35 @@
 import { getCountryName } from '@notre-nid/shared';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import {
   AppText,
+  BottomSheet,
   Button,
-  CategoryBadge,
   ConditionBadge,
   ConfirmDialog,
   ErrorState,
+  FloatingActionButton,
+  IconButton,
   LoadingSkeleton,
   OwnerAvatarGroup,
   ScreenContainer,
   StarRating,
   useToast,
 } from '../../../components';
+import { getCategoryIcon } from '../../../constants/category-icons';
 import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations';
 import { useItem } from '../../../hooks/useItem';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { countryLabelForSlug } from '../../../screens/item-form/metadataFields';
 import { useTheme } from '../../../theme';
+
+const COVER_WIDTH_RATIO = 0.6;
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('fr-FR', {
@@ -41,6 +48,7 @@ export default function ItemDetailScreen() {
   const archiveItem = useArchiveItem(householdId);
   const restoreItem = useRestoreItem(householdId);
   const [confirmArchiveVisible, setConfirmArchiveVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const handleArchive = async () => {
     try {
@@ -87,126 +95,172 @@ export default function ItemDetailScreen() {
   }
 
   const item = itemQuery.data;
+  const canEdit = !item.archivedAt;
+  const hasCountries = (item.countryCodes ?? []).length > 0;
 
   return (
-    <ScreenContainer scroll>
-      <Stack.Screen options={{ title: item.title }} />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={{ gap: theme.spacing.lg }}>
-          {item.coverImageUrl ? (
-            <Image
-              source={{ uri: item.coverImageUrl }}
-              style={{
-                width: '100%',
-                aspectRatio: 3 / 4,
-                borderRadius: theme.radii.lg,
-                backgroundColor: theme.colors.surface,
-              }}
-              contentFit="cover"
-            />
-          ) : null}
-
-          <View style={{ gap: theme.spacing.xs }}>
-            <AppText variant="title">{item.title}</AppText>
-            <View style={{ flexDirection: 'row', gap: theme.spacing.xs }}>
-              <CategoryBadge name={item.category.name} slug={item.category.slug} />
-              <ConditionBadge condition={item.condition} />
+    <View style={{ flex: 1 }}>
+      <ScreenContainer scroll>
+        <Stack.Screen
+          options={{
+            title: item.title,
+            headerRight: canEdit
+              ? () => (
+                  <IconButton
+                    name="ellipsis-horizontal"
+                    accessibilityLabel="Autres actions"
+                    onPress={() => setMenuVisible(true)}
+                  />
+                )
+              : undefined,
+          }}
+        />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: theme.spacing.xxxl * 2 }}
+        >
+          <View style={{ gap: theme.spacing.xl }}>
+            <View style={{ alignItems: 'center' }}>
+              {item.coverImageUrl ? (
+                <Image
+                  source={{ uri: item.coverImageUrl }}
+                  style={{
+                    width: `${COVER_WIDTH_RATIO * 100}%`,
+                    aspectRatio: 3 / 4,
+                    borderRadius: theme.radii.lg,
+                    backgroundColor: theme.colors.surface,
+                  }}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: `${COVER_WIDTH_RATIO * 100}%`,
+                    aspectRatio: 3 / 4,
+                    borderRadius: theme.radii.lg,
+                    backgroundColor: theme.colors.surface,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name={getCategoryIcon(item.category.slug)}
+                    size={theme.iconSizes.xl * 1.5}
+                    color={theme.colors.primaryMuted}
+                  />
+                </View>
+              )}
             </View>
-          </View>
 
-          {item.rating ? (
             <View style={{ gap: theme.spacing.xs }}>
               <AppText variant="label" color="textMuted">
-                Note
+                {item.category.name}
               </AppText>
-              <StarRating value={item.rating} readOnly />
+              <AppText variant="title">{item.title}</AppText>
+              {item.rating ? (
+                <StarRating
+                  value={item.rating}
+                  readOnly
+                  accessibilityLabel={`Note : ${item.rating} sur 5`}
+                />
+              ) : null}
             </View>
-          ) : null}
 
-          <View style={{ gap: theme.spacing.xs }}>
-            <AppText variant="label" color="textMuted">
-              Propriétaires
-            </AppText>
-            <OwnerAvatarGroup owners={item.owners} max={6} />
-          </View>
-
-          {(item.countryCodes ?? []).length > 0 ? (
-            <View style={{ gap: theme.spacing.xs }}>
-              <AppText variant="label" color="textMuted">
-                {countryLabelForSlug(item.category.slug)}
-              </AppText>
-              <AppText variant="body">
-                {item.countryCodes.map((code) => getCountryName(code) ?? code).join(', ')}
-              </AppText>
+            <View>
+              <InfoRow label="État">
+                <ConditionBadge condition={item.condition} />
+              </InfoRow>
+              <InfoRow label="Propriétaires" last={!hasCountries}>
+                <OwnerAvatarGroup owners={item.owners} max={6} />
+              </InfoRow>
+              {hasCountries ? (
+                <InfoRow label={countryLabelForSlug(item.category.slug)} last>
+                  <AppText variant="body">
+                    {item.countryCodes.map((code) => getCountryName(code) ?? code).join(', ')}
+                  </AppText>
+                </InfoRow>
+              ) : null}
             </View>
-          ) : null}
 
-          {item.description ? (
-            <View style={{ gap: theme.spacing.xs }}>
-              <AppText variant="label" color="textMuted">
-                Description
-              </AppText>
-              <AppText variant="body">{item.description}</AppText>
-            </View>
-          ) : null}
+            {item.description ? (
+              <View style={{ gap: theme.spacing.xs }}>
+                <AppText variant="label" color="textMuted">
+                  Description
+                </AppText>
+                <AppText variant="body">{item.description}</AppText>
+              </View>
+            ) : null}
 
-          <MetadataSection item={item} />
+            <MetadataSection item={item} />
 
-          {item.notes ? (
-            <View style={{ gap: theme.spacing.xs }}>
-              <AppText variant="label" color="textMuted">
-                Notes
-              </AppText>
-              <AppText variant="body">{item.notes}</AppText>
-            </View>
-          ) : null}
+            {item.notes ? (
+              <View style={{ gap: theme.spacing.xs }}>
+                <AppText variant="label" color="textMuted">
+                  Notes
+                </AppText>
+                <AppText variant="body">{item.notes}</AppText>
+              </View>
+            ) : null}
 
-          <View style={{ gap: 4 }}>
-            <AppText variant="caption" color="textMuted">
-              Ajouté par {item.createdBy.displayName} le {formatDate(item.createdAt)}
-            </AppText>
-            {item.updatedAt !== item.createdAt ? (
+            <View style={{ gap: 4 }}>
               <AppText variant="caption" color="textMuted">
-                Modifié par {item.updatedBy.displayName} le {formatDate(item.updatedAt)}
+                Ajouté par {item.createdBy.displayName} le {formatDate(item.createdAt)}
               </AppText>
+              {item.updatedAt !== item.createdAt ? (
+                <AppText variant="caption" color="textMuted">
+                  Modifié par {item.updatedBy.displayName} le {formatDate(item.updatedAt)}
+                </AppText>
+              ) : null}
+            </View>
+
+            {item.archivedAt ? (
+              <View style={{ gap: theme.spacing.sm }}>
+                <AppText variant="helper" color="textMuted">
+                  Cet objet est archivé.
+                </AppText>
+                <Button
+                  label="Restaurer"
+                  variant="secondary"
+                  onPress={() => void handleRestore()}
+                  loading={restoreItem.isPending}
+                />
+              </View>
             ) : null}
           </View>
+        </ScrollView>
+      </ScreenContainer>
 
-          {item.archivedAt ? (
-            <View style={{ gap: theme.spacing.sm }}>
-              <AppText variant="helper" color="textMuted">
-                Cet objet est archivé.
-              </AppText>
-              <Button
-                label="Restaurer"
-                variant="secondary"
-                onPress={() => void handleRestore()}
-                loading={restoreItem.isPending}
-              />
-            </View>
-          ) : (
-            <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-              <Button
-                label="Modifier"
-                variant="ghost"
-                style={{ flex: 1 }}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(app)/collection/edit/[itemId]',
-                    params: { itemId: item.id },
-                  })
-                }
-              />
-              <Button
-                label="Archiver"
-                variant="danger"
-                style={{ flex: 1 }}
-                onPress={() => setConfirmArchiveVisible(true)}
-              />
-            </View>
-          )}
+      {canEdit ? (
+        <FloatingActionButton
+          icon="pencil"
+          accessibilityLabel="Modifier cet item"
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/collection/edit/[itemId]',
+              params: { itemId: item.id },
+            })
+          }
+        />
+      ) : null}
+
+      <BottomSheet
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        title="Autres actions"
+        scrollable={false}
+      >
+        <View style={{ gap: theme.spacing.xs }}>
+          <MenuOption
+            icon="archive-outline"
+            label="Archiver"
+            destructive
+            onPress={() => {
+              setMenuVisible(false);
+              setConfirmArchiveVisible(true);
+            }}
+          />
         </View>
-      </ScrollView>
+      </BottomSheet>
 
       <ConfirmDialog
         visible={confirmArchiveVisible}
@@ -218,7 +272,78 @@ export default function ItemDetailScreen() {
         onConfirm={() => void handleArchive()}
         onCancel={() => setConfirmArchiveVisible(false)}
       />
-    </ScreenContainer>
+    </View>
+  );
+}
+
+/** Ligne "label / valeur" à séparateur fin — bloc "Informations" léger du mock-up
+ * (pas de card à fond/bordure systématique, voir docs/PHASE_STATUS.md Bloc 4). */
+function InfoRow({
+  label,
+  children,
+  last = false,
+}: {
+  label: string;
+  children: ReactNode;
+  last?: boolean;
+}) {
+  const theme = useTheme();
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: theme.colors.border,
+      }}
+    >
+      <AppText variant="label" color="textMuted">
+        {label}
+      </AppText>
+      {children}
+    </View>
+  );
+}
+
+function MenuOption({
+  icon,
+  label,
+  onPress,
+  destructive = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  destructive?: boolean;
+}) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={{
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        paddingVertical: theme.spacing.sm,
+      }}
+    >
+      <Ionicons
+        name={icon}
+        size={theme.iconSizes.md}
+        color={destructive ? theme.colors.danger : theme.colors.primary}
+      />
+      <AppText variant="body" color={destructive ? 'danger' : 'text'}>
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
 
@@ -258,18 +383,18 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
       <AppText variant="label" color="textMuted">
         Détails
       </AppText>
-      <View
-        style={{
-          borderRadius: theme.radii.md,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
-          padding: theme.spacing.md,
-          gap: theme.spacing.xs,
-        }}
-      >
-        {rows.map(([label, value]) => (
-          <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View>
+        {rows.map(([label, value], index) => (
+          <View
+            key={label}
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              paddingVertical: theme.spacing.xs,
+              borderBottomWidth: index === rows.length - 1 ? 0 : 1,
+              borderBottomColor: theme.colors.border,
+            }}
+          >
             <AppText variant="body" color="textMuted">
               {label}
             </AppText>

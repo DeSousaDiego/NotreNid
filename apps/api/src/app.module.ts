@@ -19,6 +19,7 @@ import { ItemsModule } from './items/items.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StatsModule } from './stats/stats.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { UsersModule } from './users/users.module';
 
 // Le monorepo garde un unique .env à la racine (voir README). Résolu depuis __dirname (et
 // non process.cwd()) : dist/app.module.js vit toujours à la même profondeur sous apps/api,
@@ -46,6 +47,7 @@ import { UploadsModule } from './uploads/uploads.module';
     UploadsModule,
     StatsModule,
     ExportsModule,
+    UsersModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -5,21 +5,23 @@ import { Pressable, View } from 'react-native';
 
 import { getCategoryIcon } from '../constants/category-icons';
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
+import { formatRelativeDate } from '../lib/relativeDate';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
-import { ConditionBadge } from './ConditionBadge';
-import { OwnerAvatarGroup } from './OwnerAvatarGroup';
-import { StarRating } from './StarRating';
 
-export interface ItemCardProps {
+export interface RecentItemRowProps {
   item: Item;
   onPress: () => void;
 }
 
-/** Carte compacte de la collection : couverture, titre, info secondaire, badges, propriétaires. */
-export function ItemCard({ item, onPress }: ItemCardProps) {
+/**
+ * Carte "Ajouts récents" de l'accueil (mock-up Notre Nid) : plus légère que `ItemCard`
+ * (pas de badge d'état, pas de note, pas de groupe de propriétaires) — petite
+ * couverture, titre, auteur/artiste/réalisateur, catégorie, "Ajouté par… · date".
+ */
+export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
   const theme = useTheme();
   const subtitle = secondaryInfoForItem(item);
 
@@ -28,26 +30,19 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
       accessibilityRole="button"
       accessibilityLabel={`${item.title}, ${item.category.name}`}
       onPress={onPress}
-      style={({ pressed }) => [
-        {
-          flexDirection: 'row',
-          gap: theme.spacing.md,
-          padding: theme.spacing.md,
-          borderRadius: theme.radii.md,
-          backgroundColor: theme.colors.surface,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          opacity: pressed ? 0.85 : 1,
-        },
-        theme.elevation.low,
-      ]}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        gap: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
       <View
         style={{
-          width: 56,
-          height: 56,
+          width: 48,
+          height: 64,
           borderRadius: theme.radii.sm,
-          backgroundColor: theme.colors.background,
+          backgroundColor: theme.colors.surface,
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
@@ -63,13 +58,13 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
         ) : (
           <Ionicons
             name={getCategoryIcon(item.category.slug)}
-            size={theme.iconSizes.lg}
+            size={theme.iconSizes.md}
             color={theme.colors.primaryMuted}
           />
         )}
       </View>
 
-      <View style={{ flex: 1, gap: 4 }}>
+      <View style={{ flex: 1, gap: 2, justifyContent: 'center' }}>
         <AppText variant="section" numberOfLines={1}>
           {item.title}
         </AppText>
@@ -78,21 +73,12 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
             {subtitle}
           </AppText>
         ) : null}
-        <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginTop: 4 }}>
+        <View style={{ marginTop: 2 }}>
           <CategoryBadge name={item.category.name} slug={item.category.slug} />
-          <ConditionBadge condition={item.condition} />
         </View>
-        {item.rating ? (
-          <StarRating
-            value={item.rating}
-            readOnly
-            size={theme.iconSizes.sm}
-            accessibilityLabel={`Note : ${item.rating} sur 5`}
-          />
-        ) : null}
-        <View style={{ marginTop: 4 }}>
-          <OwnerAvatarGroup owners={item.owners} />
-        </View>
+        <AppText variant="caption" color="textMuted" numberOfLines={1}>
+          Ajouté par {item.createdBy.displayName} · {formatRelativeDate(item.createdAt)}
+        </AppText>
       </View>
     </Pressable>
   );

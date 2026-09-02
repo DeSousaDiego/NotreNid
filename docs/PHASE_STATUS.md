@@ -2,11 +2,81 @@
 
 ## Phase courante
 
-**Phase 5 — Livraison** : ✅ terminée et validée (toutes les vérifications réalisables localement).
+**Bloc 4 — Simplification, refonte visuelle, profil, navigation** : ✅ implémenté et vérifié localement (typecheck/lint/tests/build/`expo export` verts). En attente de l'accord explicite du propriétaire avant commit/push/migration Neon/EAS Update.
 
-Les **Phases 1 à 5** sont donc toutes terminées — voir `docs/IMPLEMENTATION_PLAN.md`. Le **développement de la V1 est complet**. La **mise en production réelle reste à effectuer manuellement** par le propriétaire du dépôt — voir `docs/GO_LIVE_CHECKLIST.md`.
+Les **Phases 1 à 5** (V1) sont terminées — voir `docs/IMPLEMENTATION_PLAN.md`. Le Bloc 4 est un bloc de polish post-V1 (pas une nouvelle « Phase » du plan initial), demandé par le propriétaire avant la V1 anniversaire : simplification des catégories à Livre/CD/DVD, édition du profil (nom + photo), correctifs de navigation (reset du formulaire Ajouter, retour à la racine du Profil), refonte visuelle de l'écran détail et de l'accueil, bouton flottant d'édition.
 
-Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅, Phase 3B — Mutations, administration et finalisation mobile ✅, Phase 4 — Qualité ✅ (voir sections dédiées plus bas).
+Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅, Phase 3B — Mutations, administration et finalisation mobile ✅, Phase 4 — Qualité ✅, Phase 5 — Livraison ✅ (voir sections dédiées plus bas).
+
+---
+
+## Bloc 4 — Simplification, refonte visuelle, profil, navigation
+
+### Éléments terminés
+
+- **Audit préalable** (3 explorations dédiées : navigation, profil/upload, détail item/catégories/design tokens) confirmant les deux bugs signalés par le propriétaire (tab bar jamais masquée + pile Profil jamais réinitialisée ; formulaire Ajouter sans `reset()`) et l'absence de toute UI d'édition de profil/photo côté mobile.
+- **Restructuration Expo Router** (`apps/mobile/src/app/(app)/`) : les écrans d'onglets (Accueil, Collection, Ajouter, Recherche, Profil racine) déplacés dans un nouveau groupe `(tabs)/`, tandis que le détail/l'édition d'item et les sous-pages Profil (`members`, `invitations`, `categories`, `archives`, `join`, `edit`) deviennent des écrans frères dans un `<Stack>` racine — ils ne sont donc plus des descendants du `<Tabs>` : la barre d'onglets se masque naturellement et un bouton retour natif apparaît, sans hack de `tabBarStyle` ni listener. Les groupes entre parenthèses ne produisant aucun segment d'URL, **aucun chemin de route existant n'a changé** (`/collection/[itemId]`, `/profile/members`, etc. inchangés) — confirmé par `expo export --platform android` (bundle Android produit sans erreur, 1608 modules) et par la suite de tests complète.
+- **Reset du formulaire Ajouter** (`ItemFormScreen.tsx`) : `useFocusEffect` (Expo Router) dont le cleanup — déclenché uniquement à la perte de focus d'une vraie navigation, jamais pendant un simple re-render — réinitialise le formulaire (`reset(EMPTY_ITEM_FORM_VALUES)`, `step`, `useCoverPicker`) en mode création. La progression interne entre les 3 étapes du wizard ne perd aucune donnée (aucune perte de focus). `useCoverPicker` reçoit une méthode `reset()` dédiée en défense en profondeur, même si le retour de `step` à 0 démonte déjà `StepReview`/le sélecteur de couverture.
+- **Simplification des catégories** (V1 = Livre/CD/DVD) : `profile/categories.tsx` devient un écran en lecture seule (liste système/personnalisée, sans création/édition/suppression) ; `ItemFormScreen` filtre les catégories proposées au wizard sur `isSystem === true` (une catégorie personnalisée existante reste néanmoins éditable/visible en détail, seule sa proposition à la création disparaît). Backend (`categories.controller/service.ts`) **inchangé**, volontairement future-proof.
+- **Profil — édition** : nouveau module backend `users` (`PATCH /users/me`, `POST /users/me/avatar`, `DELETE /users/me/avatar`, guard `JwtAuthGuard` seul — jamais scopé household), nouveau champ `User.avatarUploadId` (clé de stockage interne, jamais exposée par `PublicUser`) permettant de supprimer proprement l'ancien fichier lors d'un remplacement sans dériver une clé fragile depuis `avatarUrl`. Ordre d'écriture strict : upload du nouveau fichier → écriture DB (rollback du nouveau fichier si elle échoue, ancien jamais touché) → suppression de l'ancien en best-effort strict. `packages/api-client` expose `users.updateProfile/uploadAvatar/removeAvatar`. Mobile : nouveau composant `Avatar` (photo avec repli initiales, y compris si le chargement de l'image échoue), `OwnerAvatarGroup` l'utilise désormais pour chaque propriétaire (leur photo, si définie, s'affiche enfin), écran `profile/edit.tsx` (nom + photo, email en lecture seule avec mention explicite), `AuthProvider.refreshUser()` + invalidation des caches `members`/`items` du household courant après une modification pour que le nouveau nom/la nouvelle photo apparaissent partout sans redémarrage. Logique de sélection d'image (permission + lancement du picker) extraite dans `lib/imagePicker.ts`, partagée entre la couverture d'un item (`useCoverPicker`) et la photo de profil (`useAvatarPicker`) — élimine la duplication tout en gardant deux points de téléversement distincts (household vs utilisateur).
+- **Refonte visuelle de l'écran détail** (`collection/[itemId].tsx`) : couverture centrée (~60 % de la largeur, plus pleine largeur), titre/infos alignés à gauche en dessous, sections ouvertes à séparateurs fins plutôt que des cards systématiques, bouton flottant rond orange (`FloatingActionButton`, nouveau composant réutilisable) pour « Modifier cet item », menu « ⋮ » dans le header (natif, hors tab bar) ouvrant un `BottomSheet` avec l'action Archiver — logique métier d'archivage/restauration strictement inchangée, seul l'emplacement du déclencheur change. `paddingBottom` généreux sur le contenu défilant pour que le FAB ne recouvre jamais les dernières lignes.
+- **Refonte de l'accueil** : section « Ajouts récents » remplacée par une requête dédiée (`useItems(..., { sort: 'createdAt', order: 'desc', pageSize: 5, archived: false })`, déjà existante et déjà typée complète) plutôt que `stats.recentAdditions` (qui n'a ni couverture ni auteur) — **aucun changement d'API**. Nouveau composant `RecentItemRow` (couverture, titre, auteur/artiste/réalisateur, badge catégorie, « Ajouté par… · date ») plus léger que `ItemCard`, réutilisant la même logique `secondaryInfoForItem` (extraite dans `lib/itemSecondaryInfo.ts`, dédupliquée avec `ItemCard`).
+- **Aucune illustration ajoutée** : placeholders sobres (icône de catégorie sur fond `surface` pour une couverture manquante, `EmptyState` existant) — emplacements prêts à recevoir les illustrations du frère du propriétaire sans refactor.
+
+### Fichiers principaux créés ou modifiés
+
+- Navigation : `apps/mobile/src/app/(app)/_layout.tsx` (réécrit, Tabs→Stack), nouveau `(app)/(tabs)/_layout.tsx` (+ `index`, `add`, `search`, `profile.tsx`, `collection/{_layout,index,filters}.tsx` déplacés), `(app)/collection/[itemId].tsx` et `edit/[itemId].tsx` inchangés de place, `(app)/profile/{members,invitations,categories,archives,join}.tsx` inchangés de place, nouveau `(app)/profile/edit.tsx`.
+- Formulaire : `apps/mobile/src/screens/item-form/{ItemFormScreen,useCoverPicker}.tsx`.
+- Backend profil : `apps/api/src/users/{users.module,users.controller,users.service}.ts` (nouveaux) + `dto/update-profile.dto.ts`, `apps/api/src/uploads/uploads.module.ts` (export `UploadsService`), `apps/api/src/app.module.ts`, `apps/api/prisma/schema.prisma` (+ `avatarUploadId`), nouvelle migration `20260902120000_add_user_avatar_upload_id`.
+- Client typé : `packages/api-client/src/endpoints/users.ts` (nouveau), `client.ts`, `index.ts`, `contract.ts` ; `docs/openapi.json` et `packages/api-client/src/generated/schema.d.ts` régénérés.
+- Mobile profil/avatar : `apps/mobile/src/components/{Avatar,OwnerAvatarGroup}.tsx`, `apps/mobile/src/lib/{initials,imagePicker}.ts` (nouveaux), `apps/mobile/src/hooks/{useProfileMutations,useAvatarPicker}.ts` (nouveaux), `apps/mobile/src/providers/AuthProvider.tsx` (`refreshUser`).
+- Détail item/accueil : `apps/mobile/src/components/{FloatingActionButton,RecentItemRow}.tsx` (nouveaux), `apps/mobile/src/lib/{itemSecondaryInfo,relativeDate}.ts` (nouveaux), `apps/mobile/src/components/ItemCard.tsx`.
+- Catégories : `apps/mobile/src/app/(app)/profile/categories.tsx` (réécrit), `apps/mobile/src/screens/item-form/ItemFormScreen.tsx` (filtre `isSystem`).
+- Tests (nouveaux ou réécrits) : `Avatar.test.tsx`, `useProfileMutations.test.ts`, `profile/edit.test.tsx`, `profile/categories.test.tsx` (réécrit), `(tabs)/profile.test.tsx` (étendu), `collection/[itemId].test.tsx` (nouveau), `(tabs)/index.test.tsx` (nouveau), `ItemFormScreen.test.tsx` (étendu), `useCoverPicker.test.ts` (1 message d'erreur générique ajusté), `apps/api/src/users/{users.service,users.controller}.spec.ts` (nouveaux).
+- Documentation : `docs/API.md`, ce fichier.
+
+### Migrations ajoutées
+
+- `20260902120000_add_user_avatar_upload_id` : `ALTER TABLE "users" ADD COLUMN "avatarUploadId" TEXT;` — additive, nullable, aucune donnée touchée. **Voir « Problèmes rencontrés » ci-dessous : cette migration a été appliquée par erreur sur la base Neon avant l'accord explicite du propriétaire, qui a ensuite confirmé la conserver.** Aucune autre migration nécessaire pour ce bloc.
+
+### Commandes réellement exécutées et leur résultat
+
+| Commande | Résultat |
+| --- | --- |
+| `pnpm --filter @notre-nid/mobile typecheck` / `lint` (répétés à chaque étape) | ✅ zéro erreur, zéro avertissement (une correction réelle : `Avatar.tsx` — `setState` dans un `useEffect` remplacé par un ajustement pendant le rendu) |
+| `pnpm --filter @notre-nid/api typecheck` / `lint` | ✅ zéro erreur (1 avertissement `import/order` corrigé) |
+| `pnpm --filter @notre-nid/mobile exec jest` (suite complète) | ✅ 172/172 (1 échec transitoire hors périmètre — `NoHouseholdView.test.tsx`, fichier non modifié — confirmé passant en isolation, flakiness d'environnement sous charge, non lié au Bloc 4) |
+| `pnpm --filter @notre-nid/api exec jest` (suite complète) | ✅ 113/113, y compris 21 nouveaux tests `users` |
+| `pnpm typecheck` / `pnpm lint` / `pnpm format:check` (monorepo) | ✅ zéro erreur après corrections (1 fichier de test avec un type `string \| null` trop strict, formatage auto-corrigé sur 7 fichiers) |
+| `pnpm build` (monorepo) | ✅ `packages/shared`, `apps/api`, `packages/api-client` compilent sans erreur |
+| `npx expo export --platform android` | ✅ bundle Android produit (1608 modules, aucune erreur de résolution de route) — validation réelle de la restructuration de navigation au-delà des tests Jest |
+| `pnpm --filter @notre-nid/api run export:openapi` + `pnpm --filter @notre-nid/api-client run generate:types` | ✅ `docs/openapi.json` et le contrat typé du client à jour avec les 3 nouvelles routes `/users/me*` |
+| `npx prisma migrate status` (lecture seule, sur demande explicite du propriétaire) | ✅ historique local cohérent avec Neon après nettoyage (voir ci-dessous) |
+
+### Problèmes rencontrés et corrigés
+
+- **Migration appliquée sur Neon sans accord préalable.** En générant la migration `avatarUploadId`, la commande `prisma migrate dev --create-only` a été exécutée sans vérifier au préalable la valeur de `DATABASE_URL` — celle-ci pointe directement vers Neon dans `apps/api/.env` (l'URL Postgres locale est en commentaire, Docker n'étant pas non plus disponible dans cet environnement). Prisma a donc appliqué la migration (déjà écrite à la main juste avant, en anticipant l'échec de connexion) contre la base Neon réelle, avant toute autorisation. **Signalé immédiatement au propriétaire dès la découverte**, avec le contenu exact du changement (une colonne nullable additive, aucune donnée touchée, rien ne la lisant encore côté API déployée). Le propriétaire a choisi de la conserver plutôt que de l'annuler. Une deuxième migration vide, générée par la même commande, a été supprimée (jamais appliquée) pour ne garder qu'un historique propre ; `prisma migrate status` confirme ensuite « Database schema is up to date! » avec un seul fichier de migration réel. **Aucune autre commande touchant Neon n'a été exécutée depuis.**
+- **Regression introduite puis corrigée pendant le refactor du picker d'image partagé** : en extrayant `pickImageFromLibrary`/`pickImageFromCamera` dans `lib/imagePicker.ts`, le `try/catch` autour de la demande de permission et du lancement du picker natif a été omis par erreur — un rejet (module natif indisponible, picker qui crashe) remontait alors comme une exception non gérée au lieu d'un message d'erreur affiché à l'utilisateur. Détecté par les tests existants (`useCoverPicker.test.ts`, 3 échecs) avant tout commit ; corrigé en réintégrant le `try/catch` dans les fonctions partagées (nouveau statut `'failed'` distinct de `'denied'`).
+- **Tests instables sous charge machine, non liés au code applicatif** : plusieurs suites (`join.test.tsx`, `NoHouseholdView.test.tsx`, `Select.test.tsx`, `CountrySelect.test.tsx`) ont ponctuellement dépassé leur timeout lors d'exécutions parallèles à d'autres commandes lourdes dans cette session — chacune reconfirmée passante en isolation (8 à 15 s au lieu de 90-160 s), donc traité comme un artefact d'environnement plutôt qu'une régression réelle.
+- **Piège de test React Native/RNTL identifié** : monter un second arbre de rendu (`render(...)`) dans un même test pour simuler l'ouverture d'un menu situé dans le header natif (`Stack.Screen options.headerRight`, inatteignable depuis l'arbre principal) perturbait silencieusement les interactions ultérieures sur le premier arbre (`fireEvent.press` sans effet, sans erreur). Corrigé en invoquant directement le `onPress` de l'élément retourné par `headerRight()` (même closure que le composant monté) plutôt qu'en le rendant séparément — voir `collection/[itemId].test.tsx`.
+
+### Décisions prises
+
+- **Édition de l'email reportée** (décision actée avec le propriétaire, section « Édition email ») : aucun flux de vérification d'email n'existe dans le dépôt ; seuls le nom affiché et la photo sont modifiables dans ce bloc, l'email reste affiché en lecture seule avec une mention explicite.
+- **Clé de stockage dédiée (`avatarUploadId`) plutôt qu'une dérivation depuis `avatarUrl`** pour identifier le fichier à supprimer lors d'un remplacement — une URL ne se reconstruit pas de façon fiable en clé de fichier selon le driver de stockage actif (local vs S3/R2, `STORAGE_PUBLIC_URL` optionnel).
+- **Nouvel endpoint `/users/me/avatar` non scopé household** plutôt que réutilisation de la route `/households/:id/uploads` existante : une photo de profil est une ressource utilisateur, pas une ressource household (cohérent avec le principe household = espace de visibilité, pas identité) — le service de stockage sous-jacent (`UploadsService`) était déjà agnostique du household, seul le contrôleur/guard est nouveau.
+- **Accueil : requête items dédiée plutôt qu'extension du contrat `stats`** — évite tout changement d'API pour cette section, réutilise un hook et un type déjà complets.
+- **`ItemCard` non réutilisé tel quel pour les « Ajouts récents »** — jugé trop dense au regard du mock-up une fois comparé (badges état + note + groupe de propriétaires) ; `RecentItemRow` créé en réutilisant les briques communes (icône de catégorie, `secondaryInfoForItem`, format de date) sans dupliquer de logique métier.
+
+### Actions manuelles restantes
+
+- **Confirmer/valider visuellement sur téléphone réel** (aucun environnement de rendu visuel disponible dans cette session, limitation déjà documentée en Phase 3A/4/5) : navigation (tab bar masquée sur détail item et sous-pages Profil, retour natif/Android fonctionnel depuis les 4 points d'entrée du détail item), écran détail restylé, bouton flottant, accueil, édition de profil et changement de photo.
+- **`pnpm --filter @notre-nid/api exec prisma migrate deploy` n'a pas été réexécuté** — la migration `avatarUploadId` est déjà appliquée sur Neon (voir « Problèmes rencontrés »), aucune action supplémentaire requise ici, mais à garder en tête pour un futur déploiement du backend : appliquer toute migration à Neon **avant** de déployer un nouveau build de l'API qui la référence.
+- **Aucun commit, push, migration Neon supplémentaire ni EAS Update** ne sera exécuté avant l'accord final explicite du propriétaire, conformément à sa demande répétée.
+
+### Prochaine étape recommandée
+
+Revue par le propriétaire (rapport détaillé fourni séparément) puis, sur accord explicite : commit, éventuel push, et vérification manuelle sur au moins un téléphone réel avant de considérer le Bloc 4 clos.
 
 ---
 

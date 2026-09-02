@@ -5,7 +5,7 @@ import type { ReactElement } from 'react';
 import { ToastProvider } from '../../../components';
 import { ThemeProvider } from '../../../theme';
 
-import ProfileScreen from './index';
+import ProfileScreen from './profile';
 
 // expo-image's module-level analytics-integration probing isn't compatible with
 // this jest environment; the components barrel pulls it in via ItemCard even
@@ -105,9 +105,19 @@ describe('ProfileScreen', () => {
     await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
   });
 
+  it('shows the fallback initials when the user has no avatar photo', async () => {
+    const view = await renderScreen(<ProfileScreen />);
+    await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    expect(view.getByText('A')).toBeTruthy();
+  });
+
   it('navigates to each management screen', async () => {
     const view = await renderScreen(<ProfileScreen />);
     await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    await fireEvent.press(view.getByRole('button', { name: 'Modifier mon profil' }));
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/profile/edit');
 
     await fireEvent.press(view.getByRole('button', { name: 'Membres' }));
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/profile/members');

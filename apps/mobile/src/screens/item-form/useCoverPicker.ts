@@ -1,6 +1,7 @@
-import * as ImagePicker from 'expo-image-picker';
+import type * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 
+import { pickImageFromCamera, pickImageFromLibrary } from '../../lib/imagePicker';
 import { useDeleteUpload, useUploadCover } from '../../hooks/useUploads';
 import { getErrorMessage } from '../../lib/errorMessage';
 
@@ -53,68 +54,24 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
 
   const pickFromLibrary = async () => {
     setError(null);
-    let asset: ImagePicker.ImagePickerAsset;
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setError('Accédez à vos photos depuis les réglages pour choisir une couverture.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      if (result.canceled || !result.assets[0]) return;
-      asset = result.assets[0];
-    } catch (pickerError) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[useCoverPicker] picker failed', {
-          errorType:
-            pickerError instanceof Error ? pickerError.constructor.name : typeof pickerError,
-          message: pickerError instanceof Error ? pickerError.message : String(pickerError),
-        });
-      }
-      setError(getErrorMessage(pickerError));
+    const result = await pickImageFromLibrary();
+    if (result.status === 'denied' || result.status === 'failed') {
+      setError(result.message);
       return;
     }
-
-    await uploadAsset(asset);
+    if (result.status === 'cancelled') return;
+    await uploadAsset(result.asset);
   };
 
   const pickFromCamera = async () => {
     setError(null);
-    let asset: ImagePicker.ImagePickerAsset;
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        setError(
-          permission.canAskAgain
-            ? 'La caméra est nécessaire pour prendre une photo de la couverture.'
-            : "La caméra est nécessaire pour prendre une photo de la couverture. Activez-la depuis les réglages de l'application.",
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      if (result.canceled || !result.assets[0]) return;
-      asset = result.assets[0];
-    } catch (pickerError) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[useCoverPicker] camera failed', {
-          errorType:
-            pickerError instanceof Error ? pickerError.constructor.name : typeof pickerError,
-          message: pickerError instanceof Error ? pickerError.message : String(pickerError),
-        });
-      }
-      setError(getErrorMessage(pickerError));
+    const result = await pickImageFromCamera();
+    if (result.status === 'denied' || result.status === 'failed') {
+      setError(result.message);
       return;
     }
-
-    await uploadAsset(asset);
+    if (result.status === 'cancelled') return;
+    await uploadAsset(result.asset);
   };
 
   const removeImage = async () => {
@@ -129,6 +86,13 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
     onChange('');
   };
 
+  /** Décharge l'état local (Bloc 4, reset du formulaire Ajouter) sans appel réseau. */
+  const reset = () => {
+    setLocalPreviewUri(null);
+    setUploadedId(null);
+    setError(null);
+  };
+
   return {
     previewUri: value || localPreviewUri,
     isUploading: uploadMutation.isPending,
@@ -137,5 +101,6 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
     pickFromLibrary,
     pickFromCamera,
     removeImage,
+    reset,
   };
 }

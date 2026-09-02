@@ -71,4 +71,9 @@ export type ApiClientContractChecks = [
   ExpectTrue<MethodExists<'/households/{householdId}/stats', 'get'>>,
   ExpectTrue<MethodExists<'/households/{householdId}/exports/json', 'get'>>,
   ExpectTrue<MethodExists<'/households/{householdId}/exports/csv', 'get'>>,
+
+  // Profil utilisateur (Bloc 4)
+  ExpectTrue<MethodExists<'/users/me', 'patch'>>,
+  ExpectTrue<MethodExists<'/users/me/avatar', 'post'>>,
+  ExpectTrue<MethodExists<'/users/me/avatar', 'delete'>>,
 ];

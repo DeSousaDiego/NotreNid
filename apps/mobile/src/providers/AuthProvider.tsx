@@ -23,6 +23,17 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   logoutAllDevices: () => Promise<void>;
   retryRestore: () => void;
+  /**
+   * Met à jour l'utilisateur courant en cache après une modification de profil
+   * réussie (Bloc 4). Une fois `login`/`register` appelés, `user` est figé sur
+   * l'instantané reçu à ce moment-là — `restoreQuery` reste désactivée pour le
+   * reste de la session (`enabled: override === null`) — donc un simple
+   * `refetch()` de la query ne suffirait pas à faire apparaître un nom/une photo
+   * modifiés. Passer directement l'utilisateur déjà retourné par la mutation
+   * (`updateProfile`/`uploadAvatar`/`removeAvatar`) pour éviter un aller-retour
+   * réseau superflu ; sans argument, revalide via `GET /auth/me`.
+   */
+  refreshUser: (freshUser?: PublicUser) => Promise<void>;
 }
 
 /**
@@ -135,9 +146,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setOverride({ kind: 'unauthenticated' });
   }, [apiClient]);
 
+  const refreshUser = useCallback(
+    async (freshUser?: PublicUser) => {
+      const nextUser = freshUser ?? (await apiClient.auth.me());
+      setOverride({ kind: 'authenticated', user: nextUser });
+    },
+    [apiClient],
+  );
+
   const authValue = useMemo<AuthContextValue>(
-    () => ({ status, user, login, register, logout, logoutAllDevices, retryRestore }),
-    [status, user, login, register, logout, logoutAllDevices, retryRestore],
+    () => ({ status, user, login, register, logout, logoutAllDevices, retryRestore, refreshUser }),
+    [status, user, login, register, logout, logoutAllDevices, retryRestore, refreshUser],
   );
 
   return (

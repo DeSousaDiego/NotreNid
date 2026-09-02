@@ -3,17 +3,17 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { AppText, Button, Chip, ScreenContainer } from '../../../components';
-import { CONDITION_OPTIONS } from '../../../constants/condition';
-import { useCategories } from '../../../hooks/useCategories';
-import { useMembers } from '../../../hooks/useMembers';
+import { AppText, Button, Chip, ScreenContainer } from '../../../../components';
+import { CONDITION_OPTIONS } from '../../../../constants/condition';
+import { useCategories } from '../../../../hooks/useCategories';
+import { useMembers } from '../../../../hooks/useMembers';
 import {
   DEFAULT_COLLECTION_FILTERS,
   useCollectionFilters,
   type CollectionFiltersState,
-} from '../../../providers/CollectionFiltersProvider';
-import { useHousehold } from '../../../providers/HouseholdProvider';
-import { useTheme } from '../../../theme';
+} from '../../../../providers/CollectionFiltersProvider';
+import { useHousehold } from '../../../../providers/HouseholdProvider';
+import { useTheme } from '../../../../theme';
 
 const SORT_OPTIONS: { value: ItemSortField; label: string }[] = [
   { value: 'createdAt', label: 'Date d’ajout' },

@@ -29,6 +29,11 @@ model User {
   passwordHash String
   displayName  String
   avatarUrl    String?
+  // Nom de fichier de stockage (ex. "<uuid>.jpg") retourné par UploadsService.save()
+  // lors du dernier avatar téléversé — jamais exposé publiquement (PublicUser). Permet
+  // de supprimer proprement l'ancien fichier lors d'un remplacement/retrait sans
+  // dériver une clé fragile depuis avatarUrl (Bloc 4, docs/PHASE_STATUS.md).
+  avatarUploadId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

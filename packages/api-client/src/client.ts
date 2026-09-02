@@ -6,6 +6,7 @@ import { createInvitationsEndpoints } from './endpoints/invitations';
 import { createItemsEndpoints } from './endpoints/items';
 import { createStatsEndpoints } from './endpoints/stats';
 import { createUploadsEndpoints } from './endpoints/uploads';
+import { createUsersEndpoints } from './endpoints/users';
 import { createHttpClient } from './http';
 import type { ApiClientConfig } from './types';
 
@@ -21,6 +22,7 @@ export function createApiClient(config: ApiClientConfig) {
     invitations: createInvitationsEndpoints(http),
     uploads: createUploadsEndpoints(http),
     exports: createExportsEndpoints(http),
+    users: createUsersEndpoints(http),
   };
 }
 

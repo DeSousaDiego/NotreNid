@@ -170,9 +170,10 @@ describe('useCoverPicker', () => {
         await result.current.pickFromCamera();
       });
 
-      expect(result.current.error).toBe(
-        'La caméra est nécessaire pour prendre une photo de la couverture.',
-      );
+      // Message générique (Bloc 4) : le picker caméra est désormais partagé entre la
+      // couverture d'un item et la photo de profil (lib/imagePicker.ts), donc son texte
+      // ne peut plus mentionner "la couverture" spécifiquement.
+      expect(result.current.error).toBe('La caméra est nécessaire pour prendre une photo.');
       expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
       expect(mockApiClient.uploads.upload).not.toHaveBeenCalled();
     });

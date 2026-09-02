@@ -52,5 +52,10 @@ export function createMockApiClient(): ApiClient {
       json: jest.fn(),
       csv: jest.fn(),
     },
+    users: {
+      updateProfile: jest.fn(),
+      uploadAvatar: jest.fn(),
+      removeAvatar: jest.fn(),
+    },
   } as unknown as ApiClient;
 }

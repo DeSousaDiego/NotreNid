@@ -36,6 +36,7 @@ Ce document explique la structure générale ; pour le détail exact d'une route
 | --- | --- | --- |
 | Santé | `/health`, `/health/ready` | Liveness / readiness (vérifie réellement PostgreSQL) — sans authentification. |
 | Authentification | `/auth/*` | Inscription, connexion, refresh, déconnexion (simple/globale), profil courant. |
+| Profil utilisateur | `/users/me`, `/users/me/avatar` | Modification du nom affiché et de la photo de profil de l'utilisateur authentifié (Bloc 4) — jamais scopé household. |
 | Households | `/households/*` | CRUD, membres, rôles, `leave`. |
 | Invitations | `/households/:id/invitations`, `/invitations/accept`, `/invitations/:id/revoke` | Génération d'un code (email facultatif), liste, acceptation par code, révocation. |
 | Catégories | `/households/:id/categories/*` | Catégories système (lecture seule) + personnalisées (OWNER/ADMIN). |

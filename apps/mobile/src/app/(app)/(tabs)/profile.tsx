@@ -2,7 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 
-import { AppText, Button, LoadingSkeleton, ScreenContainer, useToast } from '../../../components';
+import {
+  AppText,
+  Avatar,
+  Button,
+  LoadingSkeleton,
+  ScreenContainer,
+  useToast,
+} from '../../../components';
 import { useExportCollection } from '../../../hooks/useExports';
 import { useHouseholds } from '../../../hooks/useHouseholds';
 import { getErrorMessage } from '../../../lib/errorMessage';
@@ -65,13 +72,21 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ gap: theme.spacing.xl }}
       >
-        <View style={{ gap: theme.spacing.xs }}>
-          <AppText variant="title">Profil</AppText>
-          <AppText variant="body">{user?.displayName}</AppText>
-          <AppText variant="body" color="textMuted">
-            {user?.email}
-          </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+          <Avatar displayName={user?.displayName ?? ''} avatarUrl={user?.avatarUrl} size={56} />
+          <View style={{ flex: 1, gap: theme.spacing.xs }}>
+            <AppText variant="title">{user?.displayName}</AppText>
+            <AppText variant="body" color="textMuted">
+              {user?.email}
+            </AppText>
+          </View>
         </View>
+
+        <NavRow
+          icon="person-outline"
+          label="Modifier mon profil"
+          onPress={() => router.push('/(app)/profile/edit')}
+        />
 
         <View style={{ gap: theme.spacing.sm }}>
           <AppText variant="section">Foyer actuel</AppText>

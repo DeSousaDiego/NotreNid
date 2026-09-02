@@ -1,5 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useHousehold } from '../../providers/HouseholdProvider';
@@ -8,6 +7,13 @@ import { NoHouseholdView } from '../../screens/NoHouseholdView';
 import { useTheme } from '../../theme';
 import { useAuth } from '../../providers/AuthProvider';
 
+/**
+ * Stack racine du groupe (app) : héberge le `(tabs)` (Accueil/Collection/Ajouter/
+ * Recherche/Profil) et, en écrans frères hors des tabs, le détail/édition d'item et
+ * les sous-pages Profil — pour que la barre d'onglets se masque naturellement (ils
+ * ne sont plus des descendants du <Tabs>) et qu'un bouton retour natif apparaisse,
+ * sans hack de `tabBarStyle` ni listener de navigation (Bloc 4).
+ */
 export default function AppLayout() {
   const theme = useTheme();
   const { status } = useAuth();
@@ -41,61 +47,23 @@ export default function AppLayout() {
   }
 
   return (
-    <Tabs
+    <Stack
       screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.secondary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.border,
-        },
-        tabBarLabelStyle: { fontFamily: theme.fonts.medium, fontSize: 11 },
+        headerStyle: { backgroundColor: theme.colors.background },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: { fontFamily: theme.fonts.semiBold },
+        headerShadowVisible: false,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Accueil',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="collection"
-        options={{
-          title: 'Collection',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="albums-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: 'Ajouter',
-          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: 'Recherche',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profil',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="collection/[itemId]" options={{ title: '' }} />
+      <Stack.Screen name="collection/edit/[itemId]" options={{ title: '' }} />
+      <Stack.Screen name="profile/edit" options={{ title: 'Modifier mon profil' }} />
+      <Stack.Screen name="profile/members" options={{ title: 'Membres' }} />
+      <Stack.Screen name="profile/invitations" options={{ title: 'Invitations' }} />
+      <Stack.Screen name="profile/categories" options={{ title: 'Catégories' }} />
+      <Stack.Screen name="profile/archives" options={{ title: 'Archives' }} />
+      <Stack.Screen name="profile/join" options={{ title: 'Rejoindre un foyer' }} />
+    </Stack>
   );
 }

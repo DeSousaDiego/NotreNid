@@ -3,19 +3,40 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
-import { AppText, Button, ErrorState, LoadingSkeleton, ScreenContainer } from '../../components';
-import { getCategoryIcon } from '../../constants/category-icons';
-import { getErrorMessage } from '../../lib/errorMessage';
-import { useAuth } from '../../providers/AuthProvider';
-import { useHousehold } from '../../providers/HouseholdProvider';
-import { useStats } from '../../hooks/useStats';
-import { useTheme } from '../../theme';
+import {
+  AppText,
+  Button,
+  EmptyState,
+  ErrorState,
+  ItemCardSkeleton,
+  LoadingSkeleton,
+  RecentItemRow,
+  ScreenContainer,
+} from '../../../components';
+import { getCategoryIcon } from '../../../constants/category-icons';
+import { useItems } from '../../../hooks/useItems';
+import { getErrorMessage } from '../../../lib/errorMessage';
+import { useAuth } from '../../../providers/AuthProvider';
+import { useHousehold } from '../../../providers/HouseholdProvider';
+import { useStats } from '../../../hooks/useStats';
+import { useTheme } from '../../../theme';
+
+const RECENT_ITEMS_COUNT = 5;
 
 export default function HomeScreen() {
   const theme = useTheme();
   const { user } = useAuth();
   const { householdId } = useHousehold();
   const statsQuery = useStats(householdId);
+  // Une requête dédiée (plutôt que `stats.recentAdditions`, qui n'a ni couverture ni
+  // auteur) — déjà typée complète (Item), aucun changement d'API nécessaire (Bloc 4).
+  const recentItemsQuery = useItems(householdId, {
+    sort: 'createdAt',
+    order: 'desc',
+    pageSize: RECENT_ITEMS_COUNT,
+    archived: false,
+  });
+  const recentItems = recentItemsQuery.data?.pages[0]?.data ?? [];
 
   return (
     <ScreenContainer>
@@ -23,8 +44,11 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={statsQuery.isRefetching}
-            onRefresh={() => void statsQuery.refetch()}
+            refreshing={statsQuery.isRefetching || recentItemsQuery.isRefetching}
+            onRefresh={() => {
+              void statsQuery.refetch();
+              void recentItemsQuery.refetch();
+            }}
           />
         }
         contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.xl }}
@@ -54,25 +78,34 @@ export default function HomeScreen() {
 
             <View style={{ gap: theme.spacing.sm }}>
               <AppText variant="section">Ajouts récents</AppText>
-              {statsQuery.data.recentAdditions.length === 0 ? (
-                <AppText variant="body" color="textMuted">
-                  Votre nid est encore vide. Les prochains objets ajoutés apparaîtront ici.
-                </AppText>
+              {recentItemsQuery.isLoading ? (
+                <View style={{ gap: theme.spacing.sm }}>
+                  <ItemCardSkeleton />
+                  <ItemCardSkeleton />
+                </View>
+              ) : recentItemsQuery.isError ? (
+                <ErrorState
+                  message={getErrorMessage(recentItemsQuery.error)}
+                  onRetry={() => void recentItemsQuery.refetch()}
+                />
+              ) : recentItems.length === 0 ? (
+                <EmptyState
+                  icon="leaf-outline"
+                  title="Votre nid est encore vide."
+                  message="Les prochains objets ajoutés apparaîtront ici."
+                />
               ) : (
-                statsQuery.data.recentAdditions.map((addition) => (
-                  <AppText
-                    key={addition.id}
-                    variant="body"
-                    color="primary"
+                recentItems.map((item) => (
+                  <RecentItemRow
+                    key={item.id}
+                    item={item}
                     onPress={() =>
                       router.push({
                         pathname: '/(app)/collection/[itemId]',
-                        params: { itemId: addition.id },
+                        params: { itemId: item.id },
                       })
                     }
-                  >
-                    {addition.title} · {addition.category}
-                  </AppText>
+                  />
                 ))
               )}
             </View>

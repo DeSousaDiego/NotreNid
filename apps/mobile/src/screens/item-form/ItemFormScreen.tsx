@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { View } from 'react-native';
 
@@ -64,12 +64,33 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
     trigger,
     setError,
     clearErrors,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues,
     values: mode === 'edit' && itemQuery.data ? defaultValues : undefined,
   });
+
+  // Formulaire neuf à chaque nouvelle visite de "Ajouter" (Bloc 4) : l'onglet n'est
+  // jamais démonté par Expo Router (les tabs restent montés en arrière-plan), donc
+  // sans ce nettoyage les valeurs du dernier item saisi persistaient d'une visite à
+  // l'autre. Le cleanup ne s'exécute qu'à la perte de focus d'un vrai changement
+  // d'onglet — jamais pendant un simple re-render — donc la progression normale
+  // entre les 3 étapes du wizard (setStep, sans perte de focus) n'est jamais
+  // affectée. Remettre `step` à 0 démonte `StepReview`/le sélecteur de couverture
+  // (rendu conditionnellement), ce qui décharge aussi leur état local au passage.
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (mode === 'create') {
+          reset(EMPTY_ITEM_FORM_VALUES);
+          setStep(0);
+          setSubmitError(null);
+        }
+      };
+    }, [mode, reset]),
+  );
 
   // `useWatch` without a `name` types every field as optional (it can genuinely
   // be partial while async default values are still loading in edit mode) —
@@ -87,6 +108,11 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   };
   const categories = categoriesQuery.data ?? [];
   const selectedCategory = categories.find((category) => category.id === values.categoryId);
+  // V1 se limite aux 3 catégories système (Bloc 4) : le sélecteur de l'étape 1 n'offre
+  // que celles-ci. `categories`/`selectedCategory` restent basés sur la liste complète
+  // pour ne pas casser l'édition d'un item existant dont la catégorie personnalisée
+  // (créée avant cette simplification) ne serait plus proposée à la création.
+  const systemCategories = categories.filter((category) => category.isSystem);
 
   if (mode === 'edit' && itemQuery.isLoading) {
     return (
@@ -200,7 +226,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
         ) : (
           <>
             {step === 0 ? (
-              <StepBasics control={control} errors={errors} categories={categories} />
+              <StepBasics control={control} errors={errors} categories={systemCategories} />
             ) : null}
             {step === 1 ? <StepMetadata control={control} category={selectedCategory} /> : null}
             {step === 2 ? (
