@@ -3,6 +3,7 @@ export { Avatar } from './Avatar';
 export { BottomSheet } from './BottomSheet';
 export { Button } from './Button';
 export { CategoryBadge } from './CategoryBadge';
+export { CategoryIllustration } from './CategoryIllustration';
 export { CategoryPicker } from './CategoryPicker';
 export { Chip } from './Chip';
 export { ConditionBadge } from './ConditionBadge';

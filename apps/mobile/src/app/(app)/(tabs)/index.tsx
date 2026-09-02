@@ -1,11 +1,13 @@
 import { SYSTEM_CATEGORY_SLUGS } from '@notre-nid/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
 import {
   AppText,
   Button,
+  CategoryIllustration,
   EmptyState,
   ErrorState,
   ItemCardSkeleton,
@@ -13,7 +15,6 @@ import {
   RecentItemRow,
   ScreenContainer,
 } from '../../../components';
-import { getCategoryIcon } from '../../../constants/category-icons';
 import { useItems } from '../../../hooks/useItems';
 import { useTabBarClearance } from '../../../hooks/useTabBarClearance';
 import { getErrorMessage } from '../../../lib/errorMessage';
@@ -138,39 +139,41 @@ function CategoryStatsGrid({ stats }: { stats: Stats }) {
     <View style={{ gap: theme.spacing.sm }}>
       <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
         <StatTile
-          icon={getCategoryIcon(SYSTEM_CATEGORY_SLUGS.BOOK)}
+          visual={<CategoryIllustration slug={SYSTEM_CATEGORY_SLUGS.BOOK} size={24} />}
           label="Livres"
           value={countForSlug(stats, SYSTEM_CATEGORY_SLUGS.BOOK)}
         />
         <StatTile
-          icon={getCategoryIcon(SYSTEM_CATEGORY_SLUGS.CD)}
+          visual={<CategoryIllustration slug={SYSTEM_CATEGORY_SLUGS.CD} size={24} />}
           label="CD"
           value={countForSlug(stats, SYSTEM_CATEGORY_SLUGS.CD)}
         />
       </View>
       <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
         <StatTile
-          icon={getCategoryIcon(SYSTEM_CATEGORY_SLUGS.DVD)}
+          visual={<CategoryIllustration slug={SYSTEM_CATEGORY_SLUGS.DVD} size={24} />}
           label="DVD"
           value={countForSlug(stats, SYSTEM_CATEGORY_SLUGS.DVD)}
         />
-        <StatTile icon="layers-outline" label="Total" value={stats.totalActiveItems} accent />
+        <StatTile
+          visual={
+            <Ionicons
+              name="layers-outline"
+              size={theme.iconSizes.md}
+              color={theme.colors.secondary}
+            />
+          }
+          label="Total"
+          value={stats.totalActiveItems}
+        />
       </View>
     </View>
   );
 }
 
-function StatTile({
-  icon,
-  label,
-  value,
-  accent = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: number;
-  accent?: boolean;
-}) {
+/** `visual` : illustration de catégorie pour Livres/CD/DVD, icône générique pour "Total"
+ * (pas de catégorie associée) — laissé au choix de l'appelant plutôt que couplé ici. */
+function StatTile({ visual, label, value }: { visual: ReactNode; label: string; value: number }) {
   const theme = useTheme();
   return (
     <View
@@ -196,11 +199,7 @@ function StatTile({
           backgroundColor: theme.colors.background,
         }}
       >
-        <Ionicons
-          name={icon}
-          size={theme.iconSizes.md}
-          color={accent ? theme.colors.secondary : theme.colors.primary}
-        />
+        {visual}
       </View>
       <View>
         <AppText variant="title" color="primary">

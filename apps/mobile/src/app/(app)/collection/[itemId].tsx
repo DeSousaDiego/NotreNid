@@ -1,5 +1,4 @@
 import { getCountryName } from '@notre-nid/shared';
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -9,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   AppText,
+  CategoryIllustration,
   ConditionBadge,
   ConfirmDialog,
   ErrorState,
@@ -20,7 +20,6 @@ import {
   StarRating,
   useToast,
 } from '../../../components';
-import { getCategoryIcon } from '../../../constants/category-icons';
 import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations';
 import { useItem } from '../../../hooks/useItem';
 import { getErrorMessage } from '../../../lib/errorMessage';
@@ -135,11 +134,7 @@ export default function ItemDetailScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons
-                    name={getCategoryIcon(item.category.slug)}
-                    size={theme.iconSizes.xl * 1.5}
-                    color={theme.colors.primaryMuted}
-                  />
+                  <CategoryIllustration slug={item.category.slug} size={96} />
                 </View>
               )}
             </View>

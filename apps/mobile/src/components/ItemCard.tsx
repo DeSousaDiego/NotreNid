@@ -1,14 +1,13 @@
 import type { Item } from '@notre-nid/shared';
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
-import { getCategoryIcon } from '../constants/category-icons';
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
+import { CategoryIllustration } from './CategoryIllustration';
 import { ConditionBadge } from './ConditionBadge';
 import { OwnerAvatarGroup } from './OwnerAvatarGroup';
 import { StarRating } from './StarRating';
@@ -61,11 +60,7 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
             transition={150}
           />
         ) : (
-          <Ionicons
-            name={getCategoryIcon(item.category.slug)}
-            size={theme.iconSizes.lg}
-            color={theme.colors.primaryMuted}
-          />
+          <CategoryIllustration slug={item.category.slug} size={40} />
         )}
       </View>
 

@@ -1,15 +1,14 @@
 import type { Item } from '@notre-nid/shared';
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
-import { getCategoryIcon } from '../constants/category-icons';
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
 import { formatRelativeDate } from '../lib/relativeDate';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
+import { CategoryIllustration } from './CategoryIllustration';
 
 export interface RecentItemRowProps {
   item: Item;
@@ -56,11 +55,7 @@ export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
             transition={150}
           />
         ) : (
-          <Ionicons
-            name={getCategoryIcon(item.category.slug)}
-            size={theme.iconSizes.md}
-            color={theme.colors.primaryMuted}
-          />
+          <CategoryIllustration slug={item.category.slug} size={32} />
         )}
       </View>
 

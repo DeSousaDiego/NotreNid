@@ -1,11 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import type { Category } from '@notre-nid/shared';
 import { Pressable, View } from 'react-native';
 
-import { getCategoryIcon } from '../constants/category-icons';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
+import { CategoryIllustration } from './CategoryIllustration';
 
 export interface CategoryPickerProps {
   categories: Category[];
@@ -55,11 +54,22 @@ export function CategoryPicker({ categories, value, onChange }: CategoryPickerPr
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Ionicons
-              name={getCategoryIcon(category.slug)}
-              size={theme.iconSizes.lg}
-              color={selected ? theme.colors.onPrimary : theme.colors.primary}
-            />
+            {/* Tuile claire fixe : l'illustration (fond clair, couleurs propres à la
+              catégorie) resterait illisible directement sur le fond vert forêt plein
+              de la carte sélectionnée — la sélection reste portée par la carte
+              (fond, bordure, texte), pas par l'illustration elle-même. */}
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: theme.radii.sm,
+                backgroundColor: theme.colors.background,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CategoryIllustration slug={category.slug} size={32} />
+            </View>
             <AppText variant="label" color={selected ? 'onPrimary' : 'text'}>
               {category.name}
             </AppText>
