@@ -1,7 +1,7 @@
 import type { ItemSortField } from '@notre-nid/shared';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Button, Chip, ScreenContainer } from '../../../../components';
@@ -48,7 +48,6 @@ export default function FiltersScreen() {
   const { householdId } = useHousehold();
   const { filters, setFilters } = useCollectionFilters();
   const [draft, setDraft] = useState<CollectionFiltersState>(filters);
-  const [footerHeight, setFooterHeight] = useState(0);
 
   const categoriesQuery = useCategories(householdId);
   const membersQuery = useMembers(householdId);
@@ -62,26 +61,22 @@ export default function FiltersScreen() {
 
   const handleReset = () => setDraft(DEFAULT_COLLECTION_FILTERS);
 
-  const handleFooterLayout = (event: LayoutChangeEvent) => {
-    setFooterHeight(event.nativeEvent.layout.height);
-  };
-
   return (
     <ScreenContainer
       scroll
       edges={['left', 'right']}
-      contentStyle={{ paddingBottom: footerHeight + theme.spacing.lg }}
+      contentStyle={{ paddingBottom: theme.spacing.md }}
       footer={
         <View
-          onLayout={handleFooterLayout}
-          style={{
-            paddingHorizontal: theme.spacing.lg,
-            paddingTop: theme.spacing.md,
-            paddingBottom: insets.bottom + theme.spacing.md,
-            backgroundColor: theme.colors.background,
-            borderTopWidth: StyleSheet.hairlineWidth,
-            borderTopColor: theme.colors.border,
-          }}
+          style={[
+            {
+              paddingHorizontal: theme.spacing.lg,
+              paddingTop: theme.spacing.sm,
+              paddingBottom: insets.bottom + theme.spacing.sm,
+              backgroundColor: theme.colors.background,
+            },
+            theme.elevation.low,
+          ]}
         >
           <Button label="Appliquer les filtres" onPress={handleApply} />
         </View>

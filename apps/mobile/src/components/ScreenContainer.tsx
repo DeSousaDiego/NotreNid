@@ -21,9 +21,11 @@ export interface ScreenContainerProps {
   /**
    * Zone fixe sous le contenu, hors ScrollView — pour une action qui doit rester
    * visible en permanence sans dépendre du scroll (ex. "Appliquer les filtres").
-   * Le fournisseur gère lui-même son padding bas (`useSafeAreaInsets().bottom`)
-   * et le `paddingBottom` du contenu défilant (mesurer sa propre hauteur via
-   * `onLayout`), `ScreenContainer` ne fait que le positionner sous le scroll.
+   * Rendu comme un frère du ScrollView, pas en overlay : le layout flex réserve
+   * déjà sa hauteur, donc `contentStyle` n'a besoin que d'une petite marge de fin
+   * de liste (`spacing.sm`/`md`) — pas de compenser la hauteur du footer, qui
+   * créerait un vide en bas une fois le scroll arrivé au bout. Le fournisseur
+   * gère lui-même son padding bas (`useSafeAreaInsets().bottom`).
    */
   footer?: ReactNode;
 }
