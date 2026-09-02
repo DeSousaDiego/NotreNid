@@ -14,6 +14,14 @@ import FiltersScreen from './filters';
 // though this screen never renders one (see docs/PHASE_STATUS.md Phase 3B).
 jest.mock('expo-image', () => ({ Image: () => null }));
 
+// The fixed footer (docs/PHASE_STATUS.md) needs a real `useSafeAreaInsets`; this
+// test doesn't render a `SafeAreaProvider` — only `useSafeAreaInsets` is mocked,
+// the rest of the module (`SafeAreaView`, used by `ScreenContainer`) stays real.
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 const mockApiClient = createMockApiClient();
 
 jest.mock('../../../../providers/AuthProvider', () => ({

@@ -1,7 +1,8 @@
 import type { ItemSortField } from '@notre-nid/shared';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Button, Chip, ScreenContainer } from '../../../../components';
 import { CONDITION_OPTIONS } from '../../../../constants/condition';
@@ -43,9 +44,11 @@ function FilterSection({ title, children }: { title: string; children: ReactNode
  */
 export default function FiltersScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { householdId } = useHousehold();
   const { filters, setFilters } = useCollectionFilters();
   const [draft, setDraft] = useState<CollectionFiltersState>(filters);
+  const [footerHeight, setFooterHeight] = useState(0);
 
   const categoriesQuery = useCategories(householdId);
   const membersQuery = useMembers(householdId);
@@ -59,8 +62,31 @@ export default function FiltersScreen() {
 
   const handleReset = () => setDraft(DEFAULT_COLLECTION_FILTERS);
 
+  const handleFooterLayout = (event: LayoutChangeEvent) => {
+    setFooterHeight(event.nativeEvent.layout.height);
+  };
+
   return (
-    <ScreenContainer scroll edges={['left', 'right', 'bottom']}>
+    <ScreenContainer
+      scroll
+      edges={['left', 'right']}
+      contentStyle={{ paddingBottom: footerHeight + theme.spacing.lg }}
+      footer={
+        <View
+          onLayout={handleFooterLayout}
+          style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingTop: theme.spacing.md,
+            paddingBottom: insets.bottom + theme.spacing.md,
+            backgroundColor: theme.colors.background,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: theme.colors.border,
+          }}
+        >
+          <Button label="Appliquer les filtres" onPress={handleApply} />
+        </View>
+      }
+    >
       <View style={{ gap: theme.spacing.lg }}>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
           <Pressable accessibilityRole="button" onPress={handleReset} hitSlop={8}>
@@ -141,8 +167,6 @@ export default function FiltersScreen() {
             onPress={() => setDraft((d) => ({ ...d, order: 'desc' }))}
           />
         </FilterSection>
-
-        <Button label="Appliquer les filtres" onPress={handleApply} />
       </View>
     </ScreenContainer>
   );

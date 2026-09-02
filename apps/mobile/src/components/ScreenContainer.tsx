@@ -18,6 +18,14 @@ export interface ScreenContainerProps {
   scroll?: boolean;
   style?: ViewStyle;
   contentStyle?: ViewStyle;
+  /**
+   * Zone fixe sous le contenu, hors ScrollView — pour une action qui doit rester
+   * visible en permanence sans dépendre du scroll (ex. "Appliquer les filtres").
+   * Le fournisseur gère lui-même son padding bas (`useSafeAreaInsets().bottom`)
+   * et le `paddingBottom` du contenu défilant (mesurer sa propre hauteur via
+   * `onLayout`), `ScreenContainer` ne fait que le positionner sous le scroll.
+   */
+  footer?: ReactNode;
 }
 
 /** Conteneur d'écran standard : fond crème, safe area, padding cohérent. */
@@ -27,11 +35,13 @@ export function ScreenContainer({
   scroll = false,
   style,
   contentStyle,
+  footer,
 }: ScreenContainerProps) {
   const theme = useTheme();
 
   const content = scroll ? (
     <ScrollView
+      style={styles.flex}
       contentContainerStyle={[styles.content, { padding: theme.spacing.lg }, contentStyle]}
       keyboardShouldPersistTaps="handled"
     >
@@ -51,6 +61,7 @@ export function ScreenContainer({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {content}
+        {footer}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
