@@ -25,7 +25,7 @@ export default function CategoriesScreen() {
 
   if (categoriesQuery.isLoading) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['left', 'right', 'bottom']}>
         <LoadingSkeleton height={220} />
       </ScreenContainer>
     );
@@ -33,7 +33,7 @@ export default function CategoriesScreen() {
 
   if (categoriesQuery.isError) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['left', 'right', 'bottom']}>
         <ErrorState
           message={getErrorMessage(categoriesQuery.error)}
           onRetry={() => void categoriesQuery.refetch()}
@@ -45,7 +45,7 @@ export default function CategoriesScreen() {
   const categories = categoriesQuery.data ?? [];
 
   return (
-    <ScreenContainer edges={['left', 'right']}>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       {categories.length === 0 ? (
         <EmptyState icon="pricetag-outline" title="Aucune catégorie" />
       ) : (

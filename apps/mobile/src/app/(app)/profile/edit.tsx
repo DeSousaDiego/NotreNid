@@ -62,7 +62,7 @@ export default function EditProfileScreen() {
   const isAvatarBusy = avatarPicker.isUploading || avatarPicker.isRemoving;
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll edges={['top', 'left', 'right', 'bottom']}>
       <View style={{ gap: theme.spacing.xl }}>
         <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
           <Pressable

@@ -15,6 +15,7 @@ import {
 } from '../../../components';
 import { getCategoryIcon } from '../../../constants/category-icons';
 import { useItems } from '../../../hooks/useItems';
+import { useTabBarClearance } from '../../../hooks/useTabBarClearance';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useAuth } from '../../../providers/AuthProvider';
 import { useHousehold } from '../../../providers/HouseholdProvider';
@@ -37,6 +38,7 @@ export default function HomeScreen() {
     archived: false,
   });
   const recentItems = recentItemsQuery.data?.pages[0]?.data ?? [];
+  const tabBarClearance = useTabBarClearance();
 
   return (
     <ScreenContainer>
@@ -51,7 +53,7 @@ export default function HomeScreen() {
             }}
           />
         }
-        contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.xl }}
+        contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: tabBarClearance }}
       >
         <View>
           <AppText variant="display" color="primary">

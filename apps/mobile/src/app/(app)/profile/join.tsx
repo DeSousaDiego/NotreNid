@@ -47,7 +47,7 @@ export default function JoinHouseholdScreen() {
   });
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll edges={['top', 'left', 'right', 'bottom']}>
       <View style={{ gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.xs }}>
           <AppText variant="title">Rejoindre un foyer</AppText>

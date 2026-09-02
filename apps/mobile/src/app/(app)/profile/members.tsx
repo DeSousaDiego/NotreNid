@@ -91,7 +91,7 @@ export default function MembersScreen() {
 
   if (membersQuery.isLoading) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['left', 'right', 'bottom']}>
         <LoadingSkeleton height={220} />
       </ScreenContainer>
     );
@@ -99,7 +99,7 @@ export default function MembersScreen() {
 
   if (membersQuery.isError) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['left', 'right', 'bottom']}>
         <ErrorState
           message={getErrorMessage(membersQuery.error)}
           onRetry={() => void membersQuery.refetch()}
@@ -111,7 +111,7 @@ export default function MembersScreen() {
   const members = membersQuery.data ?? [];
 
   return (
-    <ScreenContainer edges={['left', 'right']}>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       {members.length === 0 ? (
         <EmptyState
           icon="people-outline"

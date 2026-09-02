@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import { ToastProvider } from '../../../components';
@@ -12,6 +12,15 @@ import ItemDetailScreen from './[itemId]';
 // though this screen never renders one (see docs/PHASE_STATUS.md Phase 3B).
 jest.mock('expo-image', () => ({ Image: () => null }));
 
+// La position basse des FAB dépend de la zone de sécurité de l'appareil (Bloc 4) —
+// non pertinente pour ces tests de rendu/interaction, mockée à 0 sur les 4 bords ;
+// on ne remplace que `useSafeAreaInsets`, le reste du module (SafeAreaView, utilisé
+// par ScreenContainer/BottomSheet/ConfirmDialog/Toast) doit rester réel.
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 const mockApiClient = createMockApiClient();
 
 jest.mock('../../../providers/AuthProvider', () => ({
@@ -23,15 +32,9 @@ jest.mock('../../../providers/HouseholdProvider', () => ({
 }));
 
 const mockRouterPush = jest.fn();
-let capturedStackScreenOptions: { headerRight?: () => ReactElement } | undefined;
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockRouterPush(...args) },
-  Stack: {
-    Screen: (props: { options?: { headerRight?: () => ReactElement } }) => {
-      capturedStackScreenOptions = props.options;
-      return null;
-    },
-  },
+  Stack: { Screen: (_props: { options?: { title?: string } }) => null },
   useLocalSearchParams: () => ({ itemId: 'item-1' }),
 }));
 
@@ -114,7 +117,6 @@ function renderScreen(ui: ReactElement) {
 describe('ItemDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    capturedStackScreenOptions = undefined;
   });
 
   it('shows a placeholder instead of a broken layout when there is no cover', async () => {
@@ -176,7 +178,16 @@ describe('ItemDetailScreen', () => {
     });
   });
 
-  it('hides the floating edit button and the header menu for an archived item, offering Restaurer instead', async () => {
+  it('shows a second FAB to archive an active item, alongside Modifier', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByLabelText('Modifier cet item')).toBeTruthy());
+    expect(view.getByLabelText('Archiver cet item')).toBeTruthy();
+    expect(view.queryByLabelText('Restaurer cet item')).toBeNull();
+  });
+
+  it('hides Modifier/Archiver and shows only Restaurer for an archived item', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       archivedAt: '2026-02-01T00:00:00.000Z',
@@ -185,35 +196,39 @@ describe('ItemDetailScreen', () => {
 
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
     expect(view.queryByLabelText('Modifier cet item')).toBeNull();
-    expect(capturedStackScreenOptions?.headerRight).toBeUndefined();
-    expect(view.getByRole('button', { name: 'Restaurer' })).toBeTruthy();
+    expect(view.queryByLabelText('Archiver cet item')).toBeNull();
+    expect(view.getByLabelText('Restaurer cet item')).toBeTruthy();
   });
 
-  it('archives the item from the header menu after confirmation', async () => {
+  it('archives the item from its own FAB after confirmation', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
     (mockApiClient.items.archive as jest.Mock).mockResolvedValue(undefined);
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
-    expect(capturedStackScreenOptions?.headerRight).toBeDefined();
+    await waitFor(() => expect(view.getByLabelText('Archiver cet item')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('Archiver cet item'));
 
-    // Le bouton "⋮" vit dans le header natif (Stack.Screen options), hors de l'arbre
-    // rendu ici — on ne peut pas le presser via l'écran monté. On appelle directement
-    // le `onPress` de l'élément qu'il retourne (même closure que le composant monté,
-    // donc met bien à jour son état réel) plutôt que de monter un second arbre de test,
-    // ce qui perturbait les interactions ultérieures sur `view` dans ce même test.
-    const headerButtonElement = capturedStackScreenOptions!.headerRight!();
-    await act(async () => {
-      (headerButtonElement.props as { onPress: () => void }).onPress();
-    });
-
-    await waitFor(() => expect(view.getByText('Archiver')).toBeTruthy());
-    await fireEvent.press(view.getByText('Archiver'));
     await waitFor(() => expect(view.getByText('Archiver cet objet ?')).toBeTruthy());
     await fireEvent.press(view.getByRole('button', { name: 'Archiver' }));
 
     await waitFor(() =>
       expect(mockApiClient.items.archive).toHaveBeenCalledWith('household-1', 'item-1'),
+    );
+  });
+
+  it('restores an archived item from its FAB, without a confirmation step (same as before)', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      archivedAt: '2026-02-01T00:00:00.000Z',
+    });
+    (mockApiClient.items.restore as jest.Mock).mockResolvedValue(undefined);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByLabelText('Restaurer cet item')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('Restaurer cet item'));
+
+    await waitFor(() =>
+      expect(mockApiClient.items.restore).toHaveBeenCalledWith('household-1', 'item-1'),
     );
   });
 });

@@ -100,7 +100,7 @@ export default function InvitationsScreen() {
 
   if (!isAdmin) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <EmptyState
           icon="lock-closed-outline"
           title="Accès réservé"
@@ -112,7 +112,7 @@ export default function InvitationsScreen() {
 
   if (invitationsQuery.isLoading) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <LoadingSkeleton height={160} />
       </ScreenContainer>
     );
@@ -120,7 +120,7 @@ export default function InvitationsScreen() {
 
   if (invitationsQuery.isError) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <ErrorState
           message={getErrorMessage(invitationsQuery.error)}
           onRetry={() => void invitationsQuery.refetch()}
@@ -132,7 +132,7 @@ export default function InvitationsScreen() {
   const formattedCode = justCreated ? formatInvitationCode(justCreated.code) : null;
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll edges={['top', 'left', 'right', 'bottom']}>
       <View style={{ gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.xs }}>
           <AppText variant="title">Inviter quelqu’un</AppText>

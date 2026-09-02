@@ -10,7 +10,7 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { CountrySelect } from './CountrySelect';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
-export { FloatingActionButton } from './FloatingActionButton';
+export { FloatingActionButton, FLOATING_ACTION_BUTTON_SIZE } from './FloatingActionButton';
 export { IconButton } from './IconButton';
 export { InvitationCodeField } from './InvitationCodeField';
 export { ItemCard } from './ItemCard';

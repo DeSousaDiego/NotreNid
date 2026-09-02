@@ -13,6 +13,7 @@ import {
 } from '../../../../components';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useItems } from '../../../../hooks/useItems';
+import { useTabBarClearance } from '../../../../hooks/useTabBarClearance';
 import { getErrorMessage } from '../../../../lib/errorMessage';
 import { useCollectionFilters } from '../../../../providers/CollectionFiltersProvider';
 import { useHousehold } from '../../../../providers/HouseholdProvider';
@@ -22,6 +23,7 @@ export default function CollectionScreen() {
   const theme = useTheme();
   const { householdId } = useHousehold();
   const { filters: activeFilters } = useCollectionFilters();
+  const tabBarClearance = useTabBarClearance();
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -84,7 +86,7 @@ export default function CollectionScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.xl }}
+          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: tabBarClearance }}
           renderItem={({ item }) => (
             <ItemCard
               item={item}

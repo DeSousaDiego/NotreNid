@@ -4,17 +4,16 @@ import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   AppText,
-  BottomSheet,
-  Button,
   ConditionBadge,
   ConfirmDialog,
   ErrorState,
   FloatingActionButton,
-  IconButton,
+  FLOATING_ACTION_BUTTON_SIZE,
   LoadingSkeleton,
   OwnerAvatarGroup,
   ScreenContainer,
@@ -47,8 +46,8 @@ export default function ItemDetailScreen() {
   const itemQuery = useItem(householdId, itemId);
   const archiveItem = useArchiveItem(householdId);
   const restoreItem = useRestoreItem(householdId);
+  const insets = useSafeAreaInsets();
   const [confirmArchiveVisible, setConfirmArchiveVisible] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
 
   const handleArchive = async () => {
     try {
@@ -72,7 +71,7 @@ export default function ItemDetailScreen() {
 
   if (itemQuery.isLoading) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <View style={{ gap: theme.spacing.md }}>
           <LoadingSkeleton height={220} radius={theme.radii.lg} />
           <LoadingSkeleton width="60%" height={24} />
@@ -84,7 +83,7 @@ export default function ItemDetailScreen() {
 
   if (itemQuery.isError || !itemQuery.data) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <ErrorState
           title="Objet introuvable"
           message={itemQuery.error ? getErrorMessage(itemQuery.error) : "Cet objet n'existe pas."}
@@ -100,24 +99,17 @@ export default function ItemDetailScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScreenContainer scroll>
-        <Stack.Screen
-          options={{
-            title: item.title,
-            headerRight: canEdit
-              ? () => (
-                  <IconButton
-                    name="ellipsis-horizontal"
-                    accessibilityLabel="Autres actions"
-                    onPress={() => setMenuVisible(true)}
-                  />
-                )
-              : undefined,
-          }}
-        />
+      <ScreenContainer scroll edges={['top', 'left', 'right', 'bottom']}>
+        <Stack.Screen options={{ title: item.title }} />
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: theme.spacing.xxxl * 2 }}
+          contentContainerStyle={{
+            // Sous les 1 ou 2 FAB empilés (Bloc 4) + la zone de sécurité basse de
+            // l'appareil, jamais une valeur fixe seule — la navigation système
+            // (barre de gestes Android, notamment) varie selon l'appareil.
+            paddingBottom:
+              insets.bottom + FLOATING_ACTION_BUTTON_SIZE * 2 + theme.spacing.xl + theme.spacing.md,
+          }}
         >
           <View style={{ gap: theme.spacing.xl }}>
             <View style={{ alignItems: 'center' }}>
@@ -214,53 +206,43 @@ export default function ItemDetailScreen() {
             </View>
 
             {item.archivedAt ? (
-              <View style={{ gap: theme.spacing.sm }}>
-                <AppText variant="helper" color="textMuted">
-                  Cet objet est archivé.
-                </AppText>
-                <Button
-                  label="Restaurer"
-                  variant="secondary"
-                  onPress={() => void handleRestore()}
-                  loading={restoreItem.isPending}
-                />
-              </View>
+              <AppText variant="helper" color="textMuted">
+                Cet objet est archivé. Utilisez le bouton en bas de l’écran pour le restaurer.
+              </AppText>
             ) : null}
           </View>
         </ScrollView>
       </ScreenContainer>
 
       {canEdit ? (
-        <FloatingActionButton
-          icon="pencil"
-          accessibilityLabel="Modifier cet item"
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/collection/edit/[itemId]',
-              params: { itemId: item.id },
-            })
-          }
-        />
-      ) : null}
-
-      <BottomSheet
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        title="Autres actions"
-        scrollable={false}
-      >
-        <View style={{ gap: theme.spacing.xs }}>
-          <MenuOption
-            icon="archive-outline"
-            label="Archiver"
-            destructive
-            onPress={() => {
-              setMenuVisible(false);
-              setConfirmArchiveVisible(true);
-            }}
+        <>
+          <FloatingActionButton
+            icon="pencil"
+            accessibilityLabel="Modifier cet item"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/collection/edit/[itemId]',
+                params: { itemId: item.id },
+              })
+            }
           />
-        </View>
-      </BottomSheet>
+          <FloatingActionButton
+            icon="archive-outline"
+            tone="primary"
+            accessibilityLabel="Archiver cet item"
+            stackOffset={FLOATING_ACTION_BUTTON_SIZE + theme.spacing.md}
+            onPress={() => setConfirmArchiveVisible(true)}
+          />
+        </>
+      ) : (
+        <FloatingActionButton
+          icon="refresh"
+          tone="primary"
+          accessibilityLabel="Restaurer cet item"
+          onPress={() => void handleRestore()}
+          disabled={restoreItem.isPending}
+        />
+      )}
 
       <ConfirmDialog
         visible={confirmArchiveVisible}
@@ -306,44 +288,6 @@ function InfoRow({
       </AppText>
       {children}
     </View>
-  );
-}
-
-function MenuOption({
-  icon,
-  label,
-  onPress,
-  destructive = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  destructive?: boolean;
-}) {
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={{
-        minHeight: 44,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.sm,
-        paddingVertical: theme.spacing.sm,
-      }}
-    >
-      <Ionicons
-        name={icon}
-        size={theme.iconSizes.md}
-        color={destructive ? theme.colors.danger : theme.colors.primary}
-      />
-      <AppText variant="body" color={destructive ? 'danger' : 'text'}>
-        {label}
-      </AppText>
-    </Pressable>
   );
 }
 

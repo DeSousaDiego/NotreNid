@@ -12,6 +12,14 @@ import HomeScreen from './index';
 // though this screen never renders one directly (see docs/PHASE_STATUS.md Phase 3B).
 jest.mock('expo-image', () => ({ Image: () => null }));
 
+// `useTabBarClearance` (Bloc 4) a besoin d'un `useSafeAreaInsets` réel ; ce test ne
+// rend pas de `SafeAreaProvider` — seul `useSafeAreaInsets` est mocké, le reste du
+// module (SafeAreaView, utilisé par ScreenContainer/Toast) doit rester réel.
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 const mockApiClient = createMockApiClient();
 const mockUser = {
   id: 'user-1',

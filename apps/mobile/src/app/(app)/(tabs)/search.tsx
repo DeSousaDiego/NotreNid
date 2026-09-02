@@ -12,6 +12,7 @@ import {
 } from '../../../components';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { useItems } from '../../../hooks/useItems';
+import { useTabBarClearance } from '../../../hooks/useTabBarClearance';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useTheme } from '../../../theme';
@@ -19,6 +20,7 @@ import { useTheme } from '../../../theme';
 export default function SearchScreen() {
   const theme = useTheme();
   const { householdId } = useHousehold();
+  const tabBarClearance = useTabBarClearance();
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
   const trimmedSearch = debouncedSearch.trim();
@@ -60,7 +62,7 @@ export default function SearchScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.xl }}
+          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: tabBarClearance }}
           renderItem={({ item }) => (
             <ItemCard
               item={item}

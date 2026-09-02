@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { View } from 'react-native';
+import type { Edge } from 'react-native-safe-area-context';
 
 import {
   AppText,
@@ -114,9 +115,16 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   // (créée avant cette simplification) ne serait plus proposée à la création.
   const systemCategories = categories.filter((category) => category.isSystem);
 
+  // En mode édition, l'écran vit désormais hors du groupe d'onglets (Bloc 4, écran
+  // Stack sans tab bar) : la zone de sécurité basse n'est plus fournie par la tab
+  // bar et doit être explicitement réservée. En création, l'écran reste dans les
+  // onglets — la tab bar occupe déjà cette zone, ne pas en rajouter par-dessus.
+  const screenEdges: Edge[] =
+    mode === 'edit' ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right'];
+
   if (mode === 'edit' && itemQuery.isLoading) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={screenEdges}>
         <LoadingSkeleton height={220} radius={theme.radii.lg} />
       </ScreenContainer>
     );
@@ -124,7 +132,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
 
   if (mode === 'edit' && (itemQuery.isError || !itemQuery.data)) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={screenEdges}>
         <ErrorState
           title="Objet introuvable"
           message={itemQuery.error ? getErrorMessage(itemQuery.error) : "Cet objet n'existe pas."}
@@ -139,7 +147,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   // par un sélecteur vide sans explication.
   if (categoriesQuery.isError) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={screenEdges}>
         <ErrorState
           title="Catégories indisponibles"
           message={getErrorMessage(categoriesQuery.error)}
@@ -151,7 +159,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
 
   if (membersQuery.isError) {
     return (
-      <ScreenContainer>
+      <ScreenContainer edges={screenEdges}>
         <ErrorState
           title="Membres indisponibles"
           message={getErrorMessage(membersQuery.error)}
@@ -210,7 +218,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   const isBusy = isSubmitting || createItem.isPending || updateItem.isPending;
 
   return (
-    <ScreenContainer scroll>
+    <ScreenContainer scroll edges={screenEdges}>
       <View style={{ gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.xs }}>
           <AppText variant="title">

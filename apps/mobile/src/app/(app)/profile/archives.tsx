@@ -22,7 +22,7 @@ export default function ArchivesScreen() {
   const items = itemsQuery.data?.pages.flatMap((page) => page.data) ?? [];
 
   return (
-    <ScreenContainer edges={['left', 'right']}>
+    <ScreenContainer edges={['left', 'right', 'bottom']}>
       {itemsQuery.isLoading ? (
         <View>
           {[0, 1, 2].map((key) => (
