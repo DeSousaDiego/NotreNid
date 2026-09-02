@@ -118,7 +118,7 @@ export default function HomeScreen() {
         <Button
           label="Voir la collection"
           variant="secondary"
-          onPress={() => router.push('/(app)/collection')}
+          onPress={() => router.push('/collection')}
         />
       </ScrollView>
     </ScreenContainer>

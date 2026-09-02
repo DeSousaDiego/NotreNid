@@ -103,7 +103,7 @@ describe('JoinHouseholdScreen', () => {
 
     await waitFor(() => expect(mockApiClient.invitations.accept).toHaveBeenCalledWith('7K4P2Q9D'));
     await waitFor(() => expect(mockSelectHousehold).toHaveBeenCalledWith('household-2'));
-    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/(app)'));
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/'));
     await waitFor(() => expect(view.getByText('Bienvenue dans Chez Sam 🌿')).toBeTruthy());
   });
 });

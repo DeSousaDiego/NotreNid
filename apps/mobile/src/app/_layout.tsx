@@ -31,7 +31,7 @@ function RootNavigator() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      router.replace('/(app)');
+      router.replace('/');
     } else if (status === 'unauthenticated') {
       router.replace('/(auth)/login');
     }

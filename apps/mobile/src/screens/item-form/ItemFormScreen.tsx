@@ -203,7 +203,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
       if (mode === 'create') {
         await createItem.mutateAsync(payload);
         showToast('Cet objet a rejoint votre nid.', 'success');
-        router.replace('/(app)/collection');
+        router.replace('/collection');
       } else if (itemId) {
         await updateItem.mutateAsync({ itemId, input: payload });
         showToast('Objet modifié.', 'success');

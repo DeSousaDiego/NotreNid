@@ -40,7 +40,7 @@ export default function JoinHouseholdScreen() {
       const result = await acceptInvitation.mutateAsync(normalizeInvitationCode(code));
       selectHousehold(result.householdId);
       showToast(`Bienvenue dans ${result.householdName} 🌿`, 'success');
-      router.replace('/(app)');
+      router.replace('/');
     } catch (error) {
       showToast(getErrorMessage(error), 'error');
     }

@@ -153,7 +153,7 @@ describe('ItemFormScreen', () => {
         ownerIds: ['user-1'],
       }),
     );
-    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/collection'));
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
   });
 
   it('shows a retryable error state instead of a blank category picker when the categories request fails', async () => {

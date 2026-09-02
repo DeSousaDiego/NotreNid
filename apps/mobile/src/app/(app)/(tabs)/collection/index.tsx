@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
 
 import {
+  Chip,
   EmptyState,
   ErrorState,
   IconButton,
@@ -11,6 +12,7 @@ import {
   ScreenContainer,
   SearchField,
 } from '../../../../components';
+import { useCategories } from '../../../../hooks/useCategories';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useItems } from '../../../../hooks/useItems';
 import { useTabBarClearance } from '../../../../hooks/useTabBarClearance';
@@ -22,7 +24,9 @@ import { useTheme } from '../../../../theme';
 export default function CollectionScreen() {
   const theme = useTheme();
   const { householdId } = useHousehold();
-  const { filters: activeFilters } = useCollectionFilters();
+  const { filters: activeFilters, setFilters: setActiveFilters } = useCollectionFilters();
+  const categoriesQuery = useCategories(householdId);
+  const categories = (categoriesQuery.data ?? []).filter((category) => category.isSystem);
   const tabBarClearance = useTabBarClearance();
 
   const [search, setSearch] = useState('');
@@ -59,6 +63,26 @@ export default function CollectionScreen() {
             onPress={() => router.push('/(app)/collection/filters')}
           />
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: theme.spacing.xs }}
+        >
+          <Chip
+            label="Toutes"
+            selected={activeFilters.categoryId === undefined}
+            onPress={() => setActiveFilters({ ...activeFilters, categoryId: undefined })}
+          />
+          {categories.map((category) => (
+            <Chip
+              key={category.id}
+              label={category.name}
+              selected={activeFilters.categoryId === category.id}
+              onPress={() => setActiveFilters({ ...activeFilters, categoryId: category.id })}
+            />
+          ))}
+        </ScrollView>
       </View>
 
       {itemsQuery.isLoading ? (
