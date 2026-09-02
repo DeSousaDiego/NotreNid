@@ -71,9 +71,11 @@ export default function FiltersScreen() {
           style={[
             {
               paddingHorizontal: theme.spacing.lg,
-              paddingTop: theme.spacing.sm,
-              paddingBottom: insets.bottom + theme.spacing.sm,
+              paddingTop: theme.spacing.xs,
+              paddingBottom: insets.bottom + theme.spacing.xs,
               backgroundColor: theme.colors.background,
+              borderTopWidth: 1,
+              borderTopColor: theme.colors.border,
             },
             theme.elevation.low,
           ]}
