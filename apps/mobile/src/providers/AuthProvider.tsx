@@ -149,31 +149,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Invalider la génération en premier : un rafraîchissement démarré juste
     // avant ce logout ne pourra plus écrire ses tokens (voir http.ts).
     bumpSessionGeneration();
-    await queryClient.cancelQueries();
+    // État local (tokens, foyer, cache, identité) réglé intégralement AVANT
+    // tout appel réseau : la révocation serveur ne doit jamais conditionner
+    // la déconnexion locale. Sans cet ordre, un force-quit pendant l'attente
+    // réseau (potentiellement plusieurs secondes) laissait les tokens
+    // intacts dans SecureStore — la session revenait alors à la relance.
     const tokens = await secureTokenStorage.getTokens();
-    if (tokens) {
-      await apiClient.auth.logout(tokens.refreshToken).catch(() => {
-        /* déconnexion locale malgré tout si l'appel réseau échoue */
-      });
-    }
     await secureTokenStorage.clearTokens();
     await clearLastHouseholdId();
+    await queryClient.cancelQueries();
     // Aucune donnée du compte qui se déconnecte ne doit rester lisible par le
     // prochain utilisateur qui se connectera sur cet appareil.
     queryClient.clear();
     setOverride({ kind: 'unauthenticated' });
+    if (tokens) {
+      await apiClient.auth.logout(tokens.refreshToken).catch(() => {
+        /* la déconnexion locale a déjà eu lieu, best-effort côté serveur */
+      });
+    }
   }, [apiClient, queryClient, bumpSessionGeneration]);
 
   const logoutAllDevices = useCallback(async () => {
     bumpSessionGeneration();
-    await queryClient.cancelQueries();
-    await apiClient.auth.logoutAll().catch(() => {
-      /* déconnexion locale malgré tout si l'appel réseau échoue */
-    });
     await secureTokenStorage.clearTokens();
     await clearLastHouseholdId();
+    await queryClient.cancelQueries();
     queryClient.clear();
     setOverride({ kind: 'unauthenticated' });
+    await apiClient.auth.logoutAll().catch(() => {
+      /* la déconnexion locale a déjà eu lieu, best-effort côté serveur */
+    });
   }, [apiClient, queryClient, bumpSessionGeneration]);
 
   const refreshUser = useCallback(

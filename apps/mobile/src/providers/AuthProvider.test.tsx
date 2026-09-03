@@ -6,6 +6,19 @@ import type { ReactNode } from 'react';
 
 import { AuthProvider, useAuth } from './AuthProvider';
 
+/**
+ * Promesse contrôlable pour simuler un appel réseau lent/injoignable sans
+ * jamais laisser une promesse véritablement éternelle fuiter d'un test vers
+ * les suivants (source de plantages en cascade sous Jest).
+ */
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 jest.mock('../lib/secureTokenStorage', () => ({
   secureTokenStorage: {
     getTokens: jest.fn(),
@@ -188,6 +201,32 @@ describe('AuthProvider', () => {
     expect(secureTokenStorage.clearTokens).toHaveBeenCalled();
   });
 
+  it('vide les tokens locaux et repasse "unauthenticated" même si la révocation réseau ne répond jamais', async () => {
+    secureTokenStorage.getTokens.mockResolvedValue({
+      accessToken: 'access',
+      refreshToken: 'refresh',
+    });
+    (mockAuthClient.auth.me as jest.Mock).mockResolvedValue(user);
+    // Réseau très lent/injoignable pendant le logout. La déconnexion locale
+    // (tokens, cache, statut) ne doit jamais dépendre de cet appel — sinon un
+    // force-quit pendant cette attente laisse les anciens tokens intacts et
+    // la session revient à la relance.
+    const pendingRevoke = createDeferred<void>();
+    (mockAuthClient.auth.logout as jest.Mock).mockReturnValue(pendingRevoke.promise);
+
+    const { result } = await renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+
+    const logoutPromise = result.current.logout();
+    await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
+    expect(result.current.user).toBeNull();
+    expect(secureTokenStorage.clearTokens).toHaveBeenCalled();
+
+    // Nettoyage : ne pas laisser cette promesse pendante fuiter vers les tests suivants.
+    pendingRevoke.resolve();
+    await logoutPromise;
+  });
+
   it('revient à "unauthenticated" après logoutAllDevices()', async () => {
     secureTokenStorage.getTokens.mockResolvedValue({
       accessToken: 'access',
@@ -207,6 +246,26 @@ describe('AuthProvider', () => {
     expect(result.current.status).toBe('unauthenticated');
     expect(result.current.user).toBeNull();
     expect(secureTokenStorage.clearTokens).toHaveBeenCalled();
+  });
+
+  it('vide les tokens locaux et repasse "unauthenticated" même si logoutAllDevices() ne répond jamais côté réseau', async () => {
+    secureTokenStorage.getTokens.mockResolvedValue({
+      accessToken: 'access',
+      refreshToken: 'refresh',
+    });
+    (mockAuthClient.auth.me as jest.Mock).mockResolvedValue(user);
+    const pendingRevoke = createDeferred<void>();
+    (mockAuthClient.auth.logoutAll as jest.Mock).mockReturnValue(pendingRevoke.promise);
+
+    const { result } = await renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+
+    const logoutPromise = result.current.logoutAllDevices();
+    await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
+    expect(secureTokenStorage.clearTokens).toHaveBeenCalled();
+
+    pendingRevoke.resolve();
+    await logoutPromise;
   });
 
   it('revient à "unauthenticated" quand la session expire (refresh token révoqué)', async () => {
