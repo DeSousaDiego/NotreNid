@@ -10,7 +10,7 @@ const mockRefreshUser = jest.fn();
 
 jest.mock('../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
-  useAuth: () => ({ refreshUser: mockRefreshUser }),
+  useAuth: () => ({ user: { id: 'user-1' }, refreshUser: mockRefreshUser }),
 }));
 
 jest.mock('../providers/HouseholdProvider', () => ({
@@ -45,10 +45,10 @@ describe('useProfileMutations', () => {
     expect(mockApiClient.users.updateProfile).toHaveBeenCalledWith({ displayName: 'Alix Barbosa' });
     await waitFor(() => expect(mockRefreshUser).toHaveBeenCalledWith(FRESH_USER));
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['households', 'household-1', 'members'],
+      queryKey: ['users', 'user-1', 'households', 'household-1', 'members'],
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['households', 'household-1', 'items'],
+      queryKey: ['users', 'user-1', 'households', 'household-1', 'items'],
     });
   });
 

@@ -174,6 +174,68 @@ describe('createHttpClient', () => {
     expect(refreshCalls).toHaveLength(1);
   });
 
+  it('writes the refreshed tokens when the session generation is unchanged', async () => {
+    const tokenStorage = createMemoryTokenStorage({
+      accessToken: 'expired',
+      refreshToken: 'refresh-1',
+    });
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, { accessToken: 'new-access', refreshToken: 'new-refresh', user: {} }),
+      )
+      .mockResolvedValueOnce(jsonResponse(200, { data: [] }));
+
+    const http = createHttpClient({
+      baseUrl: 'http://api.test',
+      tokenStorage,
+      getSessionGeneration: () => 1,
+    });
+    await http.request('/households');
+
+    await expect(tokenStorage.getTokens()).resolves.toEqual({
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+    });
+  });
+
+  it('discards a refresh that resolves after the session moved on (stale-refresh guard)', async () => {
+    const tokenStorage = createMemoryTokenStorage({
+      accessToken: 'expired',
+      refreshToken: 'refresh-1',
+    });
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED', message: '' }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          accessToken: 'stale-access',
+          refreshToken: 'stale-refresh',
+          user: {},
+        }),
+      );
+    // Un logout/login est survenu pendant que ce rafraîchissement était en vol :
+    // la génération lue au début (1) diffère de celle lue juste avant l'écriture (2).
+    const getSessionGeneration = jest.fn().mockReturnValueOnce(1).mockReturnValue(2);
+
+    const http = createHttpClient({
+      baseUrl: 'http://api.test',
+      tokenStorage,
+      getSessionGeneration,
+    });
+
+    await expect(http.request('/households')).rejects.toMatchObject({ code: 'STALE_REFRESH' });
+    // Les tokens de la session abandonnée ne doivent jamais écraser ceux de la
+    // session courante (ici : ceux d'origine, puisqu'aucune n'a réellement pris le relais).
+    await expect(tokenStorage.getTokens()).resolves.toEqual({
+      accessToken: 'expired',
+      refreshToken: 'refresh-1',
+    });
+  });
+
   it('sends FormData bodies as-is, without a JSON Content-Type header', async () => {
     const tokenStorage = createMemoryTokenStorage({ accessToken: 'a', refreshToken: 'r' });
     fetchMock.mockResolvedValue(jsonResponse(201, { id: 'file-1', url: 'http://x/file-1.jpg' }));

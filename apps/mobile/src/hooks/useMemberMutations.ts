@@ -2,17 +2,21 @@ import type { HouseholdRole } from '@notre-nid/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '../lib/queryKeys';
-import { useApiClient } from '../providers/AuthProvider';
+import { useApiClient, useAuth } from '../providers/AuthProvider';
 
 export function useUpdateMemberRole(householdId: string | null) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id ?? '__none__';
 
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: HouseholdRole }) =>
-      apiClient.households.updateMemberRole(householdId as string, userId, role),
+    mutationFn: ({ userId: targetUserId, role }: { userId: string; role: HouseholdRole }) =>
+      apiClient.households.updateMemberRole(householdId as string, targetUserId, role),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members(householdId as string) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.members(userId, householdId as string),
+      });
     },
   });
 }
@@ -20,12 +24,16 @@ export function useUpdateMemberRole(householdId: string | null) {
 export function useRemoveMember(householdId: string | null) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id ?? '__none__';
 
   return useMutation({
-    mutationFn: (userId: string) =>
-      apiClient.households.removeMember(householdId as string, userId),
+    mutationFn: (targetUserId: string) =>
+      apiClient.households.removeMember(householdId as string, targetUserId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.members(householdId as string) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.members(userId, householdId as string),
+      });
     },
   });
 }
@@ -33,11 +41,14 @@ export function useRemoveMember(householdId: string | null) {
 export function useLeaveHousehold(householdId: string | null) {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
     mutationFn: () => apiClient.households.leave(householdId as string),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.households });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.households(user?.id ?? '__none__'),
+      });
     },
   });
 }

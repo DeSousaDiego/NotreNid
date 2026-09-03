@@ -14,6 +14,7 @@ const mockApiClient = createMockApiClient();
 
 jest.mock('../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
+  useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
 const HOUSEHOLD_ID = 'h1';
@@ -57,7 +58,7 @@ describe('useInvitations', () => {
     expect(mockApiClient.invitations.create).toHaveBeenCalledWith(HOUSEHOLD_ID, 'sam@example.com');
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['households', HOUSEHOLD_ID, 'invitations'],
+        queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'invitations'],
       }),
     );
   });
@@ -91,6 +92,8 @@ describe('useInvitations', () => {
     });
 
     expect(mockApiClient.invitations.accept).toHaveBeenCalledWith('7K4P2Q9D');
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['households'] }));
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['users', 'user-1', 'households'] }),
+    );
   });
 });

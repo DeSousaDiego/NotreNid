@@ -18,11 +18,12 @@ import { useHousehold } from '../providers/HouseholdProvider';
 function useInvalidateProfileCaches() {
   const queryClient = useQueryClient();
   const { householdId } = useHousehold();
+  const { user } = useAuth();
 
   return () => {
-    if (!householdId) return;
-    void queryClient.invalidateQueries({ queryKey: queryKeys.members(householdId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.itemsRoot(householdId) });
+    if (!householdId || !user) return;
+    void queryClient.invalidateQueries({ queryKey: queryKeys.members(user.id, householdId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.itemsRoot(user.id, householdId) });
   };
 }
 

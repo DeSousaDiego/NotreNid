@@ -25,6 +25,7 @@ const mockApiClient = createMockApiClient();
 
 jest.mock('../../../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
+  useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
 jest.mock('../../../providers/HouseholdProvider', () => ({

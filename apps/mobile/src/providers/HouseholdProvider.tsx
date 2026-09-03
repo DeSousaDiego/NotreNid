@@ -34,6 +34,24 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const householdsQuery = useHouseholds(status === 'authenticated');
   const [manualSelection, setManualSelection] = useState<string | null>(null);
   const [persistedLastId, setPersistedLastId] = useState<string | null>(null);
+  const [lastStatus, setLastStatus] = useState(status);
+
+  /**
+   * Ajustement pendant le rendu plutôt qu'un effet (docs React — « Adjusting
+   * state when a prop changes ») : une sélection de household (manuelle ou
+   * mémorisée) appartient à une session précise. Sans ce reset, elle
+   * survivrait en mémoire — ce provider ne se démonte jamais — à un logout et
+   * resterait visible le temps qu'une nouvelle connexion recharge la vraie
+   * liste de households du prochain utilisateur (cause racine confirmée du
+   * bug d'isolation de compte, voir docs/PHASE_STATUS.md).
+   */
+  if (status !== lastStatus) {
+    setLastStatus(status);
+    if (status === 'unauthenticated') {
+      setManualSelection(null);
+      setPersistedLastId(null);
+    }
+  }
 
   useEffect(() => {
     void getLastHouseholdId().then((id) => setPersistedLastId(id));

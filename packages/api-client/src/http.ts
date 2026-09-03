@@ -87,6 +87,7 @@ export function createHttpClient(config: ApiClientConfig) {
   async function refreshTokens(): Promise<StoredTokens> {
     if (!refreshPromise) {
       refreshPromise = (async () => {
+        const generationAtStart = config.getSessionGeneration?.();
         const tokens = await config.tokenStorage.getTokens();
         if (!tokens?.refreshToken) {
           const body: ApiErrorBody = {
@@ -116,6 +117,23 @@ export function createHttpClient(config: ApiClientConfig) {
           accessToken: result.accessToken,
           refreshToken: result.refreshToken,
         };
+
+        // La session a changé (logout/login) pendant cet appel réseau : ces
+        // tokens appartiennent à une session qui n'est plus active, ne jamais
+        // les écrire (ils écraseraient ceux de la session courante).
+        if (
+          generationAtStart !== undefined &&
+          config.getSessionGeneration?.() !== generationAtStart
+        ) {
+          const body: ApiErrorBody = {
+            statusCode: 401,
+            code: 'STALE_REFRESH',
+            message: 'Session expirée.',
+            details: [],
+          };
+          throw new ApiError(body);
+        }
+
         await config.tokenStorage.setTokens(newTokens);
         return newTokens;
       })().finally(() => {

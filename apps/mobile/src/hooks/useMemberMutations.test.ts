@@ -9,6 +9,7 @@ const mockApiClient = createMockApiClient();
 
 jest.mock('../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
+  useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
 const HOUSEHOLD_ID = 'h1';
@@ -36,7 +37,7 @@ describe('useMemberMutations', () => {
     );
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['households', HOUSEHOLD_ID, 'members'],
+        queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'members'],
       }),
     );
   });
@@ -66,7 +67,9 @@ describe('useMemberMutations', () => {
     });
 
     expect(mockApiClient.households.leave).toHaveBeenCalledWith(HOUSEHOLD_ID);
-    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['households'] }));
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['users', 'user-1', 'households'] }),
+    );
   });
 
   it('surfaces LAST_OWNER_CANNOT_LEAVE errors from the API without swallowing them', async () => {

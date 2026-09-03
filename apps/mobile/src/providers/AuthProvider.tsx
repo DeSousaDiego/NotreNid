@@ -6,7 +6,7 @@ import {
   type RegisterInput,
 } from '@notre-nid/api-client';
 import type { PublicUser } from '@notre-nid/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { API_BASE_URL } from '../lib/config';
@@ -50,16 +50,32 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [override, setOverride] = useState<AuthOverride>(null);
-
-  const [apiClient] = useState(() =>
-    createApiClient({
+  const queryClient = useQueryClient();
+  const [{ apiClient, bumpSessionGeneration }] = useState(() => {
+    // Compteur privé à cette closure (jamais exposé, jamais manipulé
+    // directement depuis l'extérieur) : incrémenté à chaque login/register/
+    // logout via `bumpSessionGeneration()`. Voir `ApiClientConfig.getSessionGeneration`
+    // — permet au client HTTP de détecter et d'ignorer l'écriture de tokens
+    // d'un rafraîchissement automatique démarré par une session qui n'est
+    // plus active.
+    let generation = 0;
+    const client = createApiClient({
       baseUrl: API_BASE_URL,
       tokenStorage: secureTokenStorage,
+      getSessionGeneration: () => generation,
       onSessionExpired: () => {
+        generation += 1;
+        queryClient.clear();
         setOverride({ kind: 'unauthenticated' });
       },
-    }),
-  );
+    });
+    return {
+      apiClient: client,
+      bumpSessionGeneration: () => {
+        generation += 1;
+      },
+    };
+  });
 
   const restoreQuery = useQuery({
     queryKey: ['auth', 'restore'],
@@ -103,6 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (input: LoginInput) => {
+      // Ferme la fenêtre pour tout rafraîchissement résiduel d'une session
+      // précédente qui écrirait ses tokens après ceux de cette connexion.
+      bumpSessionGeneration();
       const result = await apiClient.auth.login(input);
       await secureTokenStorage.setTokens({
         accessToken: result.accessToken,
@@ -110,11 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       setOverride({ kind: 'authenticated', user: result.user });
     },
-    [apiClient],
+    [apiClient, bumpSessionGeneration],
   );
 
   const register = useCallback(
     async (input: RegisterInput) => {
+      bumpSessionGeneration();
       const result = await apiClient.auth.register(input);
       await secureTokenStorage.setTokens({
         accessToken: result.accessToken,
@@ -122,10 +142,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       setOverride({ kind: 'authenticated', user: result.user });
     },
-    [apiClient],
+    [apiClient, bumpSessionGeneration],
   );
 
   const logout = useCallback(async () => {
+    // Invalider la génération en premier : un rafraîchissement démarré juste
+    // avant ce logout ne pourra plus écrire ses tokens (voir http.ts).
+    bumpSessionGeneration();
+    await queryClient.cancelQueries();
     const tokens = await secureTokenStorage.getTokens();
     if (tokens) {
       await apiClient.auth.logout(tokens.refreshToken).catch(() => {
@@ -134,17 +158,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await secureTokenStorage.clearTokens();
     await clearLastHouseholdId();
+    // Aucune donnée du compte qui se déconnecte ne doit rester lisible par le
+    // prochain utilisateur qui se connectera sur cet appareil.
+    queryClient.clear();
     setOverride({ kind: 'unauthenticated' });
-  }, [apiClient]);
+  }, [apiClient, queryClient, bumpSessionGeneration]);
 
   const logoutAllDevices = useCallback(async () => {
+    bumpSessionGeneration();
+    await queryClient.cancelQueries();
     await apiClient.auth.logoutAll().catch(() => {
       /* déconnexion locale malgré tout si l'appel réseau échoue */
     });
     await secureTokenStorage.clearTokens();
     await clearLastHouseholdId();
+    queryClient.clear();
     setOverride({ kind: 'unauthenticated' });
-  }, [apiClient]);
+  }, [apiClient, queryClient, bumpSessionGeneration]);
 
   const refreshUser = useCallback(
     async (freshUser?: PublicUser) => {

@@ -9,6 +9,7 @@ const mockApiClient = createMockApiClient();
 
 jest.mock('../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
+  useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
 const HOUSEHOLD_ID = 'h1';
@@ -34,7 +35,7 @@ describe('useCategoryMutations', () => {
     });
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['households', HOUSEHOLD_ID, 'categories'],
+        queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'categories'],
       }),
     );
   });
@@ -55,10 +56,10 @@ describe('useCategoryMutations', () => {
     });
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['households', HOUSEHOLD_ID, 'categories'],
+        queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'categories'],
       });
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['households', HOUSEHOLD_ID, 'items'],
+        queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'items'],
       });
     });
   });

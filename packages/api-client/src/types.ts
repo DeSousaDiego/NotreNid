@@ -20,4 +20,15 @@ export interface ApiClientConfig {
   tokenStorage: TokenStorage;
   /** Appelé quand le refresh token est définitivement invalide (session expirée). */
   onSessionExpired?: () => void;
+  /**
+   * Identifiant de la "génération" de session en cours, incrémenté par
+   * l'appelant à chaque login/register/logout. Un rafraîchissement automatique
+   * relit cette valeur juste avant d'écrire ses nouveaux tokens : si elle a
+   * changé depuis le début du rafraîchissement, la session qui l'a déclenché
+   * n'est plus la session active (l'utilisateur s'est déconnecté/reconnecté
+   * pendant l'appel réseau) et l'écriture est abandonnée — défense en
+   * profondeur contre un rafraîchissement résiduel qui écraserait les tokens
+   * d'une session plus récente.
+   */
+  getSessionGeneration?: () => number;
 }

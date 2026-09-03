@@ -9,6 +9,7 @@ const mockApiClient = createMockApiClient();
 
 jest.mock('../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
+  useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
 const HOUSEHOLD_ID = 'h1';
@@ -48,11 +49,11 @@ describe('useItemMutations', () => {
     });
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['households', HOUSEHOLD_ID, 'items'],
+        queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'items'],
       }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['households', HOUSEHOLD_ID, 'stats'],
+      queryKey: ['users', 'user-1', 'households', HOUSEHOLD_ID, 'stats'],
     });
   });
 
@@ -70,7 +71,10 @@ describe('useItemMutations', () => {
     expect(mockApiClient.items.update).toHaveBeenCalledWith(HOUSEHOLD_ID, 'item-1', {
       title: 'Dune (2ᵉ éd.)',
     });
-    expect(setSpy).toHaveBeenCalledWith(['households', HOUSEHOLD_ID, 'items', 'item-1'], mockItem);
+    expect(setSpy).toHaveBeenCalledWith(
+      ['users', 'user-1', 'households', HOUSEHOLD_ID, 'items', 'item-1'],
+      mockItem,
+    );
   });
 
   it('useArchiveItem calls the archive endpoint with the item id', async () => {
