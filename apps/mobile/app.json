@@ -11,7 +11,7 @@
       "bundleIdentifier": "com.notrenid.app"
     },
     "android": {
-      "package": "com.notrenid.app",
+      "package": "com.diegodesousa.notrenid",
       "predictiveBackGestureEnabled": false
     },
     "web": {

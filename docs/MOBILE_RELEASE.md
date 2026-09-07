@@ -37,7 +37,7 @@ Cette commande crée le projet côté Expo et **écrit automatiquement** `extra.
 Déjà présents dans `apps/mobile/app.json` :
 
 - iOS `bundleIdentifier` : `com.notrenid.app`
-- Android `package` : `com.notrenid.app`
+- Android `package` : `com.diegodesousa.notrenid`
 
 **À vérifier avant le premier build de production** : ces identifiants doivent être uniques sur les stores respectifs. S'ils sont déjà pris (peu probable pour ce nom précis, mais à vérifier), les modifier de façon cohérente dans `app.json` avant `eas init` — un changement après coup nécessite de reconfigurer les credentials de signature.
 
