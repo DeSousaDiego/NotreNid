@@ -218,7 +218,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   const isBusy = isSubmitting || createItem.isPending || updateItem.isPending;
 
   return (
-    <ScreenContainer scroll edges={screenEdges}>
+    <ScreenContainer scroll edges={screenEdges} androidKeyboardBehavior="height">
       <View style={{ gap: theme.spacing.lg }}>
         <View style={{ gap: theme.spacing.xs }}>
           <AppText variant="title">

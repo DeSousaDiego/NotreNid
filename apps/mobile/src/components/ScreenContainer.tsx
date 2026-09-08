@@ -16,6 +16,18 @@ export interface ScreenContainerProps {
   edges?: Edge[];
   /** Enveloppe le contenu dans un ScrollView + évitement clavier (formulaires). */
   scroll?: boolean;
+  /**
+   * Comportement de `KeyboardAvoidingView` sur Android — aucun par défaut (comportement
+   * historique inchangé pour ne pas affecter les écrans qui ne l'activent pas). iOS utilise
+   * toujours `"padding"`, indépendamment de cette prop.
+   *
+   * Sur Android récent (edge-to-edge obligatoire depuis Expo SDK 54), l'app dessine derrière
+   * la barre de navigation et le clavier : `windowSoftInputMode="adjustResize"` ne redimensionne
+   * plus réellement la fenêtre, donc sans ce comportement explicite rien ne réserve de place
+   * pour le clavier et le champ actif peut se retrouver masqué. `"height"` correspond à
+   * l'exemple canonique de la documentation React Native pour Android.
+   */
+  androidKeyboardBehavior?: 'height' | 'padding';
   style?: ViewStyle;
   contentStyle?: ViewStyle;
   /**
@@ -30,11 +42,25 @@ export interface ScreenContainerProps {
   footer?: ReactNode;
 }
 
+/**
+ * iOS utilise toujours `"padding"`. Android n'a de comportement que si l'écran
+ * l'active explicitement via `androidKeyboardBehavior` (voir sa documentation
+ * ci-dessus) — extrait en fonction pure pour rester testable sans dépendre du
+ * rendu (le renderer de test n'expose que les éléments hôtes, pas les props
+ * internes d'un composant composite comme `KeyboardAvoidingView`).
+ */
+export function resolveKeyboardAvoidingBehavior(
+  androidKeyboardBehavior: ScreenContainerProps['androidKeyboardBehavior'],
+): 'padding' | 'height' | undefined {
+  return Platform.OS === 'ios' ? 'padding' : androidKeyboardBehavior;
+}
+
 /** Conteneur d'écran standard : fond crème, safe area, padding cohérent. */
 export function ScreenContainer({
   children,
   edges = ['top', 'left', 'right'],
   scroll = false,
+  androidKeyboardBehavior,
   style,
   contentStyle,
   footer,
@@ -60,7 +86,7 @@ export function ScreenContainer({
     >
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={resolveKeyboardAvoidingBehavior(androidKeyboardBehavior)}
       >
         {content}
         {footer}
