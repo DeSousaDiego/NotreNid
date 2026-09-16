@@ -572,7 +572,6 @@ export interface components {
         };
         CdMetadataDto: {
             artist?: string;
-            album?: string;
             releaseYear?: number;
             label?: string;
             format?: string;
@@ -589,6 +588,11 @@ export interface components {
             categoryId: string;
             /** @example Dune */
             title: string;
+            /**
+             * @description Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit.
+             * @example 3600029412578
+             */
+            barcode?: string;
             description?: string;
             /** @enum {string} */
             condition: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
@@ -619,6 +623,11 @@ export interface components {
             categoryId?: string;
             /** @example Dune */
             title?: string;
+            /**
+             * @description Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit.
+             * @example 3600029412578
+             */
+            barcode?: string;
             description?: string;
             /** @enum {string} */
             condition?: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";

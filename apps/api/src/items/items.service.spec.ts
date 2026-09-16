@@ -182,6 +182,266 @@ describe('ItemsService', () => {
     });
   });
 
+  describe('create — barcode', () => {
+    it('passes the barcode through to Prisma when provided', async () => {
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      prisma.householdMember.findMany.mockResolvedValue([{ userId: 'member-1' }]);
+      const fakeUser = {
+        id: 'member-1',
+        email: 'a@a.com',
+        displayName: 'A',
+        avatarUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        passwordHash: 'x',
+      };
+      const txItem = {
+        id: 'item1',
+        householdId: 'h1',
+        title: 'Discovery',
+        barcode: '3600029412578',
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        coverImageUrl: null,
+        notes: null,
+        customMetadata: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        category: { id: 'cat1' },
+        owners: [],
+        countries: [],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+      };
+      const itemCreate = jest.fn().mockResolvedValue(txItem);
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { create: typeof itemCreate };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) => fn({ item: { create: itemCreate }, auditLog: { create: auditLogCreate } }),
+      );
+
+      const result = await service.create('h1', 'member-1', {
+        categoryId: 'cat1',
+        title: 'Discovery',
+        barcode: '3600029412578',
+        condition: ItemCondition.GOOD,
+        ownerIds: ['member-1'],
+      });
+
+      expect(itemCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ barcode: '3600029412578' }) }),
+      );
+      expect(result.barcode).toBe('3600029412578');
+    });
+
+    it('leaves the barcode absent (null) when none is provided', async () => {
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      prisma.householdMember.findMany.mockResolvedValue([{ userId: 'member-1' }]);
+      const fakeUser = {
+        id: 'member-1',
+        email: 'a@a.com',
+        displayName: 'A',
+        avatarUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        passwordHash: 'x',
+      };
+      const txItem = {
+        id: 'item1',
+        householdId: 'h1',
+        title: 'Dune',
+        barcode: null,
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        coverImageUrl: null,
+        notes: null,
+        customMetadata: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        category: { id: 'cat1' },
+        owners: [],
+        countries: [],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+      };
+      const itemCreate = jest.fn().mockResolvedValue(txItem);
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { create: typeof itemCreate };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) => fn({ item: { create: itemCreate }, auditLog: { create: auditLogCreate } }),
+      );
+
+      const result = await service.create('h1', 'member-1', {
+        categoryId: 'cat1',
+        title: 'Dune',
+        condition: ItemCondition.GOOD,
+        ownerIds: ['member-1'],
+      });
+
+      expect(itemCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ barcode: undefined }) }),
+      );
+      expect(result.barcode).toBeNull();
+    });
+
+    it('keeps the existing barcode on update when none is provided in the patch', async () => {
+      const existing = {
+        id: 'item1',
+        householdId: 'h1',
+        categoryId: 'cat1',
+        title: 'Dune',
+        barcode: '3600029412578',
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        notes: null,
+        coverImageUrl: null,
+        customMetadata: null,
+        archivedAt: null,
+        owners: [],
+      };
+      prisma.item.findUnique.mockResolvedValue(existing);
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      const fakeUser = {
+        id: 'u1',
+        email: 'a@a.com',
+        displayName: 'A',
+        avatarUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        passwordHash: 'x',
+      };
+      const updated = {
+        ...existing,
+        category: { id: 'cat1' },
+        countries: [],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const itemUpdate = jest.fn().mockResolvedValue(updated);
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { update: typeof itemUpdate };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) => fn({ item: { update: itemUpdate }, auditLog: { create: auditLogCreate } }),
+      );
+
+      const result = await service.update('h1', 'item1', 'u1', {
+        title: 'Dune (nouvelle édition)',
+      });
+
+      expect(itemUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ barcode: '3600029412578' }) }),
+      );
+      expect(result.barcode).toBe('3600029412578');
+    });
+
+    it('updates the barcode when provided in the patch', async () => {
+      const existing = {
+        id: 'item1',
+        householdId: 'h1',
+        categoryId: 'cat1',
+        title: 'Dune',
+        barcode: null,
+        description: null,
+        condition: ItemCondition.GOOD,
+        rating: null,
+        notes: null,
+        coverImageUrl: null,
+        customMetadata: null,
+        archivedAt: null,
+        owners: [],
+      };
+      prisma.item.findUnique.mockResolvedValue(existing);
+      prisma.category.findUnique.mockResolvedValue({
+        id: 'cat1',
+        householdId: null,
+        isSystem: true,
+        metadataSchema: null,
+      });
+      const fakeUser = {
+        id: 'u1',
+        email: 'a@a.com',
+        displayName: 'A',
+        avatarUrl: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        passwordHash: 'x',
+      };
+      const updated = {
+        ...existing,
+        barcode: '9781234567897',
+        category: { id: 'cat1' },
+        countries: [],
+        bookMetadata: null,
+        cdMetadata: null,
+        dvdMetadata: null,
+        createdBy: fakeUser,
+        updatedBy: fakeUser,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const itemUpdate = jest.fn().mockResolvedValue(updated);
+      const auditLogCreate = jest.fn().mockResolvedValue({});
+      prisma.$transaction.mockImplementation(
+        async (
+          fn: (tx: {
+            item: { update: typeof itemUpdate };
+            auditLog: { create: typeof auditLogCreate };
+          }) => unknown,
+        ) => fn({ item: { update: itemUpdate }, auditLog: { create: auditLogCreate } }),
+      );
+
+      const result = await service.update('h1', 'item1', 'u1', { barcode: '9781234567897' });
+
+      expect(itemUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ barcode: '9781234567897' }) }),
+      );
+      expect(result.barcode).toBe('9781234567897');
+    });
+  });
+
   describe('countryCodes', () => {
     const fakeUser = {
       id: 'member-1',

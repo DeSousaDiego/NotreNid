@@ -7,7 +7,6 @@ export interface MetadataFieldConfig {
     | 'language'
     | 'pageCount'
     | 'artist'
-    | 'album'
     | 'releaseYear'
     | 'label'
     | 'format'
@@ -30,7 +29,6 @@ export const BOOK_FIELDS: MetadataFieldConfig[] = [
 
 export const CD_FIELDS: MetadataFieldConfig[] = [
   { key: 'artist', label: 'Artiste' },
-  { key: 'album', label: 'Album' },
   { key: 'releaseYear', label: 'Année de sortie', numeric: true },
   { key: 'label', label: 'Label' },
   { key: 'format', label: 'Format' },

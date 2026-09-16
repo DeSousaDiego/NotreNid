@@ -97,6 +97,8 @@ export function StepBasics({ control, errors, categories }: StepBasicsProps) {
         render={({ field }) => (
           <TextField
             label="Description"
+            placeholder="Le résumé, le synopsis ou la présentation de l’œuvre…"
+            helperText="La présentation de l’œuvre elle-même, indépendamment de votre exemplaire."
             value={field.value}
             onChangeText={field.onChange}
             onBlur={field.onBlur}
@@ -115,6 +117,8 @@ export function StepBasics({ control, errors, categories }: StepBasicsProps) {
         render={({ field }) => (
           <TextField
             label="Notes"
+            placeholder="Votre avis, une anecdote, l’état constaté, une dédicace…"
+            helperText="Votre commentaire personnel sur cet exemplaire précis."
             value={field.value}
             onChangeText={field.onChange}
             onBlur={field.onBlur}

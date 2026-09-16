@@ -16,6 +16,8 @@ export type MetadataInput<T> = Partial<Omit<T, 'itemId'>>;
 export interface ItemInput {
   categoryId: string;
   title: string;
+  /** Code-barres produit (EAN-8/13, UPC-A/E, futurs formats). Jamais unique. */
+  barcode?: string;
   condition: ItemCondition;
   rating?: ItemRating;
   description?: string;

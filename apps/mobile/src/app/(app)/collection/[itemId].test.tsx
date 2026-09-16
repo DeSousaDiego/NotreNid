@@ -67,6 +67,7 @@ const BASE_ITEM = {
   id: 'item-1',
   householdId: 'household-1',
   title: 'Dune',
+  barcode: null,
   description: null,
   condition: 'GOOD' as const,
   rating: null,
@@ -164,6 +165,47 @@ describe('ItemDetailScreen', () => {
 
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
     expect(view.getByLabelText('Propriétaires : Alix, Ellie')).toBeTruthy();
+  });
+
+  it('shows the dvd format alongside the other technical details', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      title: 'Dune',
+      book: null,
+      dvd: {
+        itemId: 'item-1',
+        director: 'Denis Villeneuve',
+        releaseYear: 2021,
+        edition: null,
+        region: null,
+        format: 'Blu-ray',
+        durationMinutes: 155,
+      },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Réalisateur')).toBeTruthy());
+    expect(view.getByText('Format')).toBeTruthy();
+    expect(view.getByText('Blu-ray')).toBeTruthy();
+  });
+
+  it('never shows an Album row for a cd item — the title already carries the album name', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      title: 'Discovery',
+      book: null,
+      cd: {
+        itemId: 'item-1',
+        artist: 'Daft Punk',
+        releaseYear: 2001,
+        label: null,
+        format: null,
+      },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Artiste')).toBeTruthy());
+    expect(view.queryByText('Album')).toBeNull();
   });
 
   it('shows the floating edit button for an active item, navigating to the edit screen', async () => {

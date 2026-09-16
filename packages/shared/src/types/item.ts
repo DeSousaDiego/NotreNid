@@ -21,7 +21,6 @@ export interface BookMetadata {
 export interface CdMetadata {
   itemId: string;
   artist: string | null;
-  album: string | null;
   releaseYear: number | null;
   label: string | null;
   format: string | null;
@@ -42,6 +41,8 @@ export interface Item {
   id: string;
   householdId: string;
   title: string;
+  /** Code-barres produit (EAN-8/13, UPC-A/E, futurs formats). Jamais unique. */
+  barcode: string | null;
   description: string | null;
   condition: ItemCondition;
   rating: ItemRating | null;

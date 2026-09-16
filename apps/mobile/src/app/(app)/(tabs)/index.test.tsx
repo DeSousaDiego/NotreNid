@@ -72,6 +72,7 @@ const DUNE = {
   id: 'item-1',
   householdId: 'household-1',
   title: 'Dune',
+  barcode: null,
   description: null,
   condition: 'GOOD' as const,
   rating: null,

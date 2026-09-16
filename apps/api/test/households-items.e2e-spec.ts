@@ -184,6 +184,138 @@ describe('Households / Invitations / Items (e2e)', () => {
     });
   });
 
+  describe('items: barcode', () => {
+    // Un seul utilisateur/household enregistré pour tout ce bloc — /auth/register est
+    // limité à 10 req/min/IP (AUTH_THROTTLE, apps/api/src/auth/auth.controller.ts) et ce
+    // fichier partage une seule instance d'app entre tous ses tests : un registerUser par
+    // scénario ferait dépasser ce quota et casserait des tests sans rapport plus loin dans
+    // le fichier (observé une première fois avec 4 registerUser dans ce bloc).
+    let alex: { email: string; id: string; accessToken: string };
+    let householdId: string;
+    let cdCategoryId: string;
+    let bookCategoryId: string;
+
+    beforeAll(async () => {
+      alex = await registerUser('alex-barcode');
+      householdId = await createHousehold(alex.accessToken, 'Foyer barcode');
+      cdCategoryId = await createCategory(alex.accessToken, householdId, 'CD');
+      bookCategoryId = await createCategory(alex.accessToken, householdId, 'Livres');
+    });
+
+    it('creates, reads and updates an item barcode; a new item without one reads back null', async () => {
+      const categoryId = cdCategoryId;
+
+      const createWithBarcode = await request(server())
+        .post(`/api/v1/households/${householdId}/items`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({
+          categoryId,
+          title: 'Discovery',
+          condition: 'GOOD',
+          ownerIds: [alex.id],
+          barcode: '3600029412578',
+        });
+      expect(createWithBarcode.status).toBe(201);
+      expect(createWithBarcode.body.barcode).toBe('3600029412578');
+
+      const itemId = createWithBarcode.body.id as string;
+      const getResponse = await request(server())
+        .get(`/api/v1/households/${householdId}/items/${itemId}`)
+        .set('Authorization', `Bearer ${alex.accessToken}`);
+      expect(getResponse.body.barcode).toBe('3600029412578');
+
+      const updateResponse = await request(server())
+        .patch(`/api/v1/households/${householdId}/items/${itemId}`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({ barcode: '0000000000000' });
+      expect(updateResponse.status).toBe(200);
+      expect(updateResponse.body.barcode).toBe('0000000000000');
+
+      const unrelatedUpdate = await request(server())
+        .patch(`/api/v1/households/${householdId}/items/${itemId}`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({ title: 'Discovery (édition remasterisée)' });
+      expect(unrelatedUpdate.status).toBe(200);
+      expect(unrelatedUpdate.body.barcode).toBe('0000000000000');
+
+      const noBarcodeItemId = await createItem(alex.accessToken, householdId, categoryId, [
+        alex.id,
+      ]);
+      const noBarcodeResponse = await request(server())
+        .get(`/api/v1/households/${householdId}/items/${noBarcodeItemId}`)
+        .set('Authorization', `Bearer ${alex.accessToken}`);
+      expect(noBarcodeResponse.body.barcode).toBeNull();
+    });
+
+    it('allows several items to share the same barcode (several copies of the same product)', async () => {
+      const categoryId = bookCategoryId;
+
+      const firstCopy = await request(server())
+        .post(`/api/v1/households/${householdId}/items`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({
+          categoryId,
+          title: 'Dune',
+          condition: 'GOOD',
+          ownerIds: [alex.id],
+          barcode: '9780441172719',
+        });
+      expect(firstCopy.status).toBe(201);
+
+      const secondCopy = await request(server())
+        .post(`/api/v1/households/${householdId}/items`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({
+          categoryId,
+          title: 'Dune (exemplaire de poche)',
+          condition: 'FAIR',
+          ownerIds: [alex.id],
+          barcode: '9780441172719',
+        });
+      expect(secondCopy.status).toBe(201);
+      expect(secondCopy.body.barcode).toBe(firstCopy.body.barcode);
+      expect(secondCopy.body.id).not.toBe(firstCopy.body.id);
+    });
+
+    it('creates a cd without an album field, the title alone carrying the album name', async () => {
+      const categoryId = cdCategoryId;
+
+      const response = await request(server())
+        .post(`/api/v1/households/${householdId}/items`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({
+          categoryId,
+          title: 'Discovery',
+          condition: 'GOOD',
+          ownerIds: [alex.id],
+          cd: { artist: 'Daft Punk', releaseYear: 2001 },
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.title).toBe('Discovery');
+      expect(response.body.cd).toMatchObject({ artist: 'Daft Punk', releaseYear: 2001 });
+      expect(response.body.cd).not.toHaveProperty('album');
+    });
+
+    it('rejects a request that still sends a cd.album field (removed from the API contract)', async () => {
+      const categoryId = cdCategoryId;
+
+      const response = await request(server())
+        .post(`/api/v1/households/${householdId}/items`)
+        .set('Authorization', `Bearer ${alex.accessToken}`)
+        .send({
+          categoryId,
+          title: 'Discovery',
+          condition: 'GOOD',
+          ownerIds: [alex.id],
+          cd: { artist: 'Daft Punk', album: 'Discovery' },
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
   describe('critical: household isolation (docs/NOTRE_NID_PRD.md section 15)', () => {
     it('never lets a member of household A read, modify or delete an item of household B', async () => {
       const alex = await registerUser('iso-alex');

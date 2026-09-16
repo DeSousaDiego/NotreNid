@@ -10,12 +10,6 @@ export class CdMetadataDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  album?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
   @IsInt()
   @Min(0)
   releaseYear?: number;

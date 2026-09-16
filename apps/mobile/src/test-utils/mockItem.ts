@@ -5,6 +5,7 @@ export function mockItem(overrides: Partial<Item> = {}): Item {
     id: 'item-1',
     householdId: 'household-1',
     title: 'Les Misérables',
+    barcode: null,
     description: null,
     condition: 'GOOD',
     rating: null,

@@ -135,6 +135,11 @@ model Item {
   householdId    String
   categoryId     String
   title          String
+  /// Code-barres produit scanné (EAN-8, EAN-13, UPC-A, UPC-E ou futur format) — générique à
+  /// toutes les catégories, jamais unique : un foyer peut posséder plusieurs exemplaires du
+  /// même produit. Pas de synchronisation automatique avec BookMetadata.isbn pour l'instant
+  /// (voir docs/DECISIONS.md) ; préparé pour la future détection de doublons au scan.
+  barcode        String?
   description    String?
   condition      ItemCondition
   /// Note sur 5, par pas de 0,5 (0.5, 1, 1.5 ... 5). `null` = pas de note. Ces valeurs sont
@@ -212,10 +217,12 @@ model BookMetadata {
   @@map("book_metadata")
 }
 
+/// `album` retiré (Bloc 1 refonte ajout, docs/DECISIONS.md) : `Item.title` est désormais
+/// l'unique titre d'un CD (le titre de l'album/release). Vérifié sur les données réelles
+/// avant suppression : aucune divergence entre `album` et `title` constatée.
 model CdMetadata {
   itemId      String  @id
   artist      String?
-  album       String?
   releaseYear Int?
   label       String?
   format      String?

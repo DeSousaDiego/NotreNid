@@ -55,7 +55,6 @@ export class ItemsService {
         { bookMetadata: { is: { author: { contains, mode: 'insensitive' } } } },
         { bookMetadata: { is: { isbn: { contains, mode: 'insensitive' } } } },
         { cdMetadata: { is: { artist: { contains, mode: 'insensitive' } } } },
-        { cdMetadata: { is: { album: { contains, mode: 'insensitive' } } } },
         { dvdMetadata: { is: { director: { contains, mode: 'insensitive' } } } },
       ];
     }
@@ -95,6 +94,7 @@ export class ItemsService {
           householdId,
           categoryId: dto.categoryId,
           title: dto.title,
+          barcode: dto.barcode,
           description: dto.description,
           condition: dto.condition,
           rating: dto.rating,
@@ -163,6 +163,7 @@ export class ItemsService {
         data: {
           categoryId,
           title: dto.title ?? existing.title,
+          barcode: dto.barcode ?? existing.barcode,
           description: dto.description ?? existing.description,
           condition: dto.condition ?? existing.condition,
           rating: dto.rating ?? existing.rating,
@@ -344,6 +345,7 @@ export class ItemsService {
       id: item.id,
       householdId: item.householdId,
       title: item.title,
+      barcode: item.barcode,
       description: item.description,
       condition: item.condition,
       rating: item.rating,

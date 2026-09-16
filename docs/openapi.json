@@ -1806,9 +1806,6 @@
           "artist": {
             "type": "string"
           },
-          "album": {
-            "type": "string"
-          },
           "releaseYear": {
             "type": "number"
           },
@@ -1852,6 +1849,11 @@
           "title": {
             "type": "string",
             "example": "Dune"
+          },
+          "barcode": {
+            "type": "string",
+            "example": "3600029412578",
+            "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit."
           },
           "description": {
             "type": "string"
@@ -1936,6 +1938,11 @@
           "title": {
             "type": "string",
             "example": "Dune"
+          },
+          "barcode": {
+            "type": "string",
+            "example": "3600029412578",
+            "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit."
           },
           "description": {
             "type": "string"

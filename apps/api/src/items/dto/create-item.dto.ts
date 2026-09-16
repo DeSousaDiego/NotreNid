@@ -33,6 +33,17 @@ export class CreateItemDto {
   @MaxLength(200)
   title!: string;
 
+  @ApiPropertyOptional({
+    example: '3600029412578',
+    description:
+      'Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : ' +
+      'un foyer peut posséder plusieurs exemplaires du même produit.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  barcode?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

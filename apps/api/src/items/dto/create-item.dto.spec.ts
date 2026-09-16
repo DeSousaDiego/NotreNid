@@ -45,6 +45,34 @@ describe('CreateItemDto — rating', () => {
   });
 });
 
+async function validateBarcode(barcode: unknown) {
+  const dto = plainToInstance(CreateItemDto, { ...BASE, barcode });
+  const errors = await validate(dto);
+  return errors.filter((error) => error.property === 'barcode');
+}
+
+describe('CreateItemDto — barcode', () => {
+  it('accepts an absent barcode (facultatif)', async () => {
+    expect(await validateBarcode(undefined)).toHaveLength(0);
+  });
+
+  it('accepts a typical EAN-13 barcode', async () => {
+    expect(await validateBarcode('3600029412578')).toHaveLength(0);
+  });
+
+  it('accepts a short UPC-E-style barcode', async () => {
+    expect(await validateBarcode('01234565')).toHaveLength(0);
+  });
+
+  it('rejects a non-string value', async () => {
+    expect(await validateBarcode(123456789)).not.toHaveLength(0);
+  });
+
+  it('rejects a value longer than 32 characters', async () => {
+    expect(await validateBarcode('1'.repeat(33))).not.toHaveLength(0);
+  });
+});
+
 async function validateCountryCodes(countryCodes: unknown) {
   const dto = plainToInstance(CreateItemDto, { ...BASE, countryCodes });
   const errors = await validate(dto);

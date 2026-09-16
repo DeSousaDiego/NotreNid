@@ -44,7 +44,7 @@ export default function SearchScreen() {
         <EmptyState
           icon="search-outline"
           title="Recherchez dans votre nid"
-          message="Titre, auteur, artiste, album, réalisateur ou ISBN."
+          message="Titre, auteur, artiste, réalisateur ou ISBN."
         />
       ) : itemsQuery.isLoading ? (
         <View style={{ gap: theme.spacing.sm }}>

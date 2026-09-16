@@ -299,7 +299,6 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
     if (item.book.pageCount) rows.push(['Pages', String(item.book.pageCount)]);
   } else if (item.cd) {
     if (item.cd.artist) rows.push(['Artiste', item.cd.artist]);
-    if (item.cd.album) rows.push(['Album', item.cd.album]);
     if (item.cd.releaseYear) rows.push(['Année', String(item.cd.releaseYear)]);
     if (item.cd.label) rows.push(['Label', item.cd.label]);
     if (item.cd.format) rows.push(['Format', item.cd.format]);
@@ -308,6 +307,7 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
     if (item.dvd.releaseYear) rows.push(['Année', String(item.dvd.releaseYear)]);
     if (item.dvd.edition) rows.push(['Édition', item.dvd.edition]);
     if (item.dvd.region) rows.push(['Région', item.dvd.region]);
+    if (item.dvd.format) rows.push(['Format', item.dvd.format]);
     if (item.dvd.durationMinutes) rows.push(['Durée', `${item.dvd.durationMinutes} min`]);
   } else if (item.customMetadata) {
     for (const [key, value] of Object.entries(item.customMetadata)) {

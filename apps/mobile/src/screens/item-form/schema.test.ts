@@ -128,20 +128,20 @@ describe('buildItemPayload', () => {
     expect(payload.dvd).toBeUndefined();
   });
 
-  it('builds cd metadata for the cd category', () => {
+  it('builds cd metadata for the cd category, with the album title carried by Item.title', () => {
     const values: ItemFormValues = {
       ...baseValues,
       categoryId: 'category-cd',
-      metadata: { artist: 'Daft Punk', album: 'Discovery', releaseYear: '2001' },
+      metadata: { artist: 'Daft Punk', releaseYear: '2001' },
     };
     const payload = buildItemPayload(values, CD_CATEGORY);
     expect(payload.cd).toEqual({
       artist: 'Daft Punk',
-      album: 'Discovery',
       releaseYear: 2001,
       label: undefined,
       format: undefined,
     });
+    expect(payload.cd).not.toHaveProperty('album');
     expect(payload.book).toBeUndefined();
   });
 
@@ -223,6 +223,19 @@ describe('itemToFormValues', () => {
     expect(values.ownerIds).toEqual(['user-1']);
     expect(values.metadata.author).toBe('Victor Hugo');
     expect(values.metadata.publicationYear).toBe('1862');
+  });
+
+  it('maps an existing cd item back into form values without an album field', () => {
+    const item = mockItem({
+      category: CD_CATEGORY,
+      book: null,
+      cd: { itemId: 'item-1', artist: 'Daft Punk', releaseYear: 2001, label: null, format: null },
+    });
+
+    const values = itemToFormValues(item);
+
+    expect(values.metadata.artist).toBe('Daft Punk');
+    expect(values.metadata).not.toHaveProperty('album');
   });
 
   it('maps an existing custom-category item, stringifying every metadata value', () => {

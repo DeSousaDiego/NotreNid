@@ -25,7 +25,6 @@ const metadataGroupSchema = z.object({
   language: z.string().optional(),
   pageCount: z.string().optional(),
   artist: z.string().optional(),
-  album: z.string().optional(),
   releaseYear: z.string().optional(),
   label: z.string().optional(),
   format: z.string().optional(),
@@ -81,7 +80,6 @@ export function itemToFormValues(item: Item): ItemFormValues {
     metadata.pageCount = item.book.pageCount?.toString() ?? '';
   } else if (item.cd) {
     metadata.artist = item.cd.artist ?? '';
-    metadata.album = item.cd.album ?? '';
     metadata.releaseYear = item.cd.releaseYear?.toString() ?? '';
     metadata.label = item.cd.label ?? '';
     metadata.format = item.cd.format ?? '';
@@ -179,7 +177,6 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
   } else if (category.slug === 'cd') {
     payload.cd = {
       artist: toOptionalString(values.metadata.artist),
-      album: toOptionalString(values.metadata.album),
       releaseYear: toOptionalInt(values.metadata.releaseYear),
       label: toOptionalString(values.metadata.label),
       format: toOptionalString(values.metadata.format),
