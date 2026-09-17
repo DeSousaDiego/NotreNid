@@ -1,9 +1,10 @@
 import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import type { ReactElement } from 'react';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { useState, type ReactElement } from 'react';
+import { Pressable } from 'react-native';
 
-import { ToastProvider } from '../../components';
+import { AppText, ToastProvider } from '../../components';
 import { ThemeProvider } from '../../theme';
 
 import { ItemFormScreen } from './ItemFormScreen';
@@ -12,6 +13,14 @@ import { ItemFormScreen } from './ItemFormScreen';
 // with this jest environment (unrelated to what this test exercises) — stub
 // it with a no-op component.
 jest.mock('expo-image', () => ({ Image: () => null }));
+
+// Le footer fixe (Précédent/Suivant, toujours visible) lit `useSafeAreaInsets`
+// directement — ce test ne rend pas de `SafeAreaProvider` réel, seul le hook est
+// mocké (même convention que `collection/filters.test.tsx`).
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
 
 const mockApiClient = createMockApiClient();
 
@@ -34,25 +43,15 @@ jest.mock('../../providers/HouseholdProvider', () => ({
 
 const mockRouterReplace = jest.fn();
 const mockRouterBack = jest.fn();
-// `useFocusEffect` a besoin d'un vrai NavigationContainer pour se déclencher tout
-// seul ; ce test le simule en exécutant l'effet immédiatement et en exposant son
-// cleanup pour que les tests puissent le déclencher manuellement, comme le ferait
-// un vrai changement d'onglet (Bloc 4 — reset du formulaire Ajouter).
-let capturedFocusCleanup: (() => void) | undefined;
 jest.mock('expo-router', () => ({
   router: {
     replace: (...args: unknown[]) => mockRouterReplace(...args),
     back: () => mockRouterBack(),
   },
-  useFocusEffect: (callback: () => (() => void) | void) => {
-    const cleanup = callback();
-    capturedFocusCleanup = typeof cleanup === 'function' ? cleanup : undefined;
-  },
 }));
 
 function createMockApiClient() {
   return {
-    categories: { list: jest.fn(), create: jest.fn(), update: jest.fn(), remove: jest.fn() },
     households: { listMembers: jest.fn() },
     items: { create: jest.fn(), update: jest.fn(), get: jest.fn() },
   } as unknown as import('@notre-nid/api-client').ApiClient;
@@ -70,16 +69,11 @@ const BOOK_CATEGORY = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-const CUSTOM_CATEGORY = {
-  id: 'category-custom',
-  householdId: 'household-1',
-  name: 'Jeux de société',
-  slug: 'board-games',
-  icon: null,
-  isSystem: false,
-  metadataSchema: null,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
+const CD_CATEGORY = {
+  ...BOOK_CATEGORY,
+  id: 'category-cd',
+  slug: 'cd',
+  name: 'CD',
 };
 
 const MEMBER = {
@@ -96,6 +90,38 @@ const MEMBER = {
   },
 };
 
+const EXISTING_ITEM = {
+  id: 'item-1',
+  householdId: 'household-1',
+  title: 'Dune',
+  barcode: null,
+  description: null,
+  condition: 'GOOD' as const,
+  rating: null,
+  coverImageUrl: null,
+  notes: null,
+  customMetadata: null,
+  countryCodes: [] as string[],
+  archivedAt: null,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  category: BOOK_CATEGORY,
+  owners: [MEMBER.user],
+  book: {
+    itemId: 'item-1',
+    author: 'Frank Herbert',
+    isbn: null,
+    publisher: null,
+    publicationYear: null,
+    language: null,
+    pageCount: null,
+  },
+  cd: null,
+  dvd: null,
+  createdBy: MEMBER.user,
+  updatedBy: MEMBER.user,
+};
+
 function renderScreen(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -110,34 +136,28 @@ function renderScreen(ui: ReactElement) {
 describe('ItemFormScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    capturedFocusCleanup = undefined;
-    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
     (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
   });
 
-  it('blocks moving to step 2 until category, title and condition are valid', async () => {
-    (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
+  it('blocks moving to step 2 until the title is valid', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
 
     await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
-
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
 
     await waitFor(() => expect(view.getByText('Le titre est requis.')).toBeTruthy());
     expect(mockApiClient.items.create).not.toHaveBeenCalled();
   });
 
-  it('creates the item end-to-end across all three steps', async () => {
+  it('creates the item end-to-end across all three steps, with the category fixed from the prop', async () => {
     (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
 
     await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
-
-    await fireEvent.press(view.getByLabelText('Livre'));
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Auteur')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
     await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
@@ -157,68 +177,126 @@ describe('ItemFormScreen', () => {
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
   });
 
-  it('shows a retryable error state instead of a blank category picker when the categories request fails', async () => {
-    (mockApiClient.categories.list as jest.Mock).mockRejectedValue(new NetworkError());
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
+  it('shows a cd form with no Album field anywhere in step 1', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={CD_CATEGORY} />);
 
-    await waitFor(() => expect(view.getByText('Catégories indisponibles')).toBeTruthy());
-    expect(
-      view.getByText('Impossible de joindre le service. Vérifiez votre connexion et réessayez.'),
-    ).toBeTruthy();
-    expect(view.queryByText('Livre')).toBeNull();
-
-    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
-    await fireEvent.press(view.getByRole('button', { name: 'Réessayer' }));
-
-    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Artiste')).toBeTruthy());
+    expect(view.queryByText('Album')).toBeNull();
+    expect(view.queryByLabelText('Album')).toBeNull();
   });
 
   it('shows a retryable error state instead of silently emptying the owner picker when the members request fails', async () => {
     (mockApiClient.households.listMembers as jest.Mock).mockRejectedValue(new NetworkError());
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
 
     await waitFor(() => expect(view.getByText('Membres indisponibles')).toBeTruthy());
-    expect(view.queryByText('Livre')).toBeNull();
+    expect(view.queryByLabelText('Titre')).toBeNull();
   });
 
-  it('only offers system categories in the picker, even if a custom one exists (Bloc 4)', async () => {
-    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([
-      BOOK_CATEGORY,
-      CUSTOM_CATEGORY,
-    ]);
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
+  it('does not lose data moving between wizard steps (forward and back)', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
 
     await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
-    expect(view.queryByText('Jeux de société')).toBeNull();
-  });
-
-  it('resets the form when the screen loses focus (leaving "Ajouter" without submitting)', async () => {
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
-
-    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
-    await fireEvent.press(view.getByLabelText('Livre'));
-    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
-    expect(view.getByLabelText('Titre').props.value).toBe('Dune');
-
-    // Simule le blur de focus qu'Expo Router déclenche à un vrai changement d'onglet.
-    await act(async () => {
-      capturedFocusCleanup?.();
-    });
-
-    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe(''));
-  });
-
-  it('does not lose data moving between wizard steps internally (no focus loss)', async () => {
-    const view = await renderScreen(<ItemFormScreen mode="create" />);
-
-    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
-    await fireEvent.press(view.getByLabelText('Livre'));
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Auteur')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
     await fireEvent.press(view.getByRole('button', { name: 'Précédent' }));
 
     await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+  });
+
+  it('regression: a parent re-render with unchanged form data never re-writes the draft, independently of React.memo', async () => {
+    const onValuesChange = jest.fn();
+
+    // `onChangeCategoryPress` is rebuilt on every render of this harness — a new
+    // reference each time — which deliberately defeats `React.memo`'s shallow prop
+    // comparison on `ItemFormScreen`, forcing it to genuinely re-render. This proves
+    // the protection lives in the RHF `watch` subscription itself, not in `memo`
+    // (which stays a pure optimisation, per the fix — see ItemFormScreen.tsx).
+    function Harness() {
+      const [tick, setTick] = useState(0);
+      return (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="force-rerender"
+            onPress={() => setTick((current) => current + 1)}
+          >
+            <AppText>{`tick: ${tick}`}</AppText>
+          </Pressable>
+          <ItemFormScreen
+            mode="create"
+            category={BOOK_CATEGORY}
+            onValuesChange={onValuesChange}
+            onChangeCategoryPress={() => {}}
+          />
+        </>
+      );
+    }
+
+    const view = await renderScreen(<Harness />);
+    await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+    expect(onValuesChange).not.toHaveBeenCalled();
+
+    for (let i = 0; i < 5; i += 1) {
+      await fireEvent.press(view.getByLabelText('force-rerender'));
+    }
+    await waitFor(() => expect(view.getByText('tick: 5')).toBeTruthy());
+    expect(onValuesChange).not.toHaveBeenCalled();
+
+    // Une vraie saisie continue, elle, à synchroniser normalement.
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+    await waitFor(() => expect(onValuesChange).toHaveBeenCalledTimes(1));
+    expect(onValuesChange).toHaveBeenCalledWith(expect.objectContaining({ title: 'Dune' }));
+  });
+
+  it('shows a discreet "Changer" link on step 1 only when onChangeCategoryPress is provided', async () => {
+    const onChangeCategoryPress = jest.fn();
+    const withLink = await renderScreen(
+      <ItemFormScreen
+        mode="create"
+        category={BOOK_CATEGORY}
+        onChangeCategoryPress={onChangeCategoryPress}
+      />,
+    );
+    await waitFor(() => expect(withLink.getByLabelText('Changer de catégorie')).toBeTruthy());
+    await fireEvent.press(withLink.getByLabelText('Changer de catégorie'));
+    expect(onChangeCategoryPress).toHaveBeenCalledTimes(1);
+
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(EXISTING_ITEM);
+    const withoutLink = await renderScreen(
+      <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+    );
+    await waitFor(() => expect(withoutLink.getByText('Livre')).toBeTruthy());
+    expect(withoutLink.queryByLabelText('Changer de catégorie')).toBeNull();
+  });
+
+  describe('edit mode', () => {
+    beforeEach(() => {
+      (mockApiClient.items.get as jest.Mock).mockResolvedValue(EXISTING_ITEM);
+    });
+
+    it('loads the existing item and lets it be updated without going through category/mode screens', async () => {
+      (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (édition collector)');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.update).toHaveBeenCalledWith(
+        'household-1',
+        'item-1',
+        expect.objectContaining({ title: 'Dune (édition collector)' }),
+      );
+      await waitFor(() => expect(mockRouterBack).toHaveBeenCalledTimes(1));
+    });
   });
 });

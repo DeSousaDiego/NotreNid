@@ -3,6 +3,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useHousehold } from '../../../providers/HouseholdProvider';
+import { useAddTabPress } from '../../../screens/add-item/useAddTabPress';
 import { HouseholdSelectView } from '../../../screens/HouseholdSelectView';
 import { NoHouseholdView } from '../../../screens/NoHouseholdView';
 import { useTheme } from '../../../theme';
@@ -12,6 +13,7 @@ export default function AppLayout() {
   const theme = useTheme();
   const { status } = useAuth();
   const { householdId, households, isLoading, selectHousehold } = useHousehold();
+  const handleAddTabPress = useAddTabPress();
 
   if (status !== 'authenticated') {
     return <Redirect href="/(auth)/login" />;
@@ -77,6 +79,7 @@ export default function AppLayout() {
           title: 'Ajouter',
           tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size} color={color} />,
         }}
+        listeners={{ tabPress: handleAddTabPress }}
       />
       <Tabs.Screen
         name="search"

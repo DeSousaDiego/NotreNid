@@ -51,6 +51,23 @@ export function metadataFieldsForSlug(slug: string): MetadataFieldConfig[] | nul
 }
 
 /**
+ * Catégories réellement proposées par le flow d'ajout (écran « Choisir une catégorie »,
+ * Bloc 2). Volontairement une whitelist explicite plutôt qu'un simple filtre sur
+ * `isSystem` : une catégorie système ajoutée côté API avant que son formulaire mobile
+ * (config de champs ci-dessus + libellés) n'existe ne doit jamais apparaître comme
+ * sélectionnable ici. Étendre = ajouter le slug ici *et* sa config de champs.
+ */
+export const ADD_ITEM_SUPPORTED_SLUGS = ['book', 'cd', 'dvd'] as const;
+
+/** Libellé du titre d'écran ("Ajouter un livre" / "Ajouter un CD" / "Ajouter un DVD"). */
+export function categoryAddTitle(category: { slug: string; name: string }): string {
+  if (category.slug === 'book') return 'Ajouter un livre';
+  if (category.slug === 'cd') return 'Ajouter un CD';
+  if (category.slug === 'dvd') return 'Ajouter un DVD';
+  return `Ajouter ${category.name}`;
+}
+
+/**
  * Libellé du champ pays (générique sur `Item`, voir docs/NOTRE_NID_PRD.md — Bloc 1, point
  * 1C), adapté à la catégorie pour rester parlant (ex. « Pays de l'artiste » pour un CD).
  */

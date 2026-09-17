@@ -43,7 +43,7 @@ const CUSTOM_CATEGORY: Category = {
 };
 
 describe('itemFormSchema', () => {
-  it('rejects a form missing a category, title, condition or owner', () => {
+  it('rejects a form missing a title or an owner', () => {
     const result = itemFormSchema.safeParse(EMPTY_ITEM_FORM_VALUES);
     expect(result.success).toBe(false);
   });
@@ -51,7 +51,6 @@ describe('itemFormSchema', () => {
   it('accepts a minimal valid form', () => {
     const values: ItemFormValues = {
       ...EMPTY_ITEM_FORM_VALUES,
-      categoryId: 'category-book',
       title: 'Dune',
       ownerIds: ['user-1'],
     };
@@ -60,7 +59,6 @@ describe('itemFormSchema', () => {
 
   const validBase: ItemFormValues = {
     ...EMPTY_ITEM_FORM_VALUES,
-    categoryId: 'category-book',
     title: 'Dune',
     ownerIds: ['user-1'],
   };
@@ -90,7 +88,6 @@ describe('itemFormSchema', () => {
 describe('buildItemPayload', () => {
   const baseValues: ItemFormValues = {
     ...EMPTY_ITEM_FORM_VALUES,
-    categoryId: 'category-book',
     title: '  Dune  ',
     condition: 'NEW',
     ownerIds: ['user-1', 'user-2'],
@@ -103,6 +100,19 @@ describe('buildItemPayload', () => {
     expect(payload.notes).toBeUndefined();
     expect(payload.coverImageUrl).toBeUndefined();
     expect(payload.rating).toBeUndefined();
+  });
+
+  it('always sends category.id as categoryId, regardless of which category is passed', () => {
+    expect(buildItemPayload(baseValues, BOOK_CATEGORY).categoryId).toBe(BOOK_CATEGORY.id);
+    expect(buildItemPayload(baseValues, CD_CATEGORY).categoryId).toBe(CD_CATEGORY.id);
+    expect(buildItemPayload(baseValues, DVD_CATEGORY).categoryId).toBe(DVD_CATEGORY.id);
+    // Deux appels successifs avec des catégories différentes ne doivent jamais laisser
+    // de résidu de l'appel précédent — `categoryId` n'existe plus dans `ItemFormValues`
+    // (Bloc 2) : c'est toujours et uniquement `category.id` du paramètre qui compte.
+    const first = buildItemPayload(baseValues, BOOK_CATEGORY);
+    const second = buildItemPayload(baseValues, CD_CATEGORY);
+    expect(first.categoryId).toBe(BOOK_CATEGORY.id);
+    expect(second.categoryId).toBe(CD_CATEGORY.id);
   });
 
   it('passes a set rating through, and omits it when null (no note)', () => {
@@ -131,7 +141,6 @@ describe('buildItemPayload', () => {
   it('builds cd metadata for the cd category, with the album title carried by Item.title', () => {
     const values: ItemFormValues = {
       ...baseValues,
-      categoryId: 'category-cd',
       metadata: { artist: 'Daft Punk', releaseYear: '2001' },
     };
     const payload = buildItemPayload(values, CD_CATEGORY);
@@ -148,7 +157,6 @@ describe('buildItemPayload', () => {
   it('builds dvd metadata for the dvd category', () => {
     const values: ItemFormValues = {
       ...baseValues,
-      categoryId: 'category-dvd',
       metadata: { director: 'Denis Villeneuve', durationMinutes: '155' },
     };
     const payload = buildItemPayload(values, DVD_CATEGORY);
@@ -167,7 +175,6 @@ describe('buildItemPayload', () => {
   it('builds customMetadata for a custom category, converting types per field schema', () => {
     const values: ItemFormValues = {
       ...baseValues,
-      categoryId: 'category-vinyl',
       customMetadata: { edition: 'Collector', weight: '180', limited: 'true' },
     };
     const payload = buildItemPayload(values, CUSTOM_CATEGORY);
@@ -178,7 +185,6 @@ describe('buildItemPayload', () => {
   it('omits a custom field left blank', () => {
     const values: ItemFormValues = {
       ...baseValues,
-      categoryId: 'category-vinyl',
       customMetadata: { edition: 'Collector', weight: '' },
     };
     const payload = buildItemPayload(values, CUSTOM_CATEGORY);
@@ -219,7 +225,6 @@ describe('itemToFormValues', () => {
 
     const values = itemToFormValues(item);
 
-    expect(values.categoryId).toBe(item.category.id);
     expect(values.ownerIds).toEqual(['user-1']);
     expect(values.metadata.author).toBe('Victor Hugo');
     expect(values.metadata.publicationYear).toBe('1862');

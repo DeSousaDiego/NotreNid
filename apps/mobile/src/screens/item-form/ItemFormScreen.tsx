@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { router } from 'expo-router';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { View } from 'react-native';
-import type { Edge } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+import type { Category } from '@notre-nid/shared';
 
 import {
   AppText,
@@ -13,7 +14,6 @@ import {
   ScreenContainer,
   useToast,
 } from '../../components';
-import { useCategories } from '../../hooks/useCategories';
 import { useCreateItem, useUpdateItem } from '../../hooks/useItemMutations';
 import { useItem } from '../../hooks/useItem';
 import { useMembers } from '../../hooks/useMembers';
@@ -21,9 +21,7 @@ import { getErrorMessage } from '../../lib/errorMessage';
 import { useHousehold } from '../../providers/HouseholdProvider';
 import { useTheme } from '../../theme';
 
-import { StepBasics } from './StepBasics';
-import { StepMetadata } from './StepMetadata';
-import { StepReview } from './StepReview';
+import { categoryAddTitle } from './metadataFields';
 import {
   buildItemPayload,
   EMPTY_ITEM_FORM_VALUES,
@@ -32,19 +30,68 @@ import {
   itemToFormValues,
   type ItemFormValues,
 } from './schema';
+import { StepCopy } from './StepCopy';
+import { StepInformation } from './StepInformation';
+import { StepOwnersAndCover } from './StepOwnersAndCover';
 
 export interface ItemFormScreenProps {
   mode: 'create' | 'edit';
+  /** Catégorie fixe pour la durée du montage de l'écran — choisie en amont (écran
+   * « Choisir une catégorie » en création, item existant en édition). Ce composant ne
+   * permet plus de la changer lui-même (Bloc 2) : voir `onChangeCategoryPress`. */
+  category: Category;
   itemId?: string;
+  /** Brouillon à reprendre (création uniquement) — vient du `AddItemDraftContext` du
+   * flow d'ajout, et sera plus tard le point d'injection des valeurs pré-remplies par
+   * le scanner. Lu une seule fois, au montage (voir `useForm({ defaultValues })`) :
+   * ne doit jamais changer de référence après coup sous peine de réinitialiser le
+   * formulaire en cours de saisie — c'est la responsabilité de l'appelant. */
+  initialValues?: Partial<ItemFormValues>;
+  /** Miroir des valeurs courantes vers l'appelant (synchronisation du brouillon). */
+  onValuesChange?: (values: ItemFormValues) => void;
+  /** Si fourni, affiche un lien discret « Changer » à côté du contexte catégorie
+   * (étape 1). Laissé `undefined` en édition — pas de changement de catégorie là. */
+  onChangeCategoryPress?: () => void;
 }
 
-const STEP_TITLES = ['Informations', 'Détails', 'Propriétaires et couverture'];
+const STEP_TITLES = ['Informations', 'Votre exemplaire', 'Propriétaires et couverture'];
 
-export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
+// Utilisé pour les états sans footer (chargement/erreur) — la zone de sécurité basse
+// y est gérée par `SafeAreaView` seule.
+const SCREEN_EDGES: Edge[] = ['top', 'left', 'right', 'bottom'];
+// Rendu principal : le footer (boutons Précédent/Suivant, toujours visible, même
+// clavier ouvert — voir plus bas) gère lui-même sa zone de sécurité basse via
+// `useSafeAreaInsets` (même convention que `collection/filters.tsx`) ; l'inclure aussi
+// ici doublerait ce padding.
+const FORM_SCREEN_EDGES: Edge[] = ['top', 'left', 'right'];
+
+function mergeWithEmpty(partial: Partial<ItemFormValues> | undefined): ItemFormValues {
+  return {
+    ...EMPTY_ITEM_FORM_VALUES,
+    ...partial,
+    metadata: { ...EMPTY_ITEM_FORM_VALUES.metadata, ...partial?.metadata },
+    // `useWatch` (mode contrôlé, sans `name`) type ses valeurs comme potentiellement
+    // `undefined` même pour un `Record<string, string>` — le cast reflète que RHF
+    // ne renvoie jamais une entrée réellement `undefined` ici (seulement absente).
+    customMetadata: {
+      ...EMPTY_ITEM_FORM_VALUES.customMetadata,
+      ...partial?.customMetadata,
+    } as Record<string, string>,
+  };
+}
+
+function ItemFormScreenComponent({
+  mode,
+  category,
+  itemId,
+  initialValues,
+  onValuesChange,
+  onChangeCategoryPress,
+}: ItemFormScreenProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { showToast } = useToast();
   const { householdId } = useHousehold();
-  const categoriesQuery = useCategories(householdId);
   const membersQuery = useMembers(householdId);
   const itemQuery = useItem(mode === 'edit' ? householdId : null, itemId ?? '');
   const createItem = useCreateItem(householdId);
@@ -53,19 +100,25 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   const [step, setStep] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Mémoïsé : `values` ci-dessous (RHF, mode édition) ne doit se resynchroniser que
+  // lorsque l'item chargé change réellement, jamais à chaque rendu — un nouvel objet
+  // à chaque frappe y causerait une réinitialisation permanente du formulaire édité.
+  // `initialValues` est par contrat figé par l'appelant (voir la prop) : l'inclure ici
+  // ne provoque donc de recalcul qu'au tout premier rendu.
   const defaultValues = useMemo(
     () =>
-      mode === 'edit' && itemQuery.data ? itemToFormValues(itemQuery.data) : EMPTY_ITEM_FORM_VALUES,
-    [mode, itemQuery.data],
+      mode === 'edit' && itemQuery.data
+        ? itemToFormValues(itemQuery.data)
+        : mergeWithEmpty(initialValues),
+    [mode, itemQuery.data, initialValues],
   );
 
   const {
     control,
     handleSubmit,
     trigger,
-    setError,
     clearErrors,
-    reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
@@ -73,58 +126,40 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
     values: mode === 'edit' && itemQuery.data ? defaultValues : undefined,
   });
 
-  // Formulaire neuf à chaque nouvelle visite de "Ajouter" (Bloc 4) : l'onglet n'est
-  // jamais démonté par Expo Router (les tabs restent montés en arrière-plan), donc
-  // sans ce nettoyage les valeurs du dernier item saisi persistaient d'une visite à
-  // l'autre. Le cleanup ne s'exécute qu'à la perte de focus d'un vrai changement
-  // d'onglet — jamais pendant un simple re-render — donc la progression normale
-  // entre les 3 étapes du wizard (setStep, sans perte de focus) n'est jamais
-  // affectée. Remettre `step` à 0 démonte `StepReview`/le sélecteur de couverture
-  // (rendu conditionnellement), ce qui décharge aussi leur état local au passage.
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        if (mode === 'create') {
-          reset(EMPTY_ITEM_FORM_VALUES);
-          setStep(0);
-          setSubmitError(null);
-        }
-      };
-    }, [mode, reset]),
-  );
-
   // `useWatch` without a `name` types every field as optional (it can genuinely
   // be partial while async default values are still loading in edit mode) —
   // merge with empty defaults so the rest of this screen can rely on the full
-  // `ItemFormValues` shape.
+  // `ItemFormValues` shape. Purely for rendering (recap in StepOwnersAndCover) —
+  // NOT used to drive the draft sync below, on purpose (see comment there).
   const watched = useWatch<ItemFormValues>({ control });
-  const values: ItemFormValues = {
-    ...EMPTY_ITEM_FORM_VALUES,
-    ...watched,
-    metadata: { ...EMPTY_ITEM_FORM_VALUES.metadata, ...watched.metadata },
-    customMetadata: {
-      ...EMPTY_ITEM_FORM_VALUES.customMetadata,
-      ...watched.customMetadata,
-    } as Record<string, string>,
-  };
-  const categories = categoriesQuery.data ?? [];
-  const selectedCategory = categories.find((category) => category.id === values.categoryId);
-  // V1 se limite aux 3 catégories système (Bloc 4) : le sélecteur de l'étape 1 n'offre
-  // que celles-ci. `categories`/`selectedCategory` restent basés sur la liste complète
-  // pour ne pas casser l'édition d'un item existant dont la catégorie personnalisée
-  // (créée avant cette simplification) ne serait plus proposée à la création.
-  const systemCategories = categories.filter((category) => category.isSystem);
+  const values = mergeWithEmpty(watched as Partial<ItemFormValues>);
 
-  // En mode édition, l'écran vit désormais hors du groupe d'onglets (Bloc 4, écran
-  // Stack sans tab bar) : la zone de sécurité basse n'est plus fournie par la tab
-  // bar et doit être explicitement réservée. En création, l'écran reste dans les
-  // onglets — la tab bar occupe déjà cette zone, ne pas en rajouter par-dessus.
-  const screenEdges: Edge[] =
-    mode === 'edit' ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right'];
+  // Synchronise le brouillon du flow d'ajout — structurellement protégé contre toute
+  // boucle, indépendamment de `React.memo` sur ce composant (qui reste une
+  // optimisation, pas la garantie). `watch(callback)` est une souscription RHF
+  // directe au store interne du formulaire : son callback n'est invoqué que lors
+  // d'une mutation RHF réelle (saisie, `setValue`…), jamais en réaction à un rendu
+  // React déclenché par le parent (contrairement à `useWatch`/`values` ci-dessus,
+  // qui produisent un nouvel objet à *chaque* rendu et ne peuvent donc pas servir de
+  // dépendance d'effet fiable). `watch` est une référence stable retournée par RHF
+  // (jamais recréée entre les rendus) : cet effet ne (ré)abonne donc qu'au montage
+  // et au démontage, jamais à chaque rendu. Aucune deep-equality, aucun
+  // `JSON.stringify`, aucun mode contrôlé, aucune réinjection d'`initialValues`.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    // react-hooks/incompatible-library : le React Compiler ne peut pas auto-mémoïser
+    // le retour de `watch()` (API react-hook-form) — attendu et sans incidence ici,
+    // cet effet ne dépend d'aucune valeur mémoïsée par le compilateur.
+    // eslint-disable-next-line react-hooks/incompatible-library
+    const subscription = watch((value) => {
+      onValuesChange?.(mergeWithEmpty(value as Partial<ItemFormValues>));
+    });
+    return () => subscription.unsubscribe();
+  }, [mode, watch, onValuesChange]);
 
   if (mode === 'edit' && itemQuery.isLoading) {
     return (
-      <ScreenContainer edges={screenEdges}>
+      <ScreenContainer edges={SCREEN_EDGES}>
         <LoadingSkeleton height={220} radius={theme.radii.lg} />
       </ScreenContainer>
     );
@@ -132,7 +167,7 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
 
   if (mode === 'edit' && (itemQuery.isError || !itemQuery.data)) {
     return (
-      <ScreenContainer edges={screenEdges}>
+      <ScreenContainer edges={SCREEN_EDGES}>
         <ErrorState
           title="Objet introuvable"
           message={itemQuery.error ? getErrorMessage(itemQuery.error) : "Cet objet n'existe pas."}
@@ -142,24 +177,9 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
     );
   }
 
-  // Sans catégories, l'étape 1 est bloquante (impossible de choisir une catégorie, donc
-  // impossible de continuer) — une erreur réseau ne doit jamais se traduire silencieusement
-  // par un sélecteur vide sans explication.
-  if (categoriesQuery.isError) {
-    return (
-      <ScreenContainer edges={screenEdges}>
-        <ErrorState
-          title="Catégories indisponibles"
-          message={getErrorMessage(categoriesQuery.error)}
-          onRetry={() => void categoriesQuery.refetch()}
-        />
-      </ScreenContainer>
-    );
-  }
-
   if (membersQuery.isError) {
     return (
-      <ScreenContainer edges={screenEdges}>
+      <ScreenContainer edges={SCREEN_EDGES}>
         <ErrorState
           title="Membres indisponibles"
           message={getErrorMessage(membersQuery.error)}
@@ -172,15 +192,17 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   const goNext = async () => {
     clearErrors();
     if (step === 0) {
-      const valid = await trigger(['categoryId', 'title', 'condition']);
+      const valid = await trigger(['title']);
       if (!valid) return;
-    }
-    if (step === 1 && selectedCategory) {
-      const missing = findMissingRequiredCustomFields(selectedCategory, values.customMetadata);
+      const missing = findMissingRequiredCustomFields(category, values.customMetadata);
       if (missing.length > 0) {
         setSubmitError(`Champs requis manquants : ${missing.join(', ')}.`);
         return;
       }
+    }
+    if (step === 1) {
+      const valid = await trigger(['condition']);
+      if (!valid) return;
     }
     setSubmitError(null);
     setStep((current) => Math.min(current + 1, STEP_TITLES.length - 1));
@@ -192,14 +214,10 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   };
 
   const onSubmit = handleSubmit(async (formValues) => {
-    if (!selectedCategory) {
-      setError('categoryId', { message: 'Choisissez une catégorie.' });
-      return;
-    }
     setSubmitError(null);
 
     try {
-      const payload = buildItemPayload(formValues, selectedCategory);
+      const payload = buildItemPayload(formValues, category);
       if (mode === 'create') {
         await createItem.mutateAsync(payload);
         showToast('Cet objet a rejoint votre nid.', 'success');
@@ -218,45 +236,28 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
   const isBusy = isSubmitting || createItem.isPending || updateItem.isPending;
 
   return (
-    <ScreenContainer scroll edges={screenEdges} androidKeyboardBehavior="height">
-      <View style={{ gap: theme.spacing.lg }}>
-        <View style={{ gap: theme.spacing.xs }}>
-          <AppText variant="title">
-            {mode === 'create' ? 'Ajouter un objet' : "Modifier l'objet"}
-          </AppText>
-          <AppText variant="label" color="textMuted">
-            Étape {step + 1} sur {STEP_TITLES.length} — {STEP_TITLES[step]}
-          </AppText>
-        </View>
-
-        {categoriesQuery.isLoading || membersQuery.isLoading ? (
-          <LoadingSkeleton height={200} radius={theme.radii.lg} />
-        ) : (
-          <>
-            {step === 0 ? (
-              <StepBasics control={control} errors={errors} categories={systemCategories} />
-            ) : null}
-            {step === 1 ? <StepMetadata control={control} category={selectedCategory} /> : null}
-            {step === 2 ? (
-              <StepReview
-                control={control}
-                errors={errors}
-                members={membersQuery.data ?? []}
-                category={selectedCategory}
-                householdId={householdId}
-                values={values}
-              />
-            ) : null}
-          </>
-        )}
-
-        {submitError ? (
-          <AppText variant="helper" color="danger">
-            {submitError}
-          </AppText>
-        ) : null}
-
-        <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+    <ScreenContainer
+      scroll
+      edges={FORM_SCREEN_EDGES}
+      androidKeyboardBehavior="height"
+      footer={
+        // Frère du ScrollView, jamais un enfant scrollable (voir ScreenContainer) : le
+        // CTA "Suivant"/"Ajouter au nid" reste donc toujours atteignable, y compris
+        // clavier ouvert ou après avoir scrollé loin dans une étape chargée — avant ce
+        // correctif, ces boutons faisaient partie du contenu scrollable et pouvaient se
+        // retrouver hors champ (bug constaté en test manuel Android).
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: theme.spacing.sm,
+            paddingHorizontal: theme.spacing.lg,
+            paddingTop: theme.spacing.sm,
+            paddingBottom: insets.bottom + theme.spacing.sm,
+            backgroundColor: theme.colors.background,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+          }}
+        >
           {step > 0 ? (
             <Button label="Précédent" variant="ghost" onPress={goBack} disabled={isBusy} />
           ) : null}
@@ -271,7 +272,63 @@ export function ItemFormScreen({ mode, itemId }: ItemFormScreenProps) {
             <Button label="Suivant" onPress={() => void goNext()} disabled={isBusy} />
           )}
         </View>
+      }
+    >
+      <View style={{ gap: theme.spacing.lg }}>
+        <View style={{ gap: theme.spacing.xs }}>
+          <AppText variant="title">
+            {mode === 'create' ? categoryAddTitle(category) : "Modifier l'objet"}
+          </AppText>
+          <AppText variant="label" color="textMuted">
+            Étape {step + 1} sur {STEP_TITLES.length} — {STEP_TITLES[step]}
+          </AppText>
+        </View>
+
+        {membersQuery.isLoading ? (
+          <LoadingSkeleton height={200} radius={theme.radii.lg} />
+        ) : (
+          <>
+            {step === 0 ? (
+              <StepInformation
+                control={control}
+                errors={errors}
+                category={category}
+                onChangeCategoryPress={onChangeCategoryPress}
+              />
+            ) : null}
+            {step === 1 ? <StepCopy control={control} errors={errors} /> : null}
+            {step === 2 ? (
+              <StepOwnersAndCover
+                control={control}
+                errors={errors}
+                members={membersQuery.data ?? []}
+                category={category}
+                householdId={householdId}
+                values={values}
+              />
+            ) : null}
+          </>
+        )}
+
+        {submitError ? (
+          <AppText variant="helper" color="danger">
+            {submitError}
+          </AppText>
+        ) : null}
       </View>
     </ScreenContainer>
   );
 }
+
+/**
+ * Mémoïsé à titre d'optimisation (évite un rendu inutile de tout l'arbre de
+ * l'étape courante quand le parent se re-rend sans qu'aucune prop n'ait
+ * changé) — mais ce n'est plus la garantie contre la boucle de rendu
+ * `add-item/form.tsx` ↔ `AddItemDraftContext` : cette garantie est désormais
+ * structurelle, portée par la souscription `watch(callback)` ci-dessus
+ * (indépendante du cycle de rendu React), pas par ce `memo`. Un test de
+ * régression (`ItemFormScreen.test.tsx`) force explicitement des rendus du
+ * parent avec des props changeantes — donc en contournant ce `memo` — pour
+ * vérifier que la protection tient quand même.
+ */
+export const ItemFormScreen = memo(ItemFormScreenComponent);

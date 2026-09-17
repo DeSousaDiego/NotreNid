@@ -9,8 +9,9 @@ import { useAuth } from '../../providers/AuthProvider';
 
 /**
  * Stack racine du groupe (app) : héberge le `(tabs)` (Accueil/Collection/Ajouter/
- * Recherche/Profil) et, en écrans frères hors des tabs, le détail/édition d'item et
- * les sous-pages Profil — pour que la barre d'onglets se masque naturellement (ils
+ * Recherche/Profil) et, en écrans frères hors des tabs, le détail/édition d'item, le
+ * flow d'ajout (`add-item`, Bloc 2 — sous-Stack imbriqué, voir add-item/_layout.tsx)
+ * et les sous-pages Profil — pour que la barre d'onglets se masque naturellement (ils
  * ne sont plus des descendants du <Tabs>) et qu'un bouton retour natif apparaisse,
  * sans hack de `tabBarStyle` ni listener de navigation (Bloc 4).
  */
@@ -56,6 +57,7 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="add-item" options={{ headerShown: false }} />
       <Stack.Screen name="collection/[itemId]" options={{ title: '' }} />
       <Stack.Screen name="collection/edit/[itemId]" options={{ title: '' }} />
       <Stack.Screen name="profile/edit" options={{ title: 'Modifier mon profil' }} />

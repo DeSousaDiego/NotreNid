@@ -35,7 +35,6 @@ const metadataGroupSchema = z.object({
 });
 
 export const itemFormSchema = z.object({
-  categoryId: z.string().min(1, 'Choisissez une catégorie.'),
   title: z.string().min(1, 'Le titre est requis.').max(200, 'Le titre est trop long.'),
   condition: z.enum(ITEM_CONDITIONS, { message: 'Choisissez un état.' }),
   rating: z
@@ -55,7 +54,6 @@ export const itemFormSchema = z.object({
 export type ItemFormValues = z.infer<typeof itemFormSchema>;
 
 export const EMPTY_ITEM_FORM_VALUES: ItemFormValues = {
-  categoryId: '',
   title: '',
   condition: 'GOOD',
   rating: null,
@@ -100,7 +98,6 @@ export function itemToFormValues(item: Item): ItemFormValues {
   }
 
   return {
-    categoryId: item.category.id,
     title: item.title,
     condition: item.condition,
     rating: item.rating,
@@ -151,7 +148,7 @@ function buildCustomMetadataPayload(
 /** Traduit les valeurs (chaînes) du formulaire vers le payload typé attendu par l'API. */
 export function buildItemPayload(values: ItemFormValues, category: Category): CreateItemInput {
   const payload: CreateItemInput = {
-    categoryId: values.categoryId,
+    categoryId: category.id,
     title: values.title.trim(),
     condition: values.condition,
     // `.refine` valide déjà que la valeur appartient à ITEM_RATING_VALUES ; Zod ne

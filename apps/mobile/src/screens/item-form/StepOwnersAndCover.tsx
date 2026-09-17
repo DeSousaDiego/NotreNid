@@ -12,24 +12,24 @@ import { countryLabelForSlug } from './metadataFields';
 import type { ItemFormValues } from './schema';
 import { useCoverPicker } from './useCoverPicker';
 
-export interface StepReviewProps {
+export interface StepOwnersAndCoverProps {
   control: Control<ItemFormValues>;
   errors: FieldErrors<ItemFormValues>;
   members: HouseholdMember[];
-  category: Category | undefined;
+  category: Category;
   householdId: string | null;
   values: ItemFormValues;
 }
 
-/** Étape 3 : propriétaires, couverture et récapitulatif (docs/NOTRE_NID_PRD.md section 9). */
-export function StepReview({
+/** Étape 3 sur 3 — Propriétaires, couverture et récapitulatif (Bloc 2). */
+export function StepOwnersAndCover({
   control,
   errors,
   members,
   category,
   householdId,
   values,
-}: StepReviewProps) {
+}: StepOwnersAndCoverProps) {
   const theme = useTheme();
 
   return (
@@ -96,7 +96,7 @@ export function StepReview({
           Récapitulatif
         </AppText>
         <SummaryRow label="Titre" value={values.title || '—'} />
-        <SummaryRow label="Catégorie" value={category?.name ?? '—'} />
+        <SummaryRow label="Catégorie" value={category.name} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <AppText variant="body" color="textMuted">
             État
@@ -114,7 +114,7 @@ export function StepReview({
         />
         {values.countryCodes.length > 0 ? (
           <SummaryRow
-            label={category ? countryLabelForSlug(category.slug) : 'Pays'}
+            label={countryLabelForSlug(category.slug)}
             value={values.countryCodes.map((code) => getCountryName(code) ?? code).join(', ')}
           />
         ) : null}
