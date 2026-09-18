@@ -13,18 +13,15 @@ export interface AddItemDraftContextValue {
    * valeurs déjà saisies (elles ne s'appliquent qu'à l'ancienne catégorie). */
   setCategory: (categoryId: string) => void;
   /**
-   * Fusionne superficiellement `values` dans le brouillon — ne remplace jamais tout
-   * l'objet. Utilisé aujourd'hui par `ItemFormScreen.onValuesChange` (qui envoie
-   * systématiquement l'objet complet, donc la fusion vaut remplacement en pratique),
-   * mais conçu pour qu'un futur écran de scan puisse injecter un sous-ensemble de
-   * champs sans écraser le reste (Bloc 3).
-   *
-   * Limite connue à faire évoluer alors : la fusion s'arrête au premier niveau —
-   * `values.metadata`/`values.customMetadata` sont remplacés en bloc, pas fusionnés
-   * champ par champ. Sans conséquence tant que seul `ItemFormScreen` (qui envoie
-   * toujours `metadata` complet) écrit ici ; deviendra important le jour où le
-   * scanner voudra injecter un sous-ensemble de `metadata` (ex. seulement l'ISBN)
-   * sans écraser des champs déjà saisis à la main.
+   * Fusionne `values` dans le brouillon — ne remplace jamais tout l'objet.
+   * `metadata`/`customMetadata` sont fusionnés champ par champ (un niveau de
+   * profondeur), tous les autres champs sont remplacés tels quels. Utilisé par
+   * `ItemFormScreen.onValuesChange` (qui envoie systématiquement l'objet
+   * `metadata` complet — la fusion champ par champ y équivaut donc à un
+   * remplacement, sans changement de comportement) et par l'écran de scan
+   * (Bloc 3A), qui n'envoie qu'un sous-ensemble de `metadata` (ex. seulement
+   * les champs livre) sans devoir connaître ni écraser les champs déjà saisis
+   * à la main.
    */
   setValues: (values: Partial<ItemFormValues>) => void;
   clearDraft: () => void;
@@ -66,7 +63,23 @@ export function AddItemDraftProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setValues = useCallback((values: Partial<ItemFormValues>) => {
-    setDraft((prev) => ({ ...prev, values: { ...prev.values, ...values } }));
+    setDraft((prev) => ({
+      ...prev,
+      values: {
+        ...prev.values,
+        ...values,
+        // Fusion ciblée d'un niveau : un scan qui ne renseigne que `book.isbn`
+        // (par exemple) ne doit jamais effacer un `metadata.author` déjà saisi
+        // à la main. Ne s'applique qu'aux clés réellement présentes dans
+        // `values.metadata`/`customMetadata` — une clé absente là n'écrase rien.
+        ...(values.metadata || prev.values?.metadata
+          ? { metadata: { ...prev.values?.metadata, ...values.metadata } }
+          : null),
+        ...(values.customMetadata || prev.values?.customMetadata
+          ? { customMetadata: { ...prev.values?.customMetadata, ...values.customMetadata } }
+          : null),
+      },
+    }));
   }, []);
 
   const clearDraft = useCallback(() => setDraft(EMPTY_DRAFT), []);

@@ -35,6 +35,40 @@ export interface ItemInput {
 export type CreateItemInput = ItemInput;
 export type UpdateItemInput = Partial<ItemInput>;
 
+export type BarcodeCategory = 'book' | 'cd' | 'dvd';
+
+export interface ResolveBarcodeInput {
+  barcode: string;
+  category: BarcodeCategory;
+}
+
+/**
+ * `matched` : au moins un fournisseur a renvoyé un résultat exploitable.
+ * `no_match` : recherche aboutie, sans résultat — pas une erreur.
+ * `unsupported` : catégorie pas encore implémentée côté API (`cd`/`dvd`).
+ * `provider_error` : tous les fournisseurs externes ont échoué techniquement.
+ */
+export type BarcodeResolveStatus = 'matched' | 'no_match' | 'unsupported' | 'provider_error';
+
+export interface BarcodeBookResult {
+  author: string | null;
+  isbn: string | null;
+  publisher: string | null;
+  publicationYear: number | null;
+  language: string | null;
+  pageCount: number | null;
+}
+
+export interface ResolveBarcodeResult {
+  barcode: string;
+  category: BarcodeCategory;
+  status: BarcodeResolveStatus;
+  match: boolean;
+  source: 'google-books' | 'open-library' | null;
+  data: { title: string | null; description: string | null; book: BarcodeBookResult | null } | null;
+  cover: { url: string } | null;
+}
+
 export function createItemsEndpoints(http: HttpClient) {
   return {
     list: (householdId: string, query: ItemsQueryParams = {}) =>
@@ -71,6 +105,13 @@ export function createItemsEndpoints(http: HttpClient) {
     restore: (householdId: string, itemId: string) =>
       http.request<Item>(`/households/${householdId}/items/${itemId}/restore`, {
         method: 'POST',
+      }),
+
+    /** Ne crée ni ne modifie jamais d'item — recherche externe en lecture seule. */
+    resolveBarcode: (input: ResolveBarcodeInput) =>
+      http.request<ResolveBarcodeResult>('/items/barcode/resolve', {
+        method: 'POST',
+        body: input,
       }),
   };
 }

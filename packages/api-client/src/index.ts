@@ -9,6 +9,16 @@ export { ApiError, NetworkError } from './errors';
 export type { ApiClientConfig, StoredTokens, TokenStorage } from './types';
 export type { LoginInput, RegisterInput } from './endpoints/auth';
 export type { CreateCategoryInput, UpdateCategoryInput } from './endpoints/categories';
-export type { CreateItemInput, ItemInput, MetadataInput, UpdateItemInput } from './endpoints/items';
+export type {
+  BarcodeBookResult,
+  BarcodeCategory,
+  BarcodeResolveStatus,
+  CreateItemInput,
+  ItemInput,
+  MetadataInput,
+  ResolveBarcodeInput,
+  ResolveBarcodeResult,
+  UpdateItemInput,
+} from './endpoints/items';
 export type { UploadResult } from './endpoints/uploads';
 export type { UpdateProfileInput } from './endpoints/users';

@@ -371,6 +371,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/items/barcode/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library). CD/DVD renvoient un statut "unsupported" explicite. Ne crée ni ne modifie jamais un item. */
+        post: operations["BarcodeController_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/households/{householdId}/uploads": {
         parameters: {
             query?: never;
@@ -653,6 +670,18 @@ export interface components {
              *     ]
              */
             countryCodes?: string[];
+        };
+        ResolveBarcodeDto: {
+            /**
+             * @description Code-barres scanné ou saisi (EAN-8, UPC-A ou EAN-13 — uniquement des chiffres). Trimmed automatiquement ; la longueur maximale (32) suit celle d'`Item.barcode`, bien que la forme valide réelle soit toujours strictement 8, 12 ou 13 chiffres.
+             * @example 9782070368228
+             */
+            barcode: string;
+            /**
+             * @example book
+             * @enum {string}
+             */
+            category: "book" | "cd" | "dvd";
         };
         UpdateProfileDto: {
             /** @example Alex */
@@ -1977,6 +2006,49 @@ export interface operations {
             };
             /** @description La ressource demandée n'existe pas, ou n'appartient pas à ce household. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BarcodeController_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveBarcodeDto"];
+            };
+        };
+        responses: {
+            /** @description Résultat de la recherche (structure stable indépendamment du fournisseur) — voir `status` pour distinguer un match, une absence de résultat, une catégorie non gérée ou un échec technique des fournisseurs externes. Toujours 200, jamais d'erreur pour une simple absence de résultat. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Les données envoyées sont invalides. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Trop de requêtes ont été envoyées dans un court instant. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

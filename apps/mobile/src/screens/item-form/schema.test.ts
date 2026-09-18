@@ -100,6 +100,12 @@ describe('buildItemPayload', () => {
     expect(payload.notes).toBeUndefined();
     expect(payload.coverImageUrl).toBeUndefined();
     expect(payload.rating).toBeUndefined();
+    expect(payload.barcode).toBeUndefined();
+  });
+
+  it('passes a barcode prefilled by a scan through to the payload', () => {
+    const payload = buildItemPayload({ ...baseValues, barcode: '9782070368228' }, BOOK_CATEGORY);
+    expect(payload.barcode).toBe('9782070368228');
   });
 
   it('always sends category.id as categoryId, regardless of which category is passed', () => {
@@ -208,6 +214,11 @@ describe('itemToFormValues', () => {
   it('maps an existing item’s country codes back into form values', () => {
     const item = mockItem({ countryCodes: ['JP'] });
     expect(itemToFormValues(item).countryCodes).toEqual(['JP']);
+  });
+
+  it('maps an existing item’s barcode back into form values, and an empty string when absent', () => {
+    expect(itemToFormValues(mockItem({ barcode: '9782070368228' })).barcode).toBe('9782070368228');
+    expect(itemToFormValues(mockItem({ barcode: null })).barcode).toBe('');
   });
 
   it('maps an existing book item back into form values', () => {

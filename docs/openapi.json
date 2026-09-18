@@ -1305,6 +1305,45 @@
         ]
       }
     },
+    "/items/barcode/resolve": {
+      "post": {
+        "operationId": "BarcodeController_resolve",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveBarcodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Résultat de la recherche (structure stable indépendamment du fournisseur) — voir `status` pour distinguer un match, une absence de résultat, une catégorie non gérée ou un échec technique des fournisseurs externes. Toujours 200, jamais d'erreur pour une simple absence de résultat."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "429": {
+            "description": "Trop de requêtes ont été envoyées dans un court instant."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library). CD/DVD renvoient un statut \"unsupported\" explicite. Ne crée ni ne modifie jamais un item.",
+        "tags": [
+          "items"
+        ]
+      }
+    },
     "/households/{householdId}/uploads": {
       "post": {
         "operationId": "UploadsController_upload",
@@ -2011,6 +2050,29 @@
             }
           }
         }
+      },
+      "ResolveBarcodeDto": {
+        "type": "object",
+        "properties": {
+          "barcode": {
+            "type": "string",
+            "example": "9782070368228",
+            "description": "Code-barres scanné ou saisi (EAN-8, UPC-A ou EAN-13 — uniquement des chiffres). Trimmed automatiquement ; la longueur maximale (32) suit celle d'`Item.barcode`, bien que la forme valide réelle soit toujours strictement 8, 12 ou 13 chiffres."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "book",
+              "cd",
+              "dvd"
+            ],
+            "example": "book"
+          }
+        },
+        "required": [
+          "barcode",
+          "category"
+        ]
       },
       "UpdateProfileDto": {
         "type": "object",

@@ -34,13 +34,59 @@ describe('useAddItemDraft', () => {
     expect(result.current.draft).toEqual({ categoryId: 'cat-book', values: null });
   });
 
-  it('setValues merges shallowly rather than replacing the whole draft', async () => {
+  it('setValues merges top-level fields rather than replacing the whole draft', async () => {
     const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
 
     await act(async () => result.current.setValues({ title: 'Discovery' }));
     await act(async () => result.current.setValues({ ownerIds: ['user-1'] }));
 
     expect(result.current.draft.values).toEqual({ title: 'Discovery', ownerIds: ['user-1'] });
+  });
+
+  it('setValues merges metadata field by field — a scan filling only some fields never erases a field already typed by hand', async () => {
+    const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
+
+    await act(async () =>
+      result.current.setValues({ metadata: { author: 'Frank Herbert', publisher: 'Gallimard' } }),
+    );
+    // Un résultat de scan ne renseigne que l'ISBN — ne doit pas écraser `author`/`publisher`.
+    await act(async () => result.current.setValues({ metadata: { isbn: '9782070368228' } }));
+
+    expect(result.current.draft.values?.metadata).toEqual({
+      author: 'Frank Herbert',
+      publisher: 'Gallimard',
+      isbn: '9782070368228',
+    });
+  });
+
+  it('setValues metadata merge overwrites only the keys explicitly present in the new value', async () => {
+    const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
+
+    await act(async () => result.current.setValues({ metadata: { author: 'Frank Herbert' } }));
+    await act(async () => result.current.setValues({ metadata: { author: 'Corrected Author' } }));
+
+    expect(result.current.draft.values?.metadata).toEqual({ author: 'Corrected Author' });
+  });
+
+  it('setValues without a metadata key leaves the existing metadata untouched', async () => {
+    const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
+
+    await act(async () => result.current.setValues({ metadata: { author: 'Frank Herbert' } }));
+    await act(async () => result.current.setValues({ title: 'Dune' }));
+
+    expect(result.current.draft.values).toEqual({
+      title: 'Dune',
+      metadata: { author: 'Frank Herbert' },
+    });
+  });
+
+  it('setValues merges customMetadata field by field, same as metadata', async () => {
+    const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
+
+    await act(async () => result.current.setValues({ customMetadata: { color: 'red' } }));
+    await act(async () => result.current.setValues({ customMetadata: { size: 'M' } }));
+
+    expect(result.current.draft.values?.customMetadata).toEqual({ color: 'red', size: 'M' });
   });
 
   it('clearDraft resets to the empty state', async () => {

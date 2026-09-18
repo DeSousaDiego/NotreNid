@@ -36,6 +36,9 @@ const metadataGroupSchema = z.object({
 
 export const itemFormSchema = z.object({
   title: z.string().min(1, 'Le titre est requis.').max(200, 'Le titre est trop long.'),
+  // Préremplie uniquement par un résultat de scan (Bloc 3A) — pas de champ de
+  // saisie manuelle dans le formulaire pour l'instant (voir docs/DECISIONS.md).
+  barcode: z.string().optional(),
   condition: z.enum(ITEM_CONDITIONS, { message: 'Choisissez un état.' }),
   rating: z
     .number()
@@ -55,6 +58,7 @@ export type ItemFormValues = z.infer<typeof itemFormSchema>;
 
 export const EMPTY_ITEM_FORM_VALUES: ItemFormValues = {
   title: '',
+  barcode: '',
   condition: 'GOOD',
   rating: null,
   description: '',
@@ -99,6 +103,7 @@ export function itemToFormValues(item: Item): ItemFormValues {
 
   return {
     title: item.title,
+    barcode: item.barcode ?? '',
     condition: item.condition,
     rating: item.rating,
     description: item.description ?? '',
@@ -150,6 +155,7 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
   const payload: CreateItemInput = {
     categoryId: category.id,
     title: values.title.trim(),
+    barcode: toOptionalString(values.barcode),
     condition: values.condition,
     // `.refine` valide déjà que la valeur appartient à ITEM_RATING_VALUES ; Zod ne
     // dérive pas un type littéral d'un `.refine` sur `z.number()` comme il le fait

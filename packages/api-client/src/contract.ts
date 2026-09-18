@@ -62,6 +62,7 @@ export type ApiClientContractChecks = [
   ExpectTrue<MethodExists<'/households/{householdId}/items/{itemId}', 'patch'>>,
   ExpectTrue<MethodExists<'/households/{householdId}/items/{itemId}', 'delete'>>,
   ExpectTrue<MethodExists<'/households/{householdId}/items/{itemId}/restore', 'post'>>,
+  ExpectTrue<MethodExists<'/items/barcode/resolve', 'post'>>,
 
   // Uploads
   ExpectTrue<MethodExists<'/households/{householdId}/uploads', 'post'>>,
