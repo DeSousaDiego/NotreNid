@@ -112,6 +112,10 @@ export class GoogleBooksProvider implements BookBarcodeProvider {
         publicationYear: parsePublicationYear(volumeInfo.publishedDate),
         language: volumeInfo.language ?? null,
         pageCount: volumeInfo.pageCount ?? null,
+        // Google Books n'a pas de champ fiable pour le format physique :
+        // `volumeInfo.printType` ne distingue que BOOK/MAGAZINE, pas
+        // Hardcover/Paperback — l'utiliser inventerait une valeur.
+        format: null,
       },
       coverUrl: toHttps(volumeInfo.imageLinks?.thumbnail ?? volumeInfo.imageLinks?.smallThumbnail),
     };

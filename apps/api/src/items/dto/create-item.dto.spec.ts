@@ -111,3 +111,33 @@ describe('CreateItemDto — countryCodes', () => {
     expect(await validateCountryCodes('FR')).not.toHaveLength(0);
   });
 });
+
+async function validateBookFormat(format: unknown) {
+  const dto = plainToInstance(CreateItemDto, { ...BASE, book: { format } });
+  const errors = await validate(dto);
+  const bookErrors = errors.find((error) => error.property === 'book');
+  return bookErrors?.children?.filter((error) => error.property === 'format') ?? [];
+}
+
+describe('CreateItemDto — book.format', () => {
+  it('accepts an absent format (facultatif)', async () => {
+    expect(await validateBookFormat(undefined)).toHaveLength(0);
+  });
+
+  it('accepts a typical physical format value', async () => {
+    expect(await validateBookFormat('Hardcover')).toHaveLength(0);
+    expect(await validateBookFormat('Mass Market Paperback')).toHaveLength(0);
+  });
+
+  it('accepts an unrecognized provider value as-is (no normalization at this layer)', async () => {
+    expect(await validateBookFormat('Spiral-bound')).toHaveLength(0);
+  });
+
+  it('rejects a non-string value', async () => {
+    expect(await validateBookFormat(123)).not.toHaveLength(0);
+  });
+
+  it('rejects a value longer than 60 characters', async () => {
+    expect(await validateBookFormat('a'.repeat(61))).not.toHaveLength(0);
+  });
+});

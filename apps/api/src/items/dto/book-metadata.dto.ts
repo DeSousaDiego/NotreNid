@@ -37,4 +37,16 @@ export class BookMetadataDto {
   @IsInt()
   @Min(0)
   pageCount?: number;
+
+  @ApiPropertyOptional({
+    example: 'Hardcover',
+    description:
+      'Format physique de l’édition (ex. "Hardcover", "Paperback", "Mass Market ' +
+      'Paperback"). Texte libre, non normalisé — même convention que ' +
+      'CdMetadataDto.format/DvdMetadataDto.format.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  format?: string;
 }

@@ -24,7 +24,10 @@ import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations'
 import { useItem } from '../../../hooks/useItem';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
-import { countryLabelForSlug } from '../../../screens/item-form/metadataFields';
+import {
+  countryLabelForSlug,
+  formatBookFormatLabel,
+} from '../../../screens/item-form/metadataFields';
 import { useTheme } from '../../../theme';
 
 const COVER_WIDTH_RATIO = 0.6;
@@ -121,7 +124,7 @@ export default function ItemDetailScreen() {
                     borderRadius: theme.radii.lg,
                     backgroundColor: theme.colors.surface,
                   }}
-                  contentFit="cover"
+                  contentFit="contain"
                 />
               ) : (
                 <View
@@ -297,6 +300,7 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
     if (item.book.isbn) rows.push(['ISBN', item.book.isbn]);
     if (item.book.language) rows.push(['Langue', item.book.language]);
     if (item.book.pageCount) rows.push(['Pages', String(item.book.pageCount)]);
+    if (item.book.format) rows.push(['Format', formatBookFormatLabel(item.book.format)]);
   } else if (item.cd) {
     if (item.cd.artist) rows.push(['Artiste', item.cd.artist]);
     if (item.cd.releaseYear) rows.push(['Année', String(item.cd.releaseYear)]);

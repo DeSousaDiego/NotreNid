@@ -139,9 +139,15 @@ describe('buildItemPayload', () => {
       publicationYear: 1965,
       language: undefined,
       pageCount: undefined,
+      format: undefined,
     });
     expect(payload.cd).toBeUndefined();
     expect(payload.dvd).toBeUndefined();
+  });
+
+  it('passes the book physical format through to the payload, as-is', () => {
+    const values: ItemFormValues = { ...baseValues, metadata: { format: 'Mass Market Paperback' } };
+    expect(buildItemPayload(values, BOOK_CATEGORY).book?.format).toBe('Mass Market Paperback');
   });
 
   it('builds cd metadata for the cd category, with the album title carried by Item.title', () => {
@@ -231,6 +237,7 @@ describe('itemToFormValues', () => {
         publicationYear: 1862,
         language: 'fr',
         pageCount: 1900,
+        format: 'Hardcover',
       },
     });
 
@@ -239,6 +246,7 @@ describe('itemToFormValues', () => {
     expect(values.ownerIds).toEqual(['user-1']);
     expect(values.metadata.author).toBe('Victor Hugo');
     expect(values.metadata.publicationYear).toBe('1862');
+    expect(values.metadata.format).toBe('Hardcover');
   });
 
   it('maps an existing cd item back into form values without an album field', () => {

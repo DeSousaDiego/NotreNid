@@ -16,6 +16,10 @@ export interface BookMetadata {
   publicationYear: number | null;
   language: string | null;
   pageCount: number | null;
+  /** Format physique de l'édition (ex. "Hardcover", "Paperback", "Mass Market
+   * Paperback"). Texte libre, non normalisé — même convention que
+   * CdMetadata.format/DvdMetadata.format. */
+  format: string | null;
 }
 
 export interface CdMetadata {

@@ -25,6 +25,7 @@ export const BOOK_FIELDS: MetadataFieldConfig[] = [
   { key: 'publicationYear', label: 'Année de publication', numeric: true },
   { key: 'language', label: 'Langue' },
   { key: 'pageCount', label: 'Nombre de pages', numeric: true },
+  { key: 'format', label: 'Format' },
 ];
 
 export const CD_FIELDS: MetadataFieldConfig[] = [
@@ -65,6 +66,26 @@ export function categoryAddTitle(category: { slug: string; name: string }): stri
   if (category.slug === 'cd') return 'Ajouter un CD';
   if (category.slug === 'dvd') return 'Ajouter un DVD';
   return `Ajouter ${category.name}`;
+}
+
+/**
+ * Traduction en français lisible du format physique d'un livre (valeur brute
+ * d'un fournisseur externe, ex. "Hardcover", ou saisie manuellement) — la
+ * valeur stockée en base (`BookMetadata.format`) reste toujours le texte brut,
+ * jamais normalisé (voir docs/DECISIONS.md) : cette fonction ne traduit qu'à
+ * l'affichage. Repli sur la valeur brute telle quelle si elle n'est pas
+ * reconnue — jamais masquée, jamais une traduction incorrecte forcée sur une
+ * valeur ambiguë (ex. une reliure spécifique qu'aucune liste ne prévoit).
+ */
+const BOOK_FORMAT_LABELS_FR: Record<string, string> = {
+  hardcover: 'Relié',
+  paperback: 'Broché',
+  'trade paperback': 'Broché',
+  'mass market paperback': 'Poche',
+};
+
+export function formatBookFormatLabel(rawFormat: string): string {
+  return BOOK_FORMAT_LABELS_FR[rawFormat.trim().toLowerCase()] ?? rawFormat;
 }
 
 /**

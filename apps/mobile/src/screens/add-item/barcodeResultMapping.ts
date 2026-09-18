@@ -42,6 +42,10 @@ export function buildDraftValuesFromBarcodeResult(
     if (book.publicationYear != null) metadata.publicationYear = String(book.publicationYear);
     if (book.language) metadata.language = book.language;
     if (book.pageCount != null) metadata.pageCount = String(book.pageCount);
+    // Valeur brute du fournisseur (ex. "Hardcover"), jamais traduite ici — la
+    // traduction française lisible ne se fait qu'à l'affichage (voir
+    // `formatBookFormatLabel`), jamais au stockage.
+    if (book.format) metadata.format = book.format;
     if (Object.keys(metadata).length > 0) values.metadata = metadata;
   }
 

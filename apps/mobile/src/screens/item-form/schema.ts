@@ -80,6 +80,7 @@ export function itemToFormValues(item: Item): ItemFormValues {
     metadata.publicationYear = item.book.publicationYear?.toString() ?? '';
     metadata.language = item.book.language ?? '';
     metadata.pageCount = item.book.pageCount?.toString() ?? '';
+    metadata.format = item.book.format ?? '';
   } else if (item.cd) {
     metadata.artist = item.cd.artist ?? '';
     metadata.releaseYear = item.cd.releaseYear?.toString() ?? '';
@@ -176,6 +177,7 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
       publicationYear: toOptionalInt(values.metadata.publicationYear),
       language: toOptionalString(values.metadata.language),
       pageCount: toOptionalInt(values.metadata.pageCount),
+      format: toOptionalString(values.metadata.format),
     };
   } else if (category.slug === 'cd') {
     payload.cd = {

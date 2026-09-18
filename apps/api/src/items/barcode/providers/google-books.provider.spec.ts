@@ -58,9 +58,23 @@ describe('GoogleBooksProvider', () => {
         publicationYear: 1965,
         language: 'fr',
         pageCount: 592,
+        format: null,
       },
       coverUrl: 'https://books.google.com/cover.jpg',
     });
+  });
+
+  it('never sets a physical format — printType is not a reliable signal for it', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(
+        jsonResponse({ totalItems: 1, items: [{ volumeInfo: { printType: 'BOOK' } }] }),
+      );
+
+    const provider = new GoogleBooksProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.book.format).toBeNull();
   });
 
   it('joins multiple authors into a single readable string', async () => {

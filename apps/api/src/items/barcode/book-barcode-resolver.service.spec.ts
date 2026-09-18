@@ -13,6 +13,7 @@ const MATCH_RESULT: BookProviderLookupResult = {
     publicationYear: 1970,
     language: 'fr',
     pageCount: 592,
+    format: 'Hardcover',
   },
   coverUrl: 'https://example.test/cover.jpg',
 };

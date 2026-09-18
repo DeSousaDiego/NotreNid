@@ -23,6 +23,10 @@ export interface BookMetadataResult {
   publicationYear: number | null;
   language: string | null;
   pageCount: number | null;
+  /** Format physique de l'édition (ex. "Hardcover", "Mass Market Paperback"),
+   * texte brut du fournisseur — jamais normalisé ici (voir docs/DECISIONS.md).
+   * La traduction en français lisible se fait à l'affichage mobile. */
+  format: string | null;
 }
 
 /** Résultat normalisé qu'un provider retourne à son resolver — jamais la

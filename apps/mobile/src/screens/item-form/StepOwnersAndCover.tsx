@@ -189,7 +189,7 @@ function CoverPickerField({
           <Image
             source={{ uri: previewUri }}
             style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
+            contentFit="contain"
           />
         ) : (
           <AppText variant="caption" color="textMuted" style={{ textAlign: 'center', padding: 8 }}>

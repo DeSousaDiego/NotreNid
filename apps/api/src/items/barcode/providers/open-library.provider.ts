@@ -9,26 +9,36 @@ interface OpenLibraryAuthor {
   name?: string;
 }
 
-interface OpenLibraryPublisher {
-  name?: string;
-}
-
-interface OpenLibraryCover {
-  small?: string;
-  medium?: string;
-  large?: string;
-}
-
-interface OpenLibraryBookData {
+/**
+ * Forme de `jscmd=details` (pas `jscmd=data`, qui n'expose ni `physical_format`
+ * ni `covers` — confirmé en reproduisant l'appel réel, voir docs/DECISIONS.md).
+ * Différences notables avec `jscmd=data` : `publishers` est un tableau de
+ * chaînes (pas `{name}[]`), et la couverture se construit depuis l'identifiant
+ * numérique `covers[0]`, il n'y a pas de bloc `cover: {small,medium,large}`.
+ */
+interface OpenLibraryEditionDetails {
   title?: string;
   authors?: OpenLibraryAuthor[];
-  publishers?: OpenLibraryPublisher[];
+  publishers?: string[];
   publish_date?: string;
   number_of_pages?: number;
-  cover?: OpenLibraryCover;
+  covers?: number[];
+  physical_format?: string;
+}
+
+interface OpenLibraryBibkeyEntry {
+  details?: OpenLibraryEditionDetails;
 }
 
 const DEFAULT_TIMEOUT_MS = 5000;
+
+/** Reconstruit l'URL d'image depuis l'identifiant numérique Open Library —
+ * `L` (large) pour rester cohérent avec la meilleure résolution disponible,
+ * même construction que celle déjà utilisée par le champ `cover` de
+ * `jscmd=data` (simple gabarit d'URL public, pas une API séparée). */
+function coverUrlFromId(coverId: number | undefined): string | null {
+  return coverId != null ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg` : null;
+}
 
 /** `publish_date` chez Open Library n'a pas de format garanti (`"2020"`,
  * `"May 2020"`, `"2020-05-01"`…) — on n'extrait que les 4 premiers chiffres
@@ -43,10 +53,12 @@ function parsePublicationYear(publishDate: string | undefined): number | null {
 
 /**
  * Provider de repli pour `book`, interrogé uniquement si Google Books ne
- * renvoie aucun résultat exploitable (voir docs/DECISIONS.md). Le format
- * `jscmd=data` d'Open Library ne fournit ni synopsis ni code langue fiables —
- * ces deux champs restent `null` plutôt que déduits d'une source qui ne les
- * porte pas réellement.
+ * renvoie aucun résultat exploitable (voir docs/DECISIONS.md). `jscmd=details`
+ * (et non `jscmd=data`) est nécessaire pour obtenir `physical_format` — ni
+ * synopsis ni code langue fiables n'y sont pour autant disponibles ; ces deux
+ * champs restent `null` plutôt que déduits d'une source qui ne les porte pas
+ * réellement (`description` y contient le plus souvent une note bibliographique,
+ * pas un résumé de l'œuvre).
  */
 @Injectable()
 export class OpenLibraryProvider implements BookBarcodeProvider {
@@ -67,7 +79,7 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
     const url = new URL('https://openlibrary.org/api/books.json');
     url.searchParams.set('bibkeys', bibkey);
     url.searchParams.set('format', 'json');
-    url.searchParams.set('jscmd', 'data');
+    url.searchParams.set('jscmd', 'details');
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -87,14 +99,14 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
       throw new BarcodeProviderError(this.id, `Open Library a répondu ${response.status}.`);
     }
 
-    let body: Record<string, OpenLibraryBookData>;
+    let body: Record<string, OpenLibraryBibkeyEntry>;
     try {
-      body = (await response.json()) as Record<string, OpenLibraryBookData>;
+      body = (await response.json()) as Record<string, OpenLibraryBibkeyEntry>;
     } catch (error) {
       throw new BarcodeProviderError(this.id, 'Réponse Open Library illisible.', error);
     }
 
-    const data = body[bibkey];
+    const data = body[bibkey]?.details;
     if (!data) {
       return null;
     }
@@ -111,12 +123,13 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
                 .join(', ') || null
             : null,
         isbn,
-        publisher: data.publishers?.[0]?.name ?? null,
+        publisher: data.publishers?.[0] ?? null,
         publicationYear: parsePublicationYear(data.publish_date),
         language: null,
         pageCount: data.number_of_pages ?? null,
+        format: data.physical_format ?? null,
       },
-      coverUrl: data.cover?.large ?? data.cover?.medium ?? data.cover?.small ?? null,
+      coverUrl: coverUrlFromId(data.covers?.[0]),
     };
   }
 }

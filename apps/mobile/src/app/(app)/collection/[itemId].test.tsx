@@ -98,6 +98,7 @@ const BASE_ITEM = {
     publicationYear: null,
     language: null,
     pageCount: null,
+    format: null,
   },
   cd: null,
   dvd: null,
@@ -187,6 +188,36 @@ describe('ItemDetailScreen', () => {
     await waitFor(() => expect(view.getByText('Réalisateur')).toBeTruthy());
     expect(view.getByText('Format')).toBeTruthy();
     expect(view.getByText('Blu-ray')).toBeTruthy();
+  });
+
+  it('shows the book physical format translated to a readable French label', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      book: { ...BASE_ITEM.book, format: 'Mass Market Paperback' },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Format')).toBeTruthy());
+    expect(view.getByText('Poche')).toBeTruthy();
+    expect(view.queryByText('Mass Market Paperback')).toBeNull();
+  });
+
+  it('falls back to the raw provider value for a book format it does not recognize', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      book: { ...BASE_ITEM.book, format: 'Spiral-bound' },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Spiral-bound')).toBeTruthy());
+  });
+
+  it('does not show a Format row for a book with no format on file', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(view.queryByText('Format')).toBeNull();
   });
 
   it('never shows an Album row for a cd item — the title already carries the album name', async () => {

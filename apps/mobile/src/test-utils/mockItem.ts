@@ -45,6 +45,7 @@ export function mockItem(overrides: Partial<Item> = {}): Item {
       publicationYear: null,
       language: null,
       pageCount: null,
+      format: null,
     },
     cd: null,
     dvd: null,

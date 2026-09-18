@@ -18,6 +18,7 @@ const MATCHED: ResolveBarcodeResult = {
       publicationYear: 1970,
       language: 'fr',
       pageCount: 592,
+      format: 'Hardcover',
     },
   },
   cover: { url: 'https://example.test/cover.jpg' },
@@ -37,8 +38,14 @@ describe('buildDraftValuesFromBarcodeResult', () => {
         publicationYear: '1970',
         language: 'fr',
         pageCount: '592',
+        format: 'Hardcover',
       },
     });
+  });
+
+  it('passes the physical format through as-is, never translating it at storage time', () => {
+    const values = buildDraftValuesFromBarcodeResult(MATCHED);
+    expect(values.metadata?.format).toBe('Hardcover');
   });
 
   it('always includes the barcode itself, even with no other data', () => {
@@ -82,6 +89,7 @@ describe('buildDraftValuesFromBarcodeResult', () => {
           publicationYear: null,
           language: null,
           pageCount: null,
+          format: null,
         },
       },
     };
@@ -101,6 +109,7 @@ describe('buildDraftValuesFromBarcodeResult', () => {
           publicationYear: null,
           language: null,
           pageCount: null,
+          format: null,
         },
       },
     };

@@ -51,7 +51,7 @@ export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
           <Image
             source={{ uri: item.coverImageUrl }}
             style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
+            contentFit="contain"
             transition={150}
           />
         ) : (

@@ -57,6 +57,9 @@ export interface BarcodeBookResult {
   publicationYear: number | null;
   language: string | null;
   pageCount: number | null;
+  /** Format physique de l'édition (ex. "Hardcover", "Mass Market Paperback"),
+   * texte brut du fournisseur, non normalisé. */
+  format: string | null;
 }
 
 export interface ResolveBarcodeResult {

@@ -586,6 +586,11 @@ export interface components {
             publicationYear?: number;
             language?: string;
             pageCount?: number;
+            /**
+             * @description Format physique de l’édition (ex. "Hardcover", "Paperback", "Mass Market Paperback"). Texte libre, non normalisé — même convention que CdMetadataDto.format/DvdMetadataDto.format.
+             * @example Hardcover
+             */
+            format?: string;
         };
         CdMetadataDto: {
             artist?: string;

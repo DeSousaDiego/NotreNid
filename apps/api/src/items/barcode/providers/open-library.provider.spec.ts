@@ -29,16 +29,29 @@ describe('OpenLibraryProvider', () => {
     expect(requestedUrl.pathname).toBe('/api/books.json');
   });
 
-  it('maps a full match into the normalized shape (bibkey-scoped response)', async () => {
+  it('requests jscmd=details, not jscmd=data — physical_format/covers are absent from jscmd=data', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    await provider.lookup('9782070368228');
+
+    const requestedUrl = (global.fetch as jest.Mock).mock.calls[0][0] as URL;
+    expect(requestedUrl.searchParams.get('jscmd')).toBe('details');
+  });
+
+  it('maps a full match into the normalized shape (jscmd=details, bibkey-scoped response)', async () => {
     global.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
         'ISBN:9782070368228': {
-          title: 'Dune',
-          authors: [{ name: 'Frank Herbert' }],
-          publishers: [{ name: 'Robert Laffont' }],
-          publish_date: '1965',
-          number_of_pages: 592,
-          cover: { large: 'https://covers.openlibrary.org/b/id/1-L.jpg' },
+          details: {
+            title: 'Dune',
+            authors: [{ name: 'Frank Herbert' }],
+            publishers: ['Robert Laffont'],
+            publish_date: '1965',
+            number_of_pages: 592,
+            covers: [1],
+            physical_format: 'Hardcover',
+          },
         },
       }),
     );
@@ -56,15 +69,42 @@ describe('OpenLibraryProvider', () => {
         publicationYear: 1965,
         language: null,
         pageCount: 592,
+        format: 'Hardcover',
       },
       coverUrl: 'https://covers.openlibrary.org/b/id/1-L.jpg',
     });
   });
 
+  it('maps physical_format through as-is, without normalizing it (e.g. "Mass Market Paperback")', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({
+        'ISBN:9782070368228': { details: { physical_format: 'Mass Market Paperback' } },
+      }),
+    );
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.book.format).toBe('Mass Market Paperback');
+  });
+
+  it('leaves format null when physical_format is absent — never invents a value', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } }));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.book.format).toBeNull();
+  });
+
   it('joins multiple authors, skipping any without a name', async () => {
     global.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
-        'ISBN:9782070368228': { authors: [{ name: 'Auteur A' }, {}, { name: 'Auteur B' }] },
+        'ISBN:9782070368228': {
+          details: { authors: [{ name: 'Auteur A' }, {}, { name: 'Auteur B' }] },
+        },
       }),
     );
 
@@ -77,7 +117,9 @@ describe('OpenLibraryProvider', () => {
   it('extracts a 4-digit year from an imprecise publish_date', async () => {
     global.fetch = jest
       .fn()
-      .mockResolvedValue(jsonResponse({ 'ISBN:9782070368228': { publish_date: 'May 1965' } }));
+      .mockResolvedValue(
+        jsonResponse({ 'ISBN:9782070368228': { details: { publish_date: 'May 1965' } } }),
+      );
 
     const provider = new OpenLibraryProvider(fakeConfigService());
     const result = await provider.lookup('9782070368228');
@@ -88,7 +130,7 @@ describe('OpenLibraryProvider', () => {
   it('never fabricates description or language, which this endpoint does not provide', async () => {
     global.fetch = jest
       .fn()
-      .mockResolvedValue(jsonResponse({ 'ISBN:9782070368228': { title: 'Dune' } }));
+      .mockResolvedValue(jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } }));
 
     const provider = new OpenLibraryProvider(fakeConfigService());
     const result = await provider.lookup('9782070368228');
@@ -102,6 +144,24 @@ describe('OpenLibraryProvider', () => {
 
     const provider = new OpenLibraryProvider(fakeConfigService());
     expect(await provider.lookup('9782070368228')).toBeNull();
+  });
+
+  it('returns null when the bibkey is present but its details block is missing', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({ 'ISBN:9782070368228': {} }));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    expect(await provider.lookup('9782070368228')).toBeNull();
+  });
+
+  it('omits the cover entirely when no cover id is present', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } }));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.coverUrl).toBeNull();
   });
 
   it('throws a BarcodeProviderError on a non-OK HTTP status', async () => {

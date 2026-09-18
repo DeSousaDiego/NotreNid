@@ -56,7 +56,7 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
           <Image
             source={{ uri: item.coverImageUrl }}
             style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
+            contentFit="contain"
             transition={150}
           />
         ) : (

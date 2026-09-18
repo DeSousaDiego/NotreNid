@@ -211,6 +211,11 @@ model BookMetadata {
   publicationYear Int?
   language        String?
   pageCount       Int?
+  /// Format physique de l'édition (ex. "Hardcover", "Paperback", "Mass Market
+  /// Paperback") — texte libre, non normalisé, même convention que
+  /// CdMetadata.format/DvdMetadata.format. La traduction en français lisible
+  /// (Relié/Broché/Poche) se fait à l'affichage mobile, jamais en base.
+  format          String?
 
   item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
