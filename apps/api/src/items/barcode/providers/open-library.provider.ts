@@ -59,7 +59,12 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
     const timeoutMs =
       this.configService.get<number>('BARCODE_PROVIDER_TIMEOUT_MS') ?? DEFAULT_TIMEOUT_MS;
     const bibkey = `ISBN:${isbn}`;
-    const url = new URL('https://openlibrary.org/api/books');
+    // `.json` fait partie du CHEMIN, pas seulement du paramètre `format` —
+    // confirmé en reproduisant l'appel réel (curl) : `/api/books` (sans
+    // extension) renvoie 404 chez Open Library, quels que soient les query
+    // params, y compris `format=json` ; seul `/api/books.json` répond 200
+    // avec les données attendues (cause du 404 constaté sur Render).
+    const url = new URL('https://openlibrary.org/api/books.json');
     url.searchParams.set('bibkeys', bibkey);
     url.searchParams.set('format', 'json');
     url.searchParams.set('jscmd', 'data');

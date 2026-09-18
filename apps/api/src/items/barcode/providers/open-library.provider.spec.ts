@@ -19,6 +19,16 @@ describe('OpenLibraryProvider', () => {
     jest.restoreAllMocks();
   });
 
+  it('requests the .json path — Open Library returns 404 on /api/books without it, regardless of format=json', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    await provider.lookup('9782070368228');
+
+    const requestedUrl = (global.fetch as jest.Mock).mock.calls[0][0] as URL;
+    expect(requestedUrl.pathname).toBe('/api/books.json');
+  });
+
   it('maps a full match into the normalized shape (bibkey-scoped response)', async () => {
     global.fetch = jest.fn().mockResolvedValue(
       jsonResponse({
