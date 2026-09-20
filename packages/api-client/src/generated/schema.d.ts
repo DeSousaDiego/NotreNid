@@ -380,7 +380,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library). CD/DVD renvoient un statut "unsupported" explicite. Ne crée ni ne modifie jamais un item. */
+        /** Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library ; CD : MusicBrainz, avec couverture Cover Art Archive). DVD renvoie un statut "unsupported" explicite. Ne crée ni ne modifie jamais un item. */
         post: operations["BarcodeController_resolve"];
         delete?: never;
         options?: never;
