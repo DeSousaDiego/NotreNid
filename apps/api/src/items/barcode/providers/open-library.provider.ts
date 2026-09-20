@@ -195,7 +195,8 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
         );
       } catch (error) {
         lastError = error;
-        const cause = error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'erreur réseau';
+        const cause =
+          error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'erreur réseau';
         this.logger.warn(
           `tentative ${attempt}/${MAX_ATTEMPTS} échouée (${cause}, budget restant ${Math.max(0, deadline - Date.now())}ms, isbn masqué, longueur ${isbn.length})`,
         );

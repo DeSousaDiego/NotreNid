@@ -271,7 +271,10 @@ describe('OpenLibraryProvider', () => {
     global.fetch = hangingFetchUntilAbort();
 
     const provider = new OpenLibraryProvider(
-      fakeConfigService({ OPEN_LIBRARY_TIMEOUT_BUDGET_MS: 2500, BARCODE_PROVIDER_TIMEOUT_MS: 100000 }),
+      fakeConfigService({
+        OPEN_LIBRARY_TIMEOUT_BUDGET_MS: 2500,
+        BARCODE_PROVIDER_TIMEOUT_MS: 100000,
+      }),
     );
 
     await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
