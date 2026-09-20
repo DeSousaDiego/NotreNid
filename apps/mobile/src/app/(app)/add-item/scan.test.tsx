@@ -16,12 +16,16 @@ jest.mock('expo-image', () => ({ Image: () => null }));
 
 const mockRouterReplace = jest.fn();
 const mockRouterDismissTo = jest.fn();
+// Mutable plutôt qu'une valeur figée : les tests CD ont besoin d'un
+// `categoryId` différent, et `jest.mock` est hissé avant toute déclaration —
+// une fermeture sur une variable modifiable évite de dupliquer le mock.
+let mockCurrentCategoryId = 'cat-book';
 jest.mock('expo-router', () => ({
   router: {
     replace: (...args: unknown[]) => mockRouterReplace(...args),
     dismissTo: (...args: unknown[]) => mockRouterDismissTo(...args),
   },
-  useLocalSearchParams: () => ({ categoryId: 'cat-book' }),
+  useLocalSearchParams: () => ({ categoryId: mockCurrentCategoryId }),
 }));
 
 const mockApiClient = {
@@ -50,6 +54,8 @@ const BOOK_CATEGORY = {
   updatedAt: '',
 };
 
+const CD_CATEGORY = { ...BOOK_CATEGORY, id: 'cat-cd', slug: 'cd', name: 'CD' };
+
 const MATCHED_RESULT = {
   barcode: '9782070368228',
   category: 'book',
@@ -70,6 +76,20 @@ const MATCHED_RESULT = {
     },
   },
   cover: { url: 'https://example.test/cover.jpg' },
+};
+
+const MATCHED_CD_RESULT = {
+  barcode: '5099969236424',
+  category: 'cd',
+  status: 'matched',
+  match: true,
+  source: 'musicbrainz',
+  data: {
+    title: 'Discovery',
+    description: null,
+    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+  },
+  cover: { url: 'https://example.test/discovery-cover.jpg' },
 };
 
 function Harness({
@@ -121,7 +141,8 @@ async function renderScreen(seed?: Partial<ItemFormValues>) {
 describe('AddItemScanScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
+    mockCurrentCategoryId = 'cat-book';
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY, CD_CATEGORY]);
   });
 
   it('renders a manual barcode input and a search button', async () => {
@@ -308,5 +329,114 @@ describe('AddItemScanScreen', () => {
         params: { categoryId: 'cat-book' },
       }),
     );
+  });
+
+  describe('cd', () => {
+    beforeEach(() => {
+      mockCurrentCategoryId = 'cat-cd';
+    });
+
+    it('on success, prefills the draft with title, artist, year, label, format and cover', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_CD_RESULT);
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() =>
+        expect(mockRouterReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/add-item/form',
+          params: { categoryId: 'cat-cd' },
+        }),
+      );
+
+      expect(draftRef.current?.values).toEqual({
+        barcode: '5099969236424',
+        title: 'Discovery',
+        coverImageUrl: 'https://example.test/discovery-cover.jpg',
+        metadata: { artist: 'Daft Punk', releaseYear: '2001', label: 'Daft Life', format: 'CD' },
+      });
+    });
+
+    it('never prefills condition, rating, notes or ownerIds for a cd scan either', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_CD_RESULT);
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values).not.toHaveProperty('condition');
+      expect(draftRef.current?.values).not.toHaveProperty('rating');
+      expect(draftRef.current?.values).not.toHaveProperty('notes');
+      expect(draftRef.current?.values).not.toHaveProperty('ownerIds');
+    });
+
+    it('prefills whatever MusicBrainz actually returned when the match is partial (no cover, no label)', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+        ...MATCHED_CD_RESULT,
+        data: {
+          title: 'Discovery',
+          description: null,
+          cd: { artist: 'Daft Punk', releaseYear: null, label: null, format: null },
+        },
+        cover: null,
+      });
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values).not.toHaveProperty('coverImageUrl');
+      expect(draftRef.current?.values?.metadata).toEqual({ artist: 'Daft Punk' });
+    });
+
+    it('shows a clean message and does not navigate when cd search finds nothing', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+        barcode: '5099969236424',
+        category: 'cd',
+        status: 'no_match',
+        match: false,
+        source: null,
+        data: null,
+        cover: null,
+      });
+      const { view } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() =>
+        expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy(),
+      );
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+
+    it('cd is no longer "unsupported" — a provider_error still shows the same message as book', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+        barcode: '5099969236424',
+        category: 'cd',
+        status: 'provider_error',
+        match: false,
+        source: null,
+        data: null,
+        cover: null,
+      });
+      const { view } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,23 +1,31 @@
 import { Injectable } from '@nestjs/common';
 
 import { BookBarcodeResolverService } from './book-barcode-resolver.service';
+import { CdBarcodeResolverService } from './cd-barcode-resolver.service';
 import type { ResolveBarcodeDto } from './dto/resolve-barcode.dto';
 import type { BarcodeResolveResponse } from './types/barcode-result.types';
 
 /**
  * Point d'entrée unique, indépendant de la catégorie — dispatch vers le
- * resolver spécialisé. `cd`/`dvd` renvoient un statut explicite `unsupported`
- * plutôt qu'un faux résultat : ajouter leur resolver plus tard (MusicBrainz,
- * un provider UPC) ne demandera qu'un nouveau `case`, jamais de changement
- * d'architecture ici ni côté contrôleur/mobile (même forme de réponse).
+ * resolver spécialisé. `dvd` renvoie un statut explicite `unsupported` plutôt
+ * qu'un faux résultat : ajouter son resolver plus tard (un provider UPC) ne
+ * demandera qu'un nouveau `case`, jamais de changement d'architecture ici ni
+ * côté contrôleur/mobile (même forme de réponse).
  */
 @Injectable()
 export class BarcodeResolverService {
-  constructor(private readonly bookResolver: BookBarcodeResolverService) {}
+  constructor(
+    private readonly bookResolver: BookBarcodeResolverService,
+    private readonly cdResolver: CdBarcodeResolverService,
+  ) {}
 
   async resolve(dto: ResolveBarcodeDto): Promise<BarcodeResolveResponse> {
     if (dto.category === 'book') {
       return this.bookResolver.resolve(dto.barcode);
+    }
+
+    if (dto.category === 'cd') {
+      return this.cdResolver.resolve(dto.barcode);
     }
 
     return {

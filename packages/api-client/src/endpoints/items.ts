@@ -62,13 +62,29 @@ export interface BarcodeBookResult {
   format: string | null;
 }
 
+/** Pas de champ pays : aucun signal fiable sur le pays de l'artiste n'est
+ * disponible sans requête MusicBrainz supplémentaire par artiste (voir
+ * docs/DECISIONS.md) — jamais approximé à partir du pays de distribution de
+ * l'édition, qui n'est pas la même chose. */
+export interface BarcodeCdResult {
+  artist: string | null;
+  releaseYear: number | null;
+  label: string | null;
+  format: string | null;
+}
+
 export interface ResolveBarcodeResult {
   barcode: string;
   category: BarcodeCategory;
   status: BarcodeResolveStatus;
   match: boolean;
-  source: 'google-books' | 'open-library' | null;
-  data: { title: string | null; description: string | null; book: BarcodeBookResult | null } | null;
+  source: 'google-books' | 'open-library' | 'musicbrainz' | null;
+  data: {
+    title: string | null;
+    description: string | null;
+    book: BarcodeBookResult | null;
+    cd: BarcodeCdResult | null;
+  } | null;
   cover: { url: string } | null;
 }
 

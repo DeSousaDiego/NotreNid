@@ -51,7 +51,7 @@ describe('BookBarcodeResolverService', () => {
       status: 'matched',
       match: true,
       source: 'google-books',
-      data: { title: 'Dune', description: 'Synopsis.', book: MATCH_RESULT.book },
+      data: { title: 'Dune', description: 'Synopsis.', book: MATCH_RESULT.book, cd: null },
       cover: { url: 'https://example.test/cover.jpg' },
     });
     expect(openLibraryLookup).not.toHaveBeenCalled();

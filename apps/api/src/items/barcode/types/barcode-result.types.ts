@@ -13,6 +13,13 @@ export type BarcodeResolveStatus = 'matched' | 'no_match' | 'unsupported' | 'pro
 
 export type BookProviderSource = 'google-books' | 'open-library';
 
+/** Cover Art Archive n'est jamais une `source` à lui seul : il n'enrichit qu'un
+ * match MusicBrainz déjà trouvé (voir `MusicBrainzProvider`), jamais consulté
+ * seul ni capable de produire un match. */
+export type CdProviderSource = 'musicbrainz';
+
+export type BarcodeProviderSource = BookProviderSource | CdProviderSource;
+
 /** Toujours `string | null` / `number | null` — jamais de valeur inventée : un
  * champ absent chez le provider reste `null`, jamais une chaîne vide ni une
  * valeur déduite. */
@@ -38,10 +45,36 @@ export interface BookProviderLookupResult {
   coverUrl: string | null;
 }
 
+/** Toujours `string | null` / `number | null` — jamais de valeur inventée (même
+ * convention que `BookMetadataResult`). Pas de `description` : MusicBrainz n'a
+ * pas de notion de résumé/synopsis pour une release (voir docs/DECISIONS.md).
+ * Pas de champ pays : aucun signal fiable sur le pays de l'artiste n'est
+ * disponible sans requête MusicBrainz supplémentaire par artiste, ce que le
+ * budget de requêtes (~1/s) ne permet pas raisonnablement ici — voir
+ * docs/DECISIONS.md. */
+export interface CdMetadataResult {
+  artist: string | null;
+  releaseYear: number | null;
+  label: string | null;
+  format: string | null;
+}
+
+/** `coverUrl` est rempli par `MusicBrainzProvider` lui-même (via Cover Art
+ * Archive, à partir du MBID de la release retenue) — jamais par le resolver :
+ * même contrat que `BookProviderLookupResult.coverUrl`, pour que
+ * `CdBarcodeResolverService.finalize` reste un décalque exact de
+ * `BookBarcodeResolverService.finalize`. */
+export interface CdProviderLookupResult {
+  title: string | null;
+  cd: CdMetadataResult;
+  coverUrl: string | null;
+}
+
 export interface BarcodeResolveData {
   title: string | null;
   description: string | null;
   book: BookMetadataResult | null;
+  cd: CdMetadataResult | null;
 }
 
 export interface BarcodeResolveCover {
@@ -49,9 +82,9 @@ export interface BarcodeResolveCover {
 }
 
 /** Réponse stable de `POST /items/barcode/resolve`, indépendante du fournisseur
- * ayant produit le résultat (voir `source`) et de la catégorie (`data.book` est
- * `null` pour `cd`/`dvd` tant qu'ils ne sont pas implémentés — jamais un faux
- * bloc vide `{}`). */
+ * ayant produit le résultat (voir `source`) et de la catégorie (`data.book`/
+ * `data.cd` restent `null` pour toute catégorie qui n'est pas la leur, ou tant
+ * que `dvd` n'est pas implémenté — jamais un faux bloc vide `{}`). */
 export interface BarcodeResolveResponse {
   barcode: string;
   category: BarcodeCategory;
@@ -59,7 +92,7 @@ export interface BarcodeResolveResponse {
   /** Raccourci équivalent à `status === 'matched'` — préférer `status` pour
    * distinguer précisément `no_match` / `unsupported` / `provider_error`. */
   match: boolean;
-  source: BookProviderSource | null;
+  source: BarcodeProviderSource | null;
   data: BarcodeResolveData | null;
   cover: BarcodeResolveCover | null;
 }

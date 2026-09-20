@@ -7,9 +7,12 @@ import { ResolveBarcodeDto } from './dto/resolve-barcode.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ApiStandardErrors } from '../../common/swagger/api-standard-errors.decorator';
 
-// Recherche externe coûteuse (Google Books/Open Library, futur MusicBrainz) —
+// Recherche externe coûteuse (Google Books/Open Library, MusicBrainz) —
 // limite plus stricte que la limite globale par défaut (100/60s, AppModule),
-// sans être aussi sévère que l'authentification (AuthController).
+// sans être aussi sévère que l'authentification (AuthController). Ne remplace
+// pas le rate limiter dédié à MusicBrainz (`MusicBrainzRateLimiterService`,
+// ~1 req/s côté sortant) : celui-ci protège MusicBrainz, celui-ci protège
+// notre propre API contre un usage abusif de la route elle-même.
 const BARCODE_THROTTLE = { default: { limit: 20, ttl: 60_000 } };
 
 /**
@@ -31,8 +34,8 @@ export class BarcodeController {
   @ApiOperation({
     summary:
       'Résout un code-barres via un fournisseur externe (livre : Google Books puis Open ' +
-      'Library). CD/DVD renvoient un statut "unsupported" explicite. Ne crée ni ne modifie ' +
-      'jamais un item.',
+      'Library ; CD : MusicBrainz, avec couverture Cover Art Archive). DVD renvoie un statut ' +
+      '"unsupported" explicite. Ne crée ni ne modifie jamais un item.',
   })
   @ApiResponse({
     status: 200,

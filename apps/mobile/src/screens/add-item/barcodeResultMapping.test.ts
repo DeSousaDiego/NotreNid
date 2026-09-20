@@ -20,9 +20,81 @@ const MATCHED: ResolveBarcodeResult = {
       pageCount: 592,
       format: 'Hardcover',
     },
+    cd: null,
   },
   cover: { url: 'https://example.test/cover.jpg' },
 };
+
+const MATCHED_CD: ResolveBarcodeResult = {
+  barcode: '5099969236424',
+  category: 'cd',
+  status: 'matched',
+  match: true,
+  source: 'musicbrainz',
+  data: {
+    title: 'Discovery',
+    description: null,
+    book: null,
+    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+  },
+  cover: { url: 'https://example.test/discovery-cover.jpg' },
+};
+
+describe('buildDraftValuesFromBarcodeResult — cd', () => {
+  it('maps a full cd match into the expected draft shape', () => {
+    expect(buildDraftValuesFromBarcodeResult(MATCHED_CD)).toEqual({
+      barcode: '5099969236424',
+      title: 'Discovery',
+      coverImageUrl: 'https://example.test/discovery-cover.jpg',
+      metadata: {
+        artist: 'Daft Punk',
+        releaseYear: '2001',
+        label: 'Daft Life',
+        format: 'CD',
+      },
+    });
+  });
+
+  it('never prefills condition, rating, notes, ownerIds or countryCodes for a cd — no reliable artist-country signal', () => {
+    const values = buildDraftValuesFromBarcodeResult(MATCHED_CD);
+    expect(values).not.toHaveProperty('condition');
+    expect(values).not.toHaveProperty('rating');
+    expect(values).not.toHaveProperty('notes');
+    expect(values).not.toHaveProperty('ownerIds');
+    expect(values).not.toHaveProperty('countryCodes');
+  });
+
+  it('includes only the cd metadata fields MusicBrainz actually returned (partial mapping)', () => {
+    const result: ResolveBarcodeResult = {
+      ...MATCHED_CD,
+      data: {
+        title: 'Discovery',
+        description: null,
+        book: null,
+        cd: { artist: 'Daft Punk', releaseYear: null, label: null, format: null },
+      },
+    };
+    expect(buildDraftValuesFromBarcodeResult(result).metadata).toEqual({ artist: 'Daft Punk' });
+  });
+
+  it('omits the cover entirely when MusicBrainz matched but Cover Art Archive had none', () => {
+    const result: ResolveBarcodeResult = { ...MATCHED_CD, cover: null };
+    expect(buildDraftValuesFromBarcodeResult(result)).not.toHaveProperty('coverImageUrl');
+  });
+
+  it('omits metadata entirely when no cd field is exploitable', () => {
+    const result: ResolveBarcodeResult = {
+      ...MATCHED_CD,
+      data: {
+        title: 'Discovery',
+        description: null,
+        book: null,
+        cd: { artist: null, releaseYear: null, label: null, format: null },
+      },
+    };
+    expect(buildDraftValuesFromBarcodeResult(result)).not.toHaveProperty('metadata');
+  });
+});
 
 describe('buildDraftValuesFromBarcodeResult', () => {
   it('maps a full match into the expected draft shape', () => {
@@ -64,7 +136,7 @@ describe('buildDraftValuesFromBarcodeResult', () => {
   it('omits title/description when absent, rather than sending an empty string', () => {
     const result: ResolveBarcodeResult = {
       ...MATCHED,
-      data: { title: null, description: null, book: MATCHED.data!.book },
+      data: { title: null, description: null, book: MATCHED.data!.book, cd: null },
     };
     const values = buildDraftValuesFromBarcodeResult(result);
     expect(values).not.toHaveProperty('title');
@@ -91,6 +163,7 @@ describe('buildDraftValuesFromBarcodeResult', () => {
           pageCount: null,
           format: null,
         },
+        cd: null,
       },
     };
     expect(buildDraftValuesFromBarcodeResult(result)).not.toHaveProperty('metadata');
@@ -111,6 +184,7 @@ describe('buildDraftValuesFromBarcodeResult', () => {
           pageCount: null,
           format: null,
         },
+        cd: null,
       },
     };
     expect(buildDraftValuesFromBarcodeResult(result).metadata).toEqual({ author: 'Frank Herbert' });

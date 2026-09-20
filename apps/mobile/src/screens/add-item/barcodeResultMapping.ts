@@ -49,5 +49,23 @@ export function buildDraftValuesFromBarcodeResult(
     if (Object.keys(metadata).length > 0) values.metadata = metadata;
   }
 
+  // `result.data.book`/`result.data.cd` sont mutuellement exclusifs (propres à
+  // la catégorie demandée) — jamais les deux à la fois pour un même résultat.
+  const cd = result.data?.cd;
+  if (cd) {
+    const metadata: Record<string, string> = {};
+    if (cd.artist) metadata.artist = cd.artist;
+    if (cd.releaseYear != null) metadata.releaseYear = String(cd.releaseYear);
+    if (cd.label) metadata.label = cd.label;
+    // Idem `book.format` : valeur brute MusicBrainz, jamais traduite ici.
+    if (cd.format) metadata.format = cd.format;
+    if (Object.keys(metadata).length > 0) values.metadata = metadata;
+  }
+
+  // Pas de `countryCodes` ("pays de l'artiste") préremplis pour un CD : aucun
+  // signal fiable disponible sans requête MusicBrainz supplémentaire par
+  // artiste — voir docs/DECISIONS.md. Reste à saisir manuellement, comme pour
+  // un livre aujourd'hui.
+
   return values;
 }
