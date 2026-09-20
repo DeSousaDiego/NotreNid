@@ -66,6 +66,7 @@ const MATCHED_RESULT = {
       publicationYear: 1970,
       language: 'fr',
       pageCount: 592,
+      format: 'Hardcover',
     },
   },
   cover: { url: 'https://example.test/cover.jpg' },
@@ -251,6 +252,7 @@ describe('AddItemScanScreen', () => {
         publicationYear: '1970',
         language: 'fr',
         pageCount: '592',
+        format: 'Hardcover',
       },
     });
   });

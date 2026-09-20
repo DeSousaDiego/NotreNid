@@ -76,6 +76,23 @@ const CD_CATEGORY = {
   name: 'CD',
 };
 
+const DVD_CATEGORY = {
+  ...BOOK_CATEGORY,
+  id: 'category-dvd',
+  slug: 'dvd',
+  name: 'DVD',
+};
+
+const CUSTOM_CATEGORY = {
+  ...BOOK_CATEGORY,
+  id: 'category-vinyl',
+  householdId: 'household-1',
+  slug: 'vinyles',
+  name: 'Vinyles',
+  isSystem: false,
+  metadataSchema: [{ key: 'edition', label: 'Édition', type: 'string' as const }],
+};
+
 const MEMBER = {
   id: 'member-1',
   role: 'OWNER' as const,
@@ -115,6 +132,7 @@ const EXISTING_ITEM = {
     publicationYear: null,
     language: null,
     pageCount: null,
+    format: 'Hardcover',
   },
   cd: null,
   dvd: null,
@@ -137,6 +155,34 @@ describe('ItemFormScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
+  });
+
+  it('shows an optional Format field for book on step 1, as free text', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+
+    const formatField = view.getByLabelText('Format');
+    expect(formatField).toBeTruthy();
+    expect(formatField.props.value).toBe('');
+
+    await fireEvent.changeText(formatField, 'Broché');
+    expect(view.getByLabelText('Format').props.value).toBe('Broché');
+  });
+
+  it('shows exactly one Format field for cd and dvd — never a second one alongside book’s', async () => {
+    const cdView = await renderScreen(<ItemFormScreen mode="create" category={CD_CATEGORY} />);
+    await waitFor(() => expect(cdView.getByText('Artiste')).toBeTruthy());
+    expect(cdView.getAllByLabelText('Format')).toHaveLength(1);
+
+    const dvdView = await renderScreen(<ItemFormScreen mode="create" category={DVD_CATEGORY} />);
+    await waitFor(() => expect(dvdView.getByText('Réalisateur')).toBeTruthy());
+    expect(dvdView.getAllByLabelText('Format')).toHaveLength(1);
+  });
+
+  it('never shows a generic Format field for a custom category that does not define one', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={CUSTOM_CATEGORY} />);
+    await waitFor(() => expect(view.getByLabelText('Édition')).toBeTruthy());
+    expect(view.queryByLabelText('Format')).toBeNull();
   });
 
   it('blocks moving to step 2 until the title is valid', async () => {
@@ -198,12 +244,14 @@ describe('ItemFormScreen', () => {
 
     await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+    await fireEvent.changeText(view.getByLabelText('Format'), 'Broché');
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
     await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
     await fireEvent.press(view.getByRole('button', { name: 'Précédent' }));
 
     await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+    expect(view.getByLabelText('Format').props.value).toBe('Broché');
   });
 
   it('regression: a parent re-render with unchanged form data never re-writes the draft, independently of React.memo', async () => {
@@ -297,6 +345,30 @@ describe('ItemFormScreen', () => {
         expect.objectContaining({ title: 'Dune (édition collector)' }),
       );
       await waitFor(() => expect(mockRouterBack).toHaveBeenCalledTimes(1));
+    });
+
+    it('loads the stored book format as-is into the editable field, and saves an edited value on update', async () => {
+      (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+
+      // La valeur brute stockée (`Hardcover`) est affichée telle quelle dans le champ
+      // éditable, jamais déjà traduite (`Relié`) — voir `formatBookFormatLabel`, qui ne
+      // s'applique qu'à l'affichage en fiche détail, jamais à ce champ de formulaire.
+      await waitFor(() => expect(view.getByLabelText('Format').props.value).toBe('Hardcover'));
+
+      await fireEvent.changeText(view.getByLabelText('Format'), 'Poche');
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.update).toHaveBeenCalledWith(
+        'household-1',
+        'item-1',
+        expect.objectContaining({ book: expect.objectContaining({ format: 'Poche' }) }),
+      );
     });
   });
 });
