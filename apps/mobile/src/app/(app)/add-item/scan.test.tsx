@@ -87,7 +87,9 @@ const MATCHED_CD_RESULT = {
   data: {
     title: 'Discovery',
     description: null,
-    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+    // `format` représente le boîtier ("Jewel Case"), pas le support (CD) —
+    // voir docs/DECISIONS.md.
+    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'Jewel Case' },
   },
   cover: { url: 'https://example.test/discovery-cover.jpg' },
 };
@@ -355,7 +357,12 @@ describe('AddItemScanScreen', () => {
         barcode: '5099969236424',
         title: 'Discovery',
         coverImageUrl: 'https://example.test/discovery-cover.jpg',
-        metadata: { artist: 'Daft Punk', releaseYear: '2001', label: 'Daft Life', format: 'CD' },
+        metadata: {
+          artist: 'Daft Punk',
+          releaseYear: '2001',
+          label: 'Daft Life',
+          format: 'Jewel Case',
+        },
       });
     });
 

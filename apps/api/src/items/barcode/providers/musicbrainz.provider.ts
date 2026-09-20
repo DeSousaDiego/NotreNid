@@ -29,6 +29,12 @@ export interface MusicBrainzRelease {
   date?: string;
   country?: string;
   barcode?: string;
+  /** Type de boîtier/packaging physique (ex. "Jewel Case", "Digipak",
+   * "Cardboard/Paper Sleeve") — champ de base MusicBrainz, retourné sans
+   * `inc=` supplémentaire. C'est ce champ, et non `media[].format` (le
+   * SUPPORT — CD, 2×CD… — une notion différente), qui alimente
+   * `CdMetadataResult.format` — voir docs/DECISIONS.md. */
+  packaging?: string;
   'label-info'?: MusicBrainzLabelInfo[];
   media?: MusicBrainzMedium[];
   'artist-credit'?: MusicBrainzArtistCredit[];
@@ -186,7 +192,10 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
         artist: joinArtistCredit(release['artist-credit']),
         releaseYear: parseReleaseYear(release.date),
         label: release['label-info']?.[0]?.label?.name ?? null,
-        format: release.media?.[0]?.format ?? null,
+        // `packaging` (boîtier), jamais `media[].format` (support — CD,
+        // 2×CD… — hors de propos ici : la catégorie dit déjà "CD"). Aucune
+        // valeur inventée si MusicBrainz ne fournit pas ce champ.
+        format: release.packaging ?? null,
       },
       coverUrl,
     };

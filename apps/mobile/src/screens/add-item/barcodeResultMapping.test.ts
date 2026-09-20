@@ -35,7 +35,9 @@ const MATCHED_CD: ResolveBarcodeResult = {
     title: 'Discovery',
     description: null,
     book: null,
-    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+    // `format` représente le boîtier ("Jewel Case"), pas le support (CD) —
+    // voir docs/DECISIONS.md.
+    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'Jewel Case' },
   },
   cover: { url: 'https://example.test/discovery-cover.jpg' },
 };
@@ -50,7 +52,7 @@ describe('buildDraftValuesFromBarcodeResult — cd', () => {
         artist: 'Daft Punk',
         releaseYear: '2001',
         label: 'Daft Life',
-        format: 'CD',
+        format: 'Jewel Case',
       },
     });
   });

@@ -56,6 +56,8 @@ export interface CdMetadataResult {
   artist: string | null;
   releaseYear: number | null;
   label: string | null;
+  /** Type de boîtier/packaging (ex. "Jewel Case", "Digipak"), pas le support
+   * (CD, 2×CD…) — déjà connu via la catégorie. Voir docs/DECISIONS.md. */
   format: string | null;
 }
 

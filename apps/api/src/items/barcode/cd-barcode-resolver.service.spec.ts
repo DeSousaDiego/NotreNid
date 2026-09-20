@@ -155,6 +155,7 @@ describe('CdBarcodeResolverService', () => {
                   status: 'Official',
                   date: '2001-03-12',
                   barcode: '5099969236424',
+                  packaging: 'Jewel Case',
                   'label-info': [{ label: { name: 'Daft Life' } }],
                   media: [{ format: 'CD' }],
                   'artist-credit': [{ name: 'Daft Punk' }],
@@ -188,7 +189,7 @@ describe('CdBarcodeResolverService', () => {
         source: 'musicbrainz',
         data: {
           title: 'Discovery',
-          cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+          cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'Jewel Case' },
         },
       });
     } finally {

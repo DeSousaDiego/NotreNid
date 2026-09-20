@@ -57,6 +57,7 @@ const RELEASE: MusicBrainzRelease = {
   date: '2001-03-12',
   country: 'FR',
   barcode: '5099969236424',
+  packaging: 'Jewel Case',
   'label-info': [{ label: { name: 'Daft Life' } }],
   media: [{ format: 'CD' }],
   'artist-credit': [{ name: 'Daft Punk' }],
@@ -134,9 +135,38 @@ describe('MusicBrainzProvider', () => {
 
     expect(result).toEqual({
       title: 'Discovery',
-      cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+      // `format` vient de `release.packaging` ("Jewel Case"), jamais de
+      // `media[0].format` ("CD", ignoré) — voir docs/DECISIONS.md.
+      cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'Jewel Case' },
       coverUrl: 'https://example.test/cover-large.jpg',
     });
+  });
+
+  it('prefills cd.format from release.packaging when present', async () => {
+    const release: MusicBrainzRelease = { ...RELEASE, packaging: 'Digipak' };
+    global.fetch = fetchRouter({
+      musicbrainz: () => searchResponse([release]),
+      coverArt: () => jsonResponse({}, false, 404),
+    });
+
+    const result = await makeProvider().lookup('5099969236424');
+
+    expect(result?.cd.format).toBe('Digipak');
+  });
+
+  it('leaves cd.format null when packaging is absent, even when media[].format is present', async () => {
+    const release: MusicBrainzRelease = { ...RELEASE, packaging: undefined };
+    global.fetch = fetchRouter({
+      musicbrainz: () => searchResponse([release]),
+      coverArt: () => jsonResponse({}, false, 404),
+    });
+
+    const result = await makeProvider().lookup('5099969236424');
+
+    // `release.media` (le support "CD") reste présent dans ce fixture mais ne
+    // doit plus jamais alimenter `cd.format` (le boîtier) — voir docs/DECISIONS.md.
+    expect(release.media?.[0]?.format).toBe('CD');
+    expect(result?.cd.format).toBeNull();
   });
 
   it('joins multiple artist credits using the joinphrase MusicBrainz provides, never a generic separator', async () => {
