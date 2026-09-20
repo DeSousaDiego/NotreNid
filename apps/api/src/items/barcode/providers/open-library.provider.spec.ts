@@ -11,6 +11,18 @@ function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return { ok, status, json: () => Promise.resolve(body) } as unknown as Response;
 }
 
+/** Ne se résout jamais tant que le signal n'est pas annulé — seul moyen de vérifier une
+ * durée de timeout réelle plutôt qu'un simple rejet immédiat. */
+function hangingFetchUntilAbort(): jest.Mock {
+  return jest.fn().mockImplementation((_url, init?: { signal?: AbortSignal }) => {
+    return new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      });
+    });
+  });
+}
+
 describe('OpenLibraryProvider', () => {
   const originalFetch = global.fetch;
 
@@ -164,17 +176,127 @@ describe('OpenLibraryProvider', () => {
     expect(result?.coverUrl).toBeNull();
   });
 
-  it('throws a BarcodeProviderError on a non-OK HTTP status', async () => {
-    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 503));
+  it('throws a BarcodeProviderError on a non-transient 5xx status, without retrying', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 500));
 
     const provider = new OpenLibraryProvider(fakeConfigService());
     await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('throws a BarcodeProviderError on a network failure', async () => {
+  it('throws a BarcodeProviderError on a 4xx status, without retrying', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 404));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry a plain no_match (200 OK, bibkey absent)', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}));
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    expect(await provider.lookup('9782070368228')).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws a BarcodeProviderError after exhausting both attempts on a network failure', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
 
     const provider = new OpenLibraryProvider(fakeConfigService());
     await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries once on a timeout, then succeeds', async () => {
+    const abortError = Object.assign(new Error('The operation was aborted'), {
+      name: 'AbortError',
+    });
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(abortError)
+      .mockResolvedValueOnce(
+        jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } }),
+      );
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.title).toBe('Dune');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries once on a transient network error, then succeeds', async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockResolvedValueOnce(
+        jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } }),
+      );
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.title).toBe('Dune');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([502, 503, 504])('retries once on a transient HTTP %i, then succeeds', async (status) => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({}, false, status))
+      .mockResolvedValueOnce(
+        jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } }),
+      );
+
+    const provider = new OpenLibraryProvider(fakeConfigService());
+    const result = await provider.lookup('9782070368228');
+
+    expect(result?.title).toBe('Dune');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws a BarcodeProviderError after exhausting both attempts on a persistent 503', async () => {
+    global.fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 503));
+
+    const provider = new OpenLibraryProvider(
+      fakeConfigService({ OPEN_LIBRARY_TIMEOUT_BUDGET_MS: 5000 }),
+    );
+
+    await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('reads the timeout budget from OPEN_LIBRARY_TIMEOUT_BUDGET_MS, independently of BARCODE_PROVIDER_TIMEOUT_MS', async () => {
+    global.fetch = hangingFetchUntilAbort();
+
+    const provider = new OpenLibraryProvider(
+      fakeConfigService({ OPEN_LIBRARY_TIMEOUT_BUDGET_MS: 2500, BARCODE_PROVIDER_TIMEOUT_MS: 100000 }),
+    );
+
+    await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
+    // Une valeur absurdement grande de BARCODE_PROVIDER_TIMEOUT_MS (le timeout de Google
+    // Books) n'a aucune influence : seule OPEN_LIBRARY_TIMEOUT_BUDGET_MS (2500 ms) borne
+    // Open Library, preuve que les deux fournisseurs ne partagent plus le même réglage.
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds the total wall time (both attempts + retry delay) to the configured budget, not per attempt', async () => {
+    global.fetch = hangingFetchUntilAbort();
+
+    const budgetMs = 2000;
+    const provider = new OpenLibraryProvider(
+      fakeConfigService({ OPEN_LIBRARY_TIMEOUT_BUDGET_MS: budgetMs }),
+    );
+
+    const start = Date.now();
+    await expect(provider.lookup('9782070368228')).rejects.toBeInstanceOf(BarcodeProviderError);
+    const elapsedMs = Date.now() - start;
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    // Avant cette correction, 2 tentatives de `budgetMs` chacune (+ le délai de retry)
+    // pouvaient prendre environ 2×budgetMs — ici le budget est un TOTAL, jamais dépassé
+    // (une petite marge absorbe la latence de l'event loop, pas un doublement du budget).
+    expect(elapsedMs).toBeLessThan(budgetMs + 500);
   });
 });

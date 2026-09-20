@@ -1,7 +1,15 @@
+import type { ConfigService } from '@nestjs/config';
+
 import { BarcodeCacheService } from './barcode-cache.service';
 import { BookBarcodeResolverService } from './book-barcode-resolver.service';
 import type { BookBarcodeProvider } from './providers/book-provider.interface';
+import { GoogleBooksProvider } from './providers/google-books.provider';
+import { OpenLibraryProvider } from './providers/open-library.provider';
 import type { BookProviderLookupResult } from './types/barcode-result.types';
+
+function fakeConfigService(values: Record<string, unknown> = {}): ConfigService {
+  return { get: (key: string) => values[key] } as unknown as ConfigService;
+}
 
 const MATCH_RESULT: BookProviderLookupResult = {
   title: 'Dune',
@@ -123,6 +131,33 @@ describe('BookBarcodeResolverService', () => {
       source: null,
       data: null,
     });
+  });
+
+  it('returns provider_error when Google Books fails and Open Library exhausts its retry (real providers, mocked fetch)', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+
+    try {
+      const service = new BookBarcodeResolverService(
+        new GoogleBooksProvider(fakeConfigService()),
+        new OpenLibraryProvider(fakeConfigService({ OPEN_LIBRARY_TIMEOUT_BUDGET_MS: 1000 })),
+        new BarcodeCacheService(),
+      );
+
+      const response = await service.resolve('9782070368228');
+
+      expect(response).toMatchObject({
+        status: 'provider_error',
+        match: false,
+        source: null,
+        data: null,
+      });
+      // Google Books : 1 tentative (pas de retry côté ce fournisseur) + Open Library : 2
+      // tentatives (1 retry sur échec réseau) = 3 appels fetch au total.
+      expect(global.fetch).toHaveBeenCalledTimes(3);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it('returns no_match immediately, without calling any provider, for a barcode that is not ISBN-13 shaped', async () => {

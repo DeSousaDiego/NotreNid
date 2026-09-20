@@ -30,7 +30,35 @@ interface OpenLibraryBibkeyEntry {
   details?: OpenLibraryEditionDetails;
 }
 
-const DEFAULT_TIMEOUT_MS = 5000;
+// Open Library répond nettement plus lentement que Google Books depuis Render (voir
+// docs/DECISIONS.md) — mais ce délai est un BUDGET TOTAL pour l'ensemble des tentatives
+// (retry et délai entre tentatives compris), pas un timeout par tentative : deux tentatives
+// de `DEFAULT_TIMEOUT_BUDGET_MS` chacune ferait attendre le mobile jusqu'à ~18s rien que pour
+// ce fournisseur, en plus des ~5s déjà consommées par l'échec de Google Books. Porté par sa
+// propre variable d'environnement (`OPEN_LIBRARY_TIMEOUT_BUDGET_MS`) pour pouvoir l'ajuster
+// sans toucher au timeout du fournisseur principal.
+const DEFAULT_TIMEOUT_BUDGET_MS = 9000;
+
+// Une seule tentative supplémentaire (2 essais au total), partageant le même budget — voir
+// `fetchWithRetry`. Au-delà, un fournisseur de repli qui reste en échec doit laisser la main
+// au reste de la chaîne plutôt que de retarder davantage la réponse.
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 300;
+
+// Timeout minimal accordé à une tentative même si le budget restant, divisé entre les
+// tentatives restantes, donnerait moins — en dessous, la requête n'aurait pratiquement aucune
+// chance d'aboutir. Reste borné par le budget réellement restant (voir `fetchWithRetry`) :
+// avec un budget déjà presque épuisé, ce plancher n'allonge jamais l'attente au-delà du budget.
+const MIN_ATTEMPT_TIMEOUT_MS = 1000;
+
+// Codes HTTP considérés comme des pannes réellement transitoires côté serveur (passerelle/
+// service indisponible) — voir `fetchWithRetry`. Tout autre statut (4xx, ou 5xx hors de cette
+// liste, ex. 500 générique) est un résultat définitif, jamais retenté.
+const RETRYABLE_HTTP_STATUSES = new Set([502, 503, 504]);
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /** Reconstruit l'URL d'image depuis l'identifiant numérique Open Library —
  * `L` (large) pour rester cohérent avec la meilleure résolution disponible,
@@ -68,8 +96,8 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
   constructor(private readonly configService: ConfigService) {}
 
   async lookup(isbn: string): Promise<BookProviderLookupResult | null> {
-    const timeoutMs =
-      this.configService.get<number>('BARCODE_PROVIDER_TIMEOUT_MS') ?? DEFAULT_TIMEOUT_MS;
+    const budgetMs =
+      this.configService.get<number>('OPEN_LIBRARY_TIMEOUT_BUDGET_MS') ?? DEFAULT_TIMEOUT_BUDGET_MS;
     const bibkey = `ISBN:${isbn}`;
     // `.json` fait partie du CHEMIN, pas seulement du paramètre `format` —
     // confirmé en reproduisant l'appel réel (curl) : `/api/books` (sans
@@ -81,18 +109,7 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
     url.searchParams.set('format', 'json');
     url.searchParams.set('jscmd', 'details');
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-    let response: Response;
-    try {
-      response = await fetch(url, { signal: controller.signal });
-    } catch (error) {
-      this.logger.warn(`Échec réseau (isbn masqué, longueur ${isbn.length})`);
-      throw new BarcodeProviderError(this.id, 'Open Library injoignable ou timeout.', error);
-    } finally {
-      clearTimeout(timeout);
-    }
+    const response = await this.fetchWithRetry(url, budgetMs, isbn);
 
     if (!response.ok) {
       this.logger.warn(`Réponse HTTP ${response.status}`);
@@ -131,5 +148,69 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
       },
       coverUrl: coverUrlFromId(data.covers?.[0]),
     };
+  }
+
+  /**
+   * Au plus `MAX_ATTEMPTS` essais, TOUTES tentatives et délai de retry confondus bornés par
+   * `budgetMs` au total (jamais `budgetMs` par tentative) — voir la justification de
+   * `DEFAULT_TIMEOUT_BUDGET_MS`. Chaque tentative reçoit une part du budget restant
+   * (`remainingBudgetMs / tentatives restantes`), avec un plancher `MIN_ATTEMPT_TIMEOUT_MS`
+   * en dessous duquel retenter n'aurait guère de chance d'aboutir — plancher lui-même toujours
+   * ramené au budget réellement restant, qui ne peut donc jamais être dépassé.
+   *
+   * Retenté uniquement sur : timeout (`AbortController`), échec de `fetch()` avant toute
+   * réponse (coupure réseau, DNS…), ou une réponse HTTP dans `RETRYABLE_HTTP_STATUSES`
+   * (502/503/504 — passerelle ou service indisponible, réellement transitoires). Tout autre
+   * statut HTTP (4xx, ou 5xx hors de cette liste) est renvoyé tel quel dès la première
+   * réponse, sans nouvelle tentative : `lookup` le traite comme un résultat définitif.
+   */
+  private async fetchWithRetry(url: URL, budgetMs: number, isbn: string): Promise<Response> {
+    const deadline = Date.now() + budgetMs;
+    let lastError: unknown;
+    let lastResponse: Response | undefined;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      const attemptsRemaining = MAX_ATTEMPTS - attempt + 1;
+      const remainingBudgetMs = deadline - Date.now();
+      if (remainingBudgetMs <= 0) {
+        this.logger.warn(`budget épuisé avant la tentative ${attempt}/${MAX_ATTEMPTS}`);
+        break;
+      }
+
+      const timeoutMs = Math.min(
+        Math.max(MIN_ATTEMPT_TIMEOUT_MS, Math.floor(remainingBudgetMs / attemptsRemaining)),
+        remainingBudgetMs,
+      );
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (response.ok || !RETRYABLE_HTTP_STATUSES.has(response.status)) {
+          return response;
+        }
+        lastResponse = response;
+        this.logger.warn(
+          `tentative ${attempt}/${MAX_ATTEMPTS} échouée (HTTP ${response.status}, budget restant ${Math.max(0, deadline - Date.now())}ms, isbn masqué, longueur ${isbn.length})`,
+        );
+      } catch (error) {
+        lastError = error;
+        const cause = error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'erreur réseau';
+        this.logger.warn(
+          `tentative ${attempt}/${MAX_ATTEMPTS} échouée (${cause}, budget restant ${Math.max(0, deadline - Date.now())}ms, isbn masqué, longueur ${isbn.length})`,
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (attempt < MAX_ATTEMPTS) {
+        const remainingAfterAttempt = deadline - Date.now();
+        if (remainingAfterAttempt <= 0) break;
+        await delay(Math.min(RETRY_DELAY_MS, remainingAfterAttempt));
+      }
+    }
+
+    if (lastResponse) return lastResponse;
+    throw new BarcodeProviderError(this.id, 'Open Library injoignable ou timeout.', lastError);
   }
 }
