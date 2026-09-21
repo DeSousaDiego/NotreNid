@@ -167,7 +167,20 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
       `barcode:${barcode}`,
     )}&fmt=json&inc=labels+media+artist-credits`;
 
+    // TEMPORAIRE — diagnostic no_match (à retirer une fois la cause confirmée).
+    // Barcode volontairement en clair : ce n'est pas une donnée secrète (code
+    // produit public), et le masquer ici empêcherait justement le diagnostic
+    // demandé (comparaison caractère à caractère avec la valeur MusicBrainz).
+    // `logger.log`, pas `logger.debug` : niveau garanti visible sur Render avec
+    // la configuration actuelle (`AppLogger`, voir main.ts) — aucun secret,
+    // aucun JWT, aucun header Authorization dans ces lignes.
+    this.logger.log(
+      `[diag] barcode demandé="${barcode}" (type=${typeof barcode}, longueur=${barcode.length}) url=${url}`,
+    );
+
     const response = await this.fetchWithRetry(url, budgetMs, userAgent, barcode);
+
+    this.logger.log(`[diag] statut HTTP=${response.status} ok=${response.ok}`);
 
     if (!response.ok) {
       this.logger.warn(`Réponse HTTP ${response.status}`);
@@ -181,8 +194,44 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
       throw new BarcodeProviderError(this.id, 'Réponse MusicBrainz illisible.', error);
     }
 
-    const release = selectBestRelease(body.releases ?? [], barcode);
-    if (!release) return null;
+    const candidates = body.releases ?? [];
+    // Calcul dupliqué à titre purement observationnel (n'influence jamais la
+    // sélection réelle, faite par `selectBestRelease` juste en dessous) :
+    // permet de voir, pour CHAQUE candidat renvoyé, s'il aurait passé le
+    // filtre de correspondance exacte du code-barres, et pourquoi.
+    this.logger.log(
+      `[diag] releases renvoyées=${candidates.length} : ${JSON.stringify(
+        candidates.map((candidate) => ({
+          id: candidate.id,
+          barcode: candidate.barcode,
+          barcodeExactMatch: candidate.barcode === barcode,
+          packaging: candidate.packaging ?? null,
+          mediaFormat: candidate.media?.[0]?.format ?? null,
+          status: candidate.status,
+        })),
+      )}`,
+    );
+
+    const release = selectBestRelease(candidates, barcode);
+
+    if (!release) {
+      const exactMatchCount = candidates.filter(
+        (candidate) => candidate.barcode === barcode,
+      ).length;
+      this.logger.log(
+        `[diag] no_match — barcode normalisé comparé="${barcode}", ` +
+          `candidats reçus=${candidates.length}, candidats à barcode exactement identique=${exactMatchCount} ` +
+          '(0 dans les deux cas ⇒ MusicBrainz n’a rien renvoyé/rien d’identique pour cette requête ; ' +
+          'releases>0 mais exactMatchCount=0 ⇒ écart de formatage du champ barcode côté fournisseur)',
+      );
+      return null;
+    }
+
+    this.logger.log(
+      `[diag] release sélectionnée id=${release.id} barcode=${release.barcode} packaging=${
+        release.packaging ?? null
+      } mediaFormat=${release.media?.[0]?.format ?? null}`,
+    );
 
     const coverUrl = await this.fetchCoverSafely(release.id);
 
