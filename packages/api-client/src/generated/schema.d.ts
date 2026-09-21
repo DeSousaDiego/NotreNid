@@ -380,7 +380,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library ; CD : MusicBrainz, avec couverture Cover Art Archive). DVD renvoie un statut "unsupported" explicite. Ne crée ni ne modifie jamais un item. */
+        /** Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library ; CD : MusicBrainz, avec couverture Cover Art Archive ; DVD : UPCitemdb pour l'édition physique, enrichi par TMDB pour le film — voir `status: 'partial'` quand seule l'édition physique a pu être identifiée). Ne crée ni ne modifie jamais un item. */
         post: operations["BarcodeController_resolve"];
         delete?: never;
         options?: never;
@@ -2031,7 +2031,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Résultat de la recherche (structure stable indépendamment du fournisseur) — voir `status` pour distinguer un match, une absence de résultat, une catégorie non gérée ou un échec technique des fournisseurs externes. Toujours 200, jamais d'erreur pour une simple absence de résultat. */
+            /** @description Résultat de la recherche (structure stable indépendamment du fournisseur) — voir `status` pour distinguer un match complet, un match partiel (`dvd` uniquement — produit physique identifié sans film résolu), une absence de résultat, une catégorie non gérée ou un échec technique des fournisseurs externes. Toujours 200, jamais d'erreur pour une simple absence de résultat. */
             200: {
                 headers: {
                     [name: string]: unknown;

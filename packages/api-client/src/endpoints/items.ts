@@ -44,11 +44,19 @@ export interface ResolveBarcodeInput {
 
 /**
  * `matched` : au moins un fournisseur a renvoyé un résultat exploitable.
+ * `partial` : propre à `dvd` — le produit physique a été identifié
+ * (UPCitemdb) mais le FILM ne l'a pas été avec assez de confiance (recherche
+ * TMDB sans candidat suffisant — y compris un coffret multi-films jamais
+ * forcé vers un seul titre — ou panne technique TMDB non bloquante).
+ * `data.dvd` ne contient alors que les champs fiables issus d'UPCitemdb
+ * (`edition`/`region`/`format`), `director`/`releaseYear`/`duration` restant
+ * `null`. Jamais utilisé pour `book`/`cd`. Voir docs/DECISIONS.md.
  * `no_match` : recherche aboutie, sans résultat — pas une erreur.
- * `unsupported` : catégorie pas encore implémentée côté API (`cd`/`dvd`).
+ * `unsupported` : catégorie pas encore implémentée côté API.
  * `provider_error` : tous les fournisseurs externes ont échoué techniquement.
  */
-export type BarcodeResolveStatus = 'matched' | 'no_match' | 'unsupported' | 'provider_error';
+export type BarcodeResolveStatus =
+  'matched' | 'partial' | 'no_match' | 'unsupported' | 'provider_error';
 
 export interface BarcodeBookResult {
   author: string | null;
@@ -77,17 +85,41 @@ export interface BarcodeCdResult {
   artistCountry: string | null;
 }
 
+/** `director`/`releaseYear`/`duration` proviennent EXCLUSIVEMENT de TMDB
+ * (`null` en `status: 'partial'`, TMDB n'ayant pas résolu de film) ;
+ * `edition`/`region`/`format` proviennent EXCLUSIVEMENT d'UPCitemdb
+ * (renseignés dès `status: 'partial'`, dès qu'un produit vidéo physique a
+ * été identifié) — jamais l'un à la place de l'autre. Voir docs/DECISIONS.md. */
+export interface BarcodeDvdResult {
+  director: string | null;
+  releaseYear: number | null;
+  duration: number | null;
+  /** UPCitemdb uniquement (ex. "Collector's Edition") — jamais TMDB. */
+  edition: string | null;
+  /** UPCitemdb uniquement (ex. "Region 1", "Region Free") — jamais TMDB. */
+  region: string | null;
+  /** Type de boîtier/packaging UPCitemdb uniquement (ex. "Three-Disc") —
+   * jamais TMDB, jamais le support (DVD/Blu-ray, déjà la catégorie). */
+  format: string | null;
+}
+
 export interface ResolveBarcodeResult {
   barcode: string;
   category: BarcodeCategory;
   status: BarcodeResolveStatus;
   match: boolean;
-  source: 'google-books' | 'open-library' | 'musicbrainz' | null;
+  source: 'google-books' | 'open-library' | 'musicbrainz' | 'upcitemdb' | null;
   data: {
     title: string | null;
     description: string | null;
     book: BarcodeBookResult | null;
     cd: BarcodeCdResult | null;
+    dvd: BarcodeDvdResult | null;
+    /** Codes pays ISO 3166-1 alpha-2 — pour l'instant renseigné UNIQUEMENT
+     * pour `dvd` (pays de production du film, TMDB), toujours `null` pour
+     * `book`/`cd` (voir `BarcodeCdResult.artistCountry` pour le pays de
+     * l'artiste CD, un champ distinct et non concerné ici). */
+    countryCodes: string[] | null;
   } | null;
   cover: { url: string } | null;
 }

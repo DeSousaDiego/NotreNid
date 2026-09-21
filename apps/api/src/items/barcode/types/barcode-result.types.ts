@@ -2,14 +2,23 @@ import type { BarcodeCategory } from './barcode-category.type';
 
 /**
  * `matched` : au moins un provider a renvoyé un résultat exploitable.
+ * `partial` : propre à `dvd` (voir `DvdMetadataResult`) — le produit physique
+ * a été identifié (UPCitemdb) mais le FILM ne l'a pas été avec assez de
+ * confiance (recherche TMDB sans candidat suffisant, y compris un coffret
+ * multi-films jamais forcé vers un seul titre) ou TMDB a subi une panne
+ * technique non bloquante — `data.dvd` ne contient alors que les champs
+ * fiables issus d'UPCitemdb, jamais une valeur TMDB devinée. Jamais utilisé
+ * pour `book`/`cd`, qui n'ont pas cette notion de second fournisseur
+ * optionnel. Voir docs/DECISIONS.md.
  * `no_match` : la recherche a bien eu lieu (chez tous les providers de la
  * chaîne), sans résultat exploitable — pas une erreur.
- * `unsupported` : catégorie pas encore implémentée (`cd`/`dvd` pour l'instant)
- * — aucune recherche n'a été tentée, à ne jamais confondre avec `no_match`.
+ * `unsupported` : catégorie pas encore implémentée — aucune recherche n'a été
+ * tentée, à ne jamais confondre avec `no_match`.
  * `provider_error` : tous les providers de la chaîne ont échoué (réseau,
  * timeout, réponse invalide) — on ne sait pas s'il y a match ou non.
  */
-export type BarcodeResolveStatus = 'matched' | 'no_match' | 'unsupported' | 'provider_error';
+export type BarcodeResolveStatus =
+  'matched' | 'partial' | 'no_match' | 'unsupported' | 'provider_error';
 
 export type BookProviderSource = 'google-books' | 'open-library';
 
@@ -18,7 +27,13 @@ export type BookProviderSource = 'google-books' | 'open-library';
  * seul ni capable de produire un match. */
 export type CdProviderSource = 'musicbrainz';
 
-export type BarcodeProviderSource = BookProviderSource | CdProviderSource;
+/** TMDB n'est, de la même façon que Cover Art Archive pour `cd`, jamais une
+ * `source` à lui seul : il n'enrichit qu'un produit déjà identifié par
+ * UPCitemdb (voir `DvdEnrichmentService`) — `source` reste `'upcitemdb'` que
+ * TMDB ait résolu le film (`status: 'matched'`) ou non (`status: 'partial'`). */
+export type DvdProviderSource = 'upcitemdb';
+
+export type BarcodeProviderSource = BookProviderSource | CdProviderSource | DvdProviderSource;
 
 /** Toujours `string | null` / `number | null` — jamais de valeur inventée : un
  * champ absent chez le provider reste `null`, jamais une chaîne vide ni une
@@ -76,11 +91,45 @@ export interface CdProviderLookupResult {
   coverUrl: string | null;
 }
 
+/** Toujours `string | null` — jamais de valeur inventée (même convention que
+ * `BookMetadataResult`/`CdMetadataResult`). `director`/`releaseYear`/
+ * `duration` proviennent EXCLUSIVEMENT de TMDB (`null` en `status: 'partial'`,
+ * TMDB n'ayant pas résolu de film) ; `edition`/`region`/`format` proviennent
+ * EXCLUSIVEMENT d'UPCitemdb (renseignés dès `status: 'partial'`, dès qu'un
+ * produit vidéo physique a été identifié) — jamais l'un à la place de l'autre,
+ * voir docs/DECISIONS.md. Pays de production du film : voir
+ * `BarcodeResolveData.countryCodes`, pas un champ de cet objet (contrairement
+ * à `CdMetadataResult.artistCountry`, resté un champ dédié — décision
+ * indépendante, non revue ici). */
+export interface DvdMetadataResult {
+  director: string | null;
+  releaseYear: number | null;
+  duration: number | null;
+  /** UPCitemdb uniquement (ex. "Collector's Edition") — jamais TMDB, qui n'a
+   * aucune notion d'édition physique. */
+  edition: string | null;
+  /** UPCitemdb uniquement (ex. "Region 1", "Region Free") — jamais TMDB. */
+  region: string | null;
+  /** Type de boîtier/packaging UPCitemdb uniquement (ex. "Three-Disc", "Box
+   * Set") — jamais TMDB, jamais le support (DVD/Blu-ray, déjà la catégorie). */
+  format: string | null;
+}
+
 export interface BarcodeResolveData {
   title: string | null;
   description: string | null;
   book: BookMetadataResult | null;
   cd: CdMetadataResult | null;
+  dvd: DvdMetadataResult | null;
+  /** Codes pays ISO 3166-1 alpha-2 — pour l'instant renseigné UNIQUEMENT pour
+   * `dvd` (pays de PRODUCTION du film, voir TMDB `production_countries`),
+   * toujours `null` pour `book`/`cd` (qui n'exposent pas ce signal à ce
+   * niveau — voir `CdMetadataResult.artistCountry` pour le pays de l'artiste
+   * CD, un concept et un champ différents, non concernés ici). `null` plutôt
+   * qu'un tableau vide dès qu'il n'y a rien à rapporter (catégorie sans ce
+   * signal, ou `dvd` sans film résolu, ou film résolu sans pays de
+   * production renseigné côté TMDB) — jamais un tableau vide ambigu. */
+  countryCodes: string[] | null;
 }
 
 export interface BarcodeResolveCover {
@@ -89,8 +138,8 @@ export interface BarcodeResolveCover {
 
 /** Réponse stable de `POST /items/barcode/resolve`, indépendante du fournisseur
  * ayant produit le résultat (voir `source`) et de la catégorie (`data.book`/
- * `data.cd` restent `null` pour toute catégorie qui n'est pas la leur, ou tant
- * que `dvd` n'est pas implémenté — jamais un faux bloc vide `{}`). */
+ * `data.cd`/`data.dvd` restent `null` pour toute catégorie qui n'est pas la
+ * leur — jamais un faux bloc vide `{}`). */
 export interface BarcodeResolveResponse {
   barcode: string;
   category: BarcodeCategory;

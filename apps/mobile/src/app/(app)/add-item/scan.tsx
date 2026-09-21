@@ -103,12 +103,18 @@ export default function AddItemScanScreen() {
         category: barcodeCategory,
       });
 
-      if (result.status === 'matched') {
+      if (result.status === 'matched' || result.status === 'partial') {
         // Ne préremplit jamais condition/rating/notes/owners — voir
         // `buildDraftValuesFromBarcodeResult`. Pas d'auto-save : on ne fait que
         // naviguer vers le formulaire existant, la création reste un geste
-        // explicite de l'utilisateur.
-        draft.setValues(buildDraftValuesFromBarcodeResult(result));
+        // explicite de l'utilisateur. `partial` (propre à `dvd`) ouvre le
+        // MÊME formulaire, jamais un écran différent ni une modale bloquante
+        // — seul un bandeau inline y indique que certaines informations
+        // restent à vérifier (voir `AddItemDraftContext.partialWarning` et
+        // `add-item/form.tsx`).
+        draft.setValues(buildDraftValuesFromBarcodeResult(result), {
+          partial: result.status === 'partial',
+        });
         router.replace({ pathname: '/(app)/add-item/form', params: { categoryId } });
         return;
       }

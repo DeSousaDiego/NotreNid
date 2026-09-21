@@ -92,7 +92,14 @@ export class BookBarcodeResolverService {
       match: status === 'matched',
       source,
       data: result
-        ? { title: result.title, description: result.description, book: result.book, cd: null }
+        ? {
+            title: result.title,
+            description: result.description,
+            book: result.book,
+            cd: null,
+            dvd: null,
+            countryCodes: null,
+          }
         : null,
       cover: result?.coverUrl ? { url: result.coverUrl } : null,
     };

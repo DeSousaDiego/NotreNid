@@ -40,6 +40,8 @@ export default function AddItemFormScreen() {
   const [initialValues] = useState<Partial<ItemFormValues> | undefined>(
     () => draft.draft.values ?? undefined,
   );
+  // Même principe de gel au montage — voir `AddItemDraftContext.partialWarning`.
+  const [showPartialInfo] = useState<boolean>(() => draft.draft.partialWarning);
 
   if (categoriesQuery.isLoading) {
     return (
@@ -81,6 +83,12 @@ export default function AddItemFormScreen() {
         initialValues={initialValues}
         onValuesChange={draft.setValues}
         onChangeCategoryPress={requestChangeCategory}
+        infoMessage={
+          showPartialInfo
+            ? 'Certaines informations n’ont pas pu être trouvées automatiquement. ' +
+              'Vérifiez et complétez le formulaire avant l’ajout.'
+            : undefined
+        }
       />
       <ConfirmDialog
         title="Changer de catégorie ?"

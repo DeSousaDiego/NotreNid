@@ -21,6 +21,8 @@ const MATCHED: ResolveBarcodeResult = {
       format: 'Hardcover',
     },
     cd: null,
+    dvd: null,
+    countryCodes: null,
   },
   cover: { url: 'https://example.test/cover.jpg' },
 };
@@ -44,8 +46,58 @@ const MATCHED_CD: ResolveBarcodeResult = {
       format: 'Jewel Case',
       artistCountry: 'FR',
     },
+    dvd: null,
+    countryCodes: null,
   },
   cover: { url: 'https://example.test/discovery-cover.jpg' },
+};
+
+const MATCHED_DVD: ResolveBarcodeResult = {
+  barcode: '786936815481',
+  category: 'dvd',
+  status: 'matched',
+  match: true,
+  source: 'upcitemdb',
+  data: {
+    title: "Pirates of the Caribbean: At World's End",
+    description: 'After losing Captain Jack Sparrow...',
+    book: null,
+    cd: null,
+    dvd: {
+      director: 'Gore Verbinski',
+      releaseYear: 2007,
+      duration: 169,
+      edition: null,
+      region: null,
+      format: '2-Disc',
+    },
+    countryCodes: ['US'],
+  },
+  cover: { url: 'https://example.test/pirates-cover.jpg' },
+};
+
+const PARTIAL_DVD: ResolveBarcodeResult = {
+  barcode: '883929308002',
+  category: 'dvd',
+  status: 'partial',
+  match: false,
+  source: 'upcitemdb',
+  data: {
+    title: 'The Dark Knight Trilogy',
+    description: null,
+    book: null,
+    cd: null,
+    dvd: {
+      director: null,
+      releaseYear: null,
+      duration: null,
+      edition: null,
+      region: null,
+      format: null,
+    },
+    countryCodes: null,
+  },
+  cover: { url: 'https://example.test/dark-knight-cover.jpg' },
 };
 
 describe('buildDraftValuesFromBarcodeResult — cd', () => {
@@ -127,6 +179,8 @@ describe('buildDraftValuesFromBarcodeResult — cd', () => {
           format: null,
           artistCountry: null,
         },
+        dvd: null,
+        countryCodes: null,
       },
     };
     expect(buildDraftValuesFromBarcodeResult(result).metadata).toEqual({ artist: 'Daft Punk' });
@@ -145,9 +199,87 @@ describe('buildDraftValuesFromBarcodeResult — cd', () => {
         description: null,
         book: null,
         cd: { artist: null, releaseYear: null, label: null, format: null, artistCountry: null },
+        dvd: null,
+        countryCodes: null,
       },
     };
     expect(buildDraftValuesFromBarcodeResult(result)).not.toHaveProperty('metadata');
+  });
+});
+
+describe('buildDraftValuesFromBarcodeResult — dvd', () => {
+  it('maps a full dvd match into the expected draft shape (title/description/cover from the backend fusion, dvd metadata, countryCodes)', () => {
+    expect(buildDraftValuesFromBarcodeResult(MATCHED_DVD)).toEqual({
+      barcode: '786936815481',
+      title: "Pirates of the Caribbean: At World's End",
+      description: 'After losing Captain Jack Sparrow...',
+      coverImageUrl: 'https://example.test/pirates-cover.jpg',
+      metadata: {
+        director: 'Gore Verbinski',
+        releaseYear: '2007',
+        durationMinutes: '169',
+        format: '2-Disc',
+      },
+      countryCodes: ['US'],
+    });
+  });
+
+  it('never prefills condition, rating, notes or ownerIds for a dvd — personal-to-this-copy fields', () => {
+    const values = buildDraftValuesFromBarcodeResult(MATCHED_DVD);
+    expect(values).not.toHaveProperty('condition');
+    expect(values).not.toHaveProperty('rating');
+    expect(values).not.toHaveProperty('notes');
+    expect(values).not.toHaveProperty('ownerIds');
+  });
+
+  it('maps a "partial" dvd result using only the UPC-reliable fields — title/format/cover present, director/releaseYear/duration/countryCodes absent', () => {
+    const values = buildDraftValuesFromBarcodeResult(PARTIAL_DVD);
+
+    expect(values).toEqual({
+      barcode: '883929308002',
+      title: 'The Dark Knight Trilogy',
+      coverImageUrl: 'https://example.test/dark-knight-cover.jpg',
+    });
+    expect(values).not.toHaveProperty('countryCodes');
+    expect(values).not.toHaveProperty('metadata');
+  });
+
+  it('includes edition/region/format from a "partial" result whenever UPCitemdb actually provided them', () => {
+    const result: ResolveBarcodeResult = {
+      ...PARTIAL_DVD,
+      data: {
+        ...PARTIAL_DVD.data!,
+        dvd: { ...PARTIAL_DVD.data!.dvd!, edition: "Collector's Edition", region: 'Region 1' },
+      },
+    };
+
+    expect(buildDraftValuesFromBarcodeResult(result).metadata).toEqual({
+      edition: "Collector's Edition",
+      region: 'Region 1',
+    });
+  });
+
+  it('omits countryCodes on a dvd result when TMDB returned none — never an invented country', () => {
+    const result: ResolveBarcodeResult = {
+      ...MATCHED_DVD,
+      data: { ...MATCHED_DVD.data!, countryCodes: null },
+    };
+    expect(buildDraftValuesFromBarcodeResult(result)).not.toHaveProperty('countryCodes');
+  });
+
+  it('filters out an unrecognized country code from dvd countryCodes rather than crashing or inventing a value', () => {
+    const result: ResolveBarcodeResult = {
+      ...MATCHED_DVD,
+      data: { ...MATCHED_DVD.data!, countryCodes: ['US', 'ZZ'] },
+    };
+    expect(() => buildDraftValuesFromBarcodeResult(result)).not.toThrow();
+    expect(buildDraftValuesFromBarcodeResult(result).countryCodes).toEqual(['US']);
+  });
+
+  it('never overwrites an already-selected countryCodes when the dvd result has none — the key stays absent from the merge patch', () => {
+    const previousDraftValues = { countryCodes: ['BE'] };
+    const merged = { ...previousDraftValues, ...buildDraftValuesFromBarcodeResult(PARTIAL_DVD) };
+    expect(merged.countryCodes).toEqual(['BE']);
   });
 });
 
@@ -191,7 +323,14 @@ describe('buildDraftValuesFromBarcodeResult', () => {
   it('omits title/description when absent, rather than sending an empty string', () => {
     const result: ResolveBarcodeResult = {
       ...MATCHED,
-      data: { title: null, description: null, book: MATCHED.data!.book, cd: null },
+      data: {
+        title: null,
+        description: null,
+        book: MATCHED.data!.book,
+        cd: null,
+        dvd: null,
+        countryCodes: null,
+      },
     };
     const values = buildDraftValuesFromBarcodeResult(result);
     expect(values).not.toHaveProperty('title');
@@ -219,6 +358,8 @@ describe('buildDraftValuesFromBarcodeResult', () => {
           format: null,
         },
         cd: null,
+        dvd: null,
+        countryCodes: null,
       },
     };
     expect(buildDraftValuesFromBarcodeResult(result)).not.toHaveProperty('metadata');
@@ -240,6 +381,8 @@ describe('buildDraftValuesFromBarcodeResult', () => {
           format: null,
         },
         cd: null,
+        dvd: null,
+        countryCodes: null,
       },
     };
     expect(buildDraftValuesFromBarcodeResult(result).metadata).toEqual({ author: 'Frank Herbert' });

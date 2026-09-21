@@ -40,7 +40,14 @@ describe('CdBarcodeResolverService', () => {
       status: 'matched',
       match: true,
       source: 'musicbrainz',
-      data: { title: 'Discovery', description: null, book: null, cd: MATCH_RESULT.cd },
+      data: {
+        title: 'Discovery',
+        description: null,
+        book: null,
+        cd: MATCH_RESULT.cd,
+        dvd: null,
+        countryCodes: null,
+      },
       cover: { url: 'https://example.test/cover.jpg' },
     });
     expect(lookup).toHaveBeenCalledWith('5099969236424');
@@ -131,7 +138,14 @@ describe('CdBarcodeResolverService', () => {
         status: 'matched',
         match: true,
         source: 'google-books',
-        data: { title: 'Not a CD', description: null, book: null, cd: null },
+        data: {
+          title: 'Not a CD',
+          description: null,
+          book: null,
+          cd: null,
+          dvd: null,
+          countryCodes: null,
+        },
         cover: null,
       },
       60_000,

@@ -7,7 +7,7 @@ const SAMPLE: BarcodeResolveResponse = {
   status: 'matched',
   match: true,
   source: 'google-books',
-  data: { title: 'Dune', description: null, book: null, cd: null },
+  data: { title: 'Dune', description: null, book: null, cd: null, dvd: null, countryCodes: null },
   cover: null,
 };
 

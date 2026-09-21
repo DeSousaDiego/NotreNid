@@ -195,6 +195,36 @@ describe('ItemFormScreen', () => {
     expect(mockApiClient.items.create).not.toHaveBeenCalled();
   });
 
+  it('shows the infoMessage banner (dvd "partial" scan) on every step, never blocking submission', async () => {
+    const view = await renderScreen(
+      <ItemFormScreen
+        mode="create"
+        category={DVD_CATEGORY}
+        infoMessage="Certaines informations n'ont pas pu être trouvées automatiquement. Vérifiez et complétez le formulaire avant l'ajout."
+      />,
+    );
+
+    await waitFor(() => expect(view.getByText('Réalisateur')).toBeTruthy());
+    expect(
+      view.getByText(
+        "Certaines informations n'ont pas pu être trouvées automatiquement. Vérifiez et complétez le formulaire avant l'ajout.",
+      ),
+    ).toBeTruthy();
+    // Un bandeau d'information, pas un blocage : "Suivant" reste utilisable.
+    const nextButton = view.getByRole('button', { name: 'Suivant' });
+    expect(nextButton.props.accessibilityState?.disabled).toBeFalsy();
+  });
+
+  it('shows no infoMessage banner when the prop is not provided', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+    expect(
+      view.queryByText(
+        "Certaines informations n'ont pas pu être trouvées automatiquement. Vérifiez et complétez le formulaire avant l'ajout.",
+      ),
+    ).toBeNull();
+  });
+
   it('creates the item end-to-end across all three steps, with the category fixed from the prop', async () => {
     (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
     const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);

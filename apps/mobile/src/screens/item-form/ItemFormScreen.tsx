@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
@@ -52,6 +53,13 @@ export interface ItemFormScreenProps {
   /** Si fourni, affiche un lien discret « Changer » à côté du contexte catégorie
    * (étape 1). Laissé `undefined` en édition — pas de changement de catégorie là. */
   onChangeCategoryPress?: () => void;
+  /** Bandeau inline discret affiché au-dessus des étapes, jamais bloquant
+   * (pas de modale) — générique, pas spécifique au scan DVD/`partial` : tout
+   * appelant peut l'utiliser pour signaler que certaines données pré-remplies
+   * méritent vérification. Visible à chaque étape tant que fourni (le
+   * propriétaire du formulaire n'est pas censé avoir déjà tout relu à la
+   * première étape). */
+  infoMessage?: string;
 }
 
 const STEP_TITLES = ['Informations', 'Votre exemplaire', 'Propriétaires et couverture'];
@@ -87,6 +95,7 @@ function ItemFormScreenComponent({
   initialValues,
   onValuesChange,
   onChangeCategoryPress,
+  infoMessage,
 }: ItemFormScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -283,6 +292,31 @@ function ItemFormScreenComponent({
             Étape {step + 1} sur {STEP_TITLES.length} — {STEP_TITLES[step]}
           </AppText>
         </View>
+
+        {infoMessage ? (
+          <View
+            accessibilityRole="text"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: theme.spacing.sm,
+              padding: theme.spacing.sm,
+              borderRadius: theme.radii.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+            }}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={theme.iconSizes.md}
+              color={theme.colors.accent}
+            />
+            <AppText variant="body" color="textMuted" style={{ flex: 1 }}>
+              {infoMessage}
+            </AppText>
+          </View>
+        ) : null}
 
         {membersQuery.isLoading ? (
           <LoadingSkeleton height={200} radius={theme.radii.lg} />

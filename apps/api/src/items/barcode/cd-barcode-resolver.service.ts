@@ -65,7 +65,16 @@ export class CdBarcodeResolverService {
       status,
       match: status === 'matched',
       source,
-      data: result ? { title: result.title, description: null, book: null, cd: result.cd } : null,
+      data: result
+        ? {
+            title: result.title,
+            description: null,
+            book: null,
+            cd: result.cd,
+            dvd: null,
+            countryCodes: null,
+          }
+        : null,
       cover: result?.coverUrl ? { url: result.coverUrl } : null,
     };
     if (cacheTtlMs !== null) {

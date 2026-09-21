@@ -5,6 +5,16 @@ import type { ItemFormValues } from '../item-form/schema';
 export interface AddItemDraft {
   categoryId: string | null;
   values: Partial<ItemFormValues> | null;
+  /** Vrai quand le dernier scan barcode a renvoyé `status: 'partial'` (DVD
+   * identifié physiquement par UPCitemdb, film non résolu par TMDB) — sert
+   * uniquement à afficher un bandeau d'information inline sur le formulaire
+   * (`ItemFormScreen.infoMessage`, voir `add-item/form.tsx`), jamais à
+   * bloquer la saisie ni la soumission. Reste vrai pendant toute l'édition du
+   * brouillon (une frappe normale ne l'efface pas — voir `setValues`) : remis
+   * à `false` uniquement par `setCategory`/`clearDraft`, l'utilisateur doit
+   * avoir eu l'occasion de relire tout le formulaire, pas seulement le champ
+   * qu'il vient de modifier. */
+  partialWarning: boolean;
 }
 
 export interface AddItemDraftContextValue {
@@ -22,15 +32,21 @@ export interface AddItemDraftContextValue {
    * (Bloc 3A), qui n'envoie qu'un sous-ensemble de `metadata` (ex. seulement
    * les champs livre) sans devoir connaître ni écraser les champs déjà saisis
    * à la main.
+   *
+   * `options.partial` : à passer `true` uniquement depuis l'écran de scan sur
+   * un résultat `status: 'partial'` — jamais depuis `ItemFormScreen`
+   * (`onValuesChange` n'en a pas besoin, `undefined` préserve la valeur
+   * courante de `partialWarning`, ne la remet jamais à `false` en cours de
+   * frappe).
    */
-  setValues: (values: Partial<ItemFormValues>) => void;
+  setValues: (values: Partial<ItemFormValues>, options?: { partial?: boolean }) => void;
   clearDraft: () => void;
   /** Vrai si des champs significatifs ont déjà été saisis (sert la confirmation
    * avant un changement de catégorie destructeur). */
   hasMeaningfulData: boolean;
 }
 
-const EMPTY_DRAFT: AddItemDraft = { categoryId: null, values: null };
+const EMPTY_DRAFT: AddItemDraft = { categoryId: null, values: null, partialWarning: false };
 
 const AddItemDraftContext = createContext<AddItemDraftContextValue | null>(null);
 
@@ -59,28 +75,34 @@ export function AddItemDraftProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<AddItemDraft>(EMPTY_DRAFT);
 
   const setCategory = useCallback((categoryId: string) => {
-    setDraft((prev) => (prev.categoryId === categoryId ? prev : { categoryId, values: null }));
+    setDraft((prev) =>
+      prev.categoryId === categoryId ? prev : { categoryId, values: null, partialWarning: false },
+    );
   }, []);
 
-  const setValues = useCallback((values: Partial<ItemFormValues>) => {
-    setDraft((prev) => ({
-      ...prev,
-      values: {
-        ...prev.values,
-        ...values,
-        // Fusion ciblée d'un niveau : un scan qui ne renseigne que `book.isbn`
-        // (par exemple) ne doit jamais effacer un `metadata.author` déjà saisi
-        // à la main. Ne s'applique qu'aux clés réellement présentes dans
-        // `values.metadata`/`customMetadata` — une clé absente là n'écrase rien.
-        ...(values.metadata || prev.values?.metadata
-          ? { metadata: { ...prev.values?.metadata, ...values.metadata } }
-          : null),
-        ...(values.customMetadata || prev.values?.customMetadata
-          ? { customMetadata: { ...prev.values?.customMetadata, ...values.customMetadata } }
-          : null),
-      },
-    }));
-  }, []);
+  const setValues = useCallback(
+    (values: Partial<ItemFormValues>, options?: { partial?: boolean }) => {
+      setDraft((prev) => ({
+        ...prev,
+        partialWarning: options?.partial ?? prev.partialWarning,
+        values: {
+          ...prev.values,
+          ...values,
+          // Fusion ciblée d'un niveau : un scan qui ne renseigne que `book.isbn`
+          // (par exemple) ne doit jamais effacer un `metadata.author` déjà saisi
+          // à la main. Ne s'applique qu'aux clés réellement présentes dans
+          // `values.metadata`/`customMetadata` — une clé absente là n'écrase rien.
+          ...(values.metadata || prev.values?.metadata
+            ? { metadata: { ...prev.values?.metadata, ...values.metadata } }
+            : null),
+          ...(values.customMetadata || prev.values?.customMetadata
+            ? { customMetadata: { ...prev.values?.customMetadata, ...values.customMetadata } }
+            : null),
+        },
+      }));
+    },
+    [],
+  );
 
   const clearDraft = useCallback(() => setDraft(EMPTY_DRAFT), []);
 

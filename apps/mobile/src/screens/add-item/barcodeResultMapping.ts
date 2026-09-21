@@ -76,5 +76,36 @@ export function buildDraftValuesFromBarcodeResult(
     }
   }
 
+  const dvd = result.data?.dvd;
+  if (dvd) {
+    const metadata: Record<string, string> = {};
+    // `director`/`releaseYear`/`duration` : TMDB uniquement, absents en
+    // `status: 'partial'` (film non résolu) — jamais inventés ici, la clé
+    // reste simplement absente du brouillon dans ce cas.
+    if (dvd.director) metadata.director = dvd.director;
+    if (dvd.releaseYear != null) metadata.releaseYear = String(dvd.releaseYear);
+    // `durationMinutes` (pas `duration`) : nom du champ côté formulaire, voir
+    // `metadataFields.ts` (`DVD_FIELDS`).
+    if (dvd.duration != null) metadata.durationMinutes = String(dvd.duration);
+    // `edition`/`region`/`format` : UPCitemdb uniquement, déjà présents dès
+    // `status: 'partial'`.
+    if (dvd.edition) metadata.edition = dvd.edition;
+    if (dvd.region) metadata.region = dvd.region;
+    if (dvd.format) metadata.format = dvd.format;
+    if (Object.keys(metadata).length > 0) values.metadata = metadata;
+  }
+
+  // Pays de PRODUCTION du film (TMDB) — pour l'instant renseigné uniquement
+  // pour `dvd` (voir `ResolveBarcodeResult.data.countryCodes`, un champ
+  // séparé de `cd.artistCountry` ci-dessus). Chaque code est validé
+  // individuellement (même règle que pour `cd`) : un code TMDB non reconnu
+  // est simplement ignoré, jamais inventé ni substitué. Absent/vide → la clé
+  // `countryCodes` reste hors de `values`, donc `AddItemDraftContext.setValues`
+  // ne touche jamais une sélection déjà faite par l'utilisateur.
+  const countryCodes = result.data?.countryCodes?.filter(isValidCountryCode);
+  if (countryCodes && countryCodes.length > 0) {
+    values.countryCodes = countryCodes;
+  }
+
   return values;
 }

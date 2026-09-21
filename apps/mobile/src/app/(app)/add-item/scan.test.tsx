@@ -55,6 +55,7 @@ const BOOK_CATEGORY = {
 };
 
 const CD_CATEGORY = { ...BOOK_CATEGORY, id: 'cat-cd', slug: 'cd', name: 'CD' };
+const DVD_CATEGORY = { ...BOOK_CATEGORY, id: 'cat-dvd', slug: 'dvd', name: 'DVD' };
 
 const MATCHED_RESULT = {
   barcode: '9782070368228',
@@ -98,6 +99,57 @@ const MATCHED_CD_RESULT = {
     },
   },
   cover: { url: 'https://example.test/discovery-cover.jpg' },
+};
+
+const MATCHED_DVD_RESULT = {
+  barcode: '883929005559',
+  category: 'dvd',
+  status: 'matched',
+  match: true,
+  source: 'upcitemdb',
+  data: {
+    title: 'The Dark Knight : Le Chevalier Noir',
+    description: 'Batman affronte le Joker à Gotham.',
+    book: null,
+    cd: null,
+    dvd: {
+      director: 'Christopher Nolan',
+      releaseYear: 2008,
+      duration: 152,
+      edition: 'Édition Collector',
+      region: 'Zone 2',
+      format: 'Blu-ray',
+    },
+    countryCodes: ['US', 'GB'],
+  },
+  cover: { url: 'https://example.test/dark-knight-cover.jpg' },
+};
+
+// Coffret multi-films : UPCitemdb identifie bien un produit vidéo, mais TMDB
+// ne trouve aucun candidat assez confiant (voir DvdEnrichmentService) — statut
+// `partial`, seules les données UPCitemdb (fiables) sont préremplies.
+const PARTIAL_DVD_RESULT = {
+  barcode: '883929005560',
+  category: 'dvd',
+  status: 'partial',
+  match: false,
+  source: 'upcitemdb',
+  data: {
+    title: 'Coffret Trilogie Mystère',
+    description: null,
+    book: null,
+    cd: null,
+    dvd: {
+      director: null,
+      releaseYear: null,
+      duration: null,
+      edition: 'Coffret',
+      region: 'Zone 2',
+      format: 'DVD',
+    },
+    countryCodes: null,
+  },
+  cover: { url: 'https://example.test/coffret-cover.jpg' },
 };
 
 function Harness({
@@ -150,7 +202,11 @@ describe('AddItemScanScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCurrentCategoryId = 'cat-book';
-    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY, CD_CATEGORY]);
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([
+      BOOK_CATEGORY,
+      CD_CATEGORY,
+      DVD_CATEGORY,
+    ]);
   });
 
   it('renders a manual barcode input and a search button', async () => {
@@ -465,6 +521,151 @@ describe('AddItemScanScreen', () => {
 
       await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
       await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('dvd', () => {
+    beforeEach(() => {
+      mockCurrentCategoryId = 'cat-dvd';
+    });
+
+    it('on a full match (UPC + TMDB), prefills title, description, cover and every dvd field', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_DVD_RESULT);
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005559');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() =>
+        expect(mockRouterReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/add-item/form',
+          params: { categoryId: 'cat-dvd' },
+        }),
+      );
+
+      expect(draftRef.current?.values).toEqual({
+        barcode: '883929005559',
+        title: 'The Dark Knight : Le Chevalier Noir',
+        description: 'Batman affronte le Joker à Gotham.',
+        coverImageUrl: 'https://example.test/dark-knight-cover.jpg',
+        countryCodes: ['US', 'GB'],
+        metadata: {
+          director: 'Christopher Nolan',
+          releaseYear: '2008',
+          durationMinutes: '152',
+          edition: 'Édition Collector',
+          region: 'Zone 2',
+          format: 'Blu-ray',
+        },
+      });
+      expect(draftRef.current?.partialWarning).toBe(false);
+    });
+
+    it('on a partial match (film not resolved by TMDB), prefills only the fields UPCitemdb actually returned and flags the draft as partial', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(PARTIAL_DVD_RESULT);
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005560');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() =>
+        expect(mockRouterReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/add-item/form',
+          params: { categoryId: 'cat-dvd' },
+        }),
+      );
+
+      // Jamais de director/releaseYear/durationMinutes ni de countryCodes : ces
+      // champs sont exclusivement fournis par TMDB, non résolu ici.
+      expect(draftRef.current?.values).toEqual({
+        barcode: '883929005560',
+        title: 'Coffret Trilogie Mystère',
+        coverImageUrl: 'https://example.test/coffret-cover.jpg',
+        metadata: {
+          edition: 'Coffret',
+          region: 'Zone 2',
+          format: 'DVD',
+        },
+      });
+      expect(draftRef.current?.values).not.toHaveProperty('countryCodes');
+      expect(draftRef.current?.partialWarning).toBe(true);
+    });
+
+    it('never prefills condition, rating, notes or ownerIds for a dvd scan either', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_DVD_RESULT);
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005559');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values).not.toHaveProperty('condition');
+      expect(draftRef.current?.values).not.toHaveProperty('rating');
+      expect(draftRef.current?.values).not.toHaveProperty('notes');
+      expect(draftRef.current?.values).not.toHaveProperty('ownerIds');
+    });
+
+    it('a partial match never overwrites unrelated fields already present in the draft', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(PARTIAL_DVD_RESULT);
+      const { view, draftRef } = await renderScreen({
+        ownerIds: ['user-1'],
+        metadata: { format: 'Déjà saisi à la main' },
+      });
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005560');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values?.ownerIds).toEqual(['user-1']);
+      expect(draftRef.current?.values?.metadata).toMatchObject({ format: 'DVD' });
+    });
+
+    it('shows a clean message and does not navigate when dvd search finds nothing', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+        barcode: '883929005561',
+        category: 'dvd',
+        status: 'no_match',
+        match: false,
+        source: null,
+        data: null,
+        cover: null,
+      });
+      const { view } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005561');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() =>
+        expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy(),
+      );
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+
+    it('dvd is no longer "unsupported" — a provider_error (UPC down) shows the same message as book/cd', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+        barcode: '883929005559',
+        category: 'dvd',
+        status: 'provider_error',
+        match: false,
+        source: null,
+        data: null,
+        cover: null,
+      });
+      const { view } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005559');
       await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
 
       await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
