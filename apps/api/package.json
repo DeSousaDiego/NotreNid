@@ -17,6 +17,7 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "export:openapi": "ts-node -P tsconfig.json scripts/export-openapi.ts",
+    "dvd:manual-tmdb-check": "ts-node -P tsconfig.json scripts/dvd-manual-tmdb-check.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

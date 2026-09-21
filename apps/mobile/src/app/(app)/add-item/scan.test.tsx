@@ -671,5 +671,107 @@ describe('AddItemScanScreen', () => {
       await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
       expect(mockRouterReplace).not.toHaveBeenCalled();
     });
+
+    // Les deux tests suivants reprennent EXACTEMENT les valeurs des fixtures
+    // backend réellement capturées pendant le POC (voir
+    // apps/api/src/items/barcode/test-fixtures/upcitemdb/ et
+    // dvd-pipeline.integration.spec.ts) — mêmes barcodes, mêmes résultats
+    // normalisés — pour tracer la chaîne complète fixture → résolveur →
+    // contrat public → mobile, pas seulement des données synthétiques.
+
+    it('scenario "9" (fixture backend réelle) : matched, formulaire DVD complet', async () => {
+      const NINE_RESULT = {
+        barcode: '065935831686',
+        category: 'dvd',
+        status: 'matched',
+        match: true,
+        source: 'upcitemdb',
+        data: {
+          title: '9',
+          description:
+            "Dans un futur post-apocalyptique, une poupée de tissu s'éveille et doit affronter les machines qui ont exterminé l'humanité.",
+          book: null,
+          cd: null,
+          dvd: {
+            director: 'Shane Acker',
+            releaseYear: 2009,
+            duration: 79,
+            edition: null,
+            region: null,
+            format: null,
+          },
+          countryCodes: ['US'],
+        },
+        // Image UPC prioritaire, jamais le poster TMDB, quand elle est présente
+        // (voir dvd-pipeline.integration.spec.ts).
+        cover: { url: 'https://example-fixture.test/upcitemdb/nine-bluray-cover.jpg' },
+      };
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(NINE_RESULT);
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '065935831686');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values).toEqual({
+        barcode: '065935831686',
+        title: '9',
+        description:
+          "Dans un futur post-apocalyptique, une poupée de tissu s'éveille et doit affronter les machines qui ont exterminé l'humanité.",
+        coverImageUrl: 'https://example-fixture.test/upcitemdb/nine-bluray-cover.jpg',
+        countryCodes: ['US'],
+        metadata: { director: 'Shane Acker', releaseYear: '2009', durationMinutes: '79' },
+      });
+      expect(draftRef.current?.partialWarning).toBe(false);
+    });
+
+    it('scenario Dark Knight Trilogy (fixture backend réelle, coffret) : partial, uniquement les champs UPC sûrs, bandeau activé', async () => {
+      const DARK_KNIGHT_TRILOGY_RESULT = {
+        barcode: '883929308002',
+        category: 'dvd',
+        status: 'partial',
+        match: false,
+        source: 'upcitemdb',
+        data: {
+          title: 'The Dark Knight Trilogy',
+          description: null,
+          book: null,
+          cd: null,
+          dvd: {
+            director: null,
+            releaseYear: null,
+            duration: null,
+            edition: null,
+            region: null,
+            // Seul champ UPC sûr détecté pour ce coffret (voir
+            // dvd-pipeline.integration.spec.ts) — jamais un champ TMDB.
+            format: '6-Disc',
+          },
+          countryCodes: null,
+        },
+        cover: { url: 'https://example-fixture.test/upcitemdb/dark-knight-trilogy-cover.jpg' },
+      };
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(
+        DARK_KNIGHT_TRILOGY_RESULT,
+      );
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929308002');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values).toEqual({
+        barcode: '883929308002',
+        title: 'The Dark Knight Trilogy',
+        coverImageUrl: 'https://example-fixture.test/upcitemdb/dark-knight-trilogy-cover.jpg',
+        metadata: { format: '6-Disc' },
+      });
+      expect(draftRef.current?.values).not.toHaveProperty('countryCodes');
+      expect(draftRef.current?.partialWarning).toBe(true);
+    });
   });
 });
