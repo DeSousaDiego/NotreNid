@@ -46,7 +46,13 @@ describe('BarcodeResolverService', () => {
         title: 'Discovery',
         description: null,
         book: null,
-        cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+        cd: {
+          artist: 'Daft Punk',
+          releaseYear: 2001,
+          label: 'Daft Life',
+          format: 'CD',
+          artistCountry: null,
+        },
       },
       cover: null,
     };

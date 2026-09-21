@@ -89,7 +89,13 @@ const MATCHED_CD_RESULT = {
     description: null,
     // `format` représente le boîtier ("Jewel Case"), pas le support (CD) —
     // voir docs/DECISIONS.md.
-    cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'Jewel Case' },
+    cd: {
+      artist: 'Daft Punk',
+      releaseYear: 2001,
+      label: 'Daft Life',
+      format: 'Jewel Case',
+      artistCountry: null,
+    },
   },
   cover: { url: 'https://example.test/discovery-cover.jpg' },
 };
@@ -364,6 +370,25 @@ describe('AddItemScanScreen', () => {
           format: 'Jewel Case',
         },
       });
+    });
+
+    it('flow: a scan with a valid cd.artistCountry prefills draft.values.countryCodes, the same field ItemFormScreen initializes its CountrySelect from', async () => {
+      (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+        ...MATCHED_CD_RESULT,
+        data: {
+          ...MATCHED_CD_RESULT.data,
+          cd: { ...MATCHED_CD_RESULT.data.cd, artistCountry: 'FR' },
+        },
+      });
+      const { view, draftRef } = await renderScreen();
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
+      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+
+      expect(draftRef.current?.values?.countryCodes).toEqual(['FR']);
     });
 
     it('never prefills condition, rating, notes or ownerIds for a cd scan either', async () => {

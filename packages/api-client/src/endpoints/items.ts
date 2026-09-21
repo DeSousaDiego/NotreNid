@@ -62,10 +62,6 @@ export interface BarcodeBookResult {
   format: string | null;
 }
 
-/** Pas de champ pays : aucun signal fiable sur le pays de l'artiste n'est
- * disponible sans requête MusicBrainz supplémentaire par artiste (voir
- * docs/DECISIONS.md) — jamais approximé à partir du pays de distribution de
- * l'édition, qui n'est pas la même chose. */
 export interface BarcodeCdResult {
   artist: string | null;
   releaseYear: number | null;
@@ -73,6 +69,12 @@ export interface BarcodeCdResult {
   /** Type de boîtier/packaging (ex. "Jewel Case", "Digipak"), pas le support
    * (CD, 2×CD…) — déjà connu via la catégorie. Voir docs/DECISIONS.md. */
   format: string | null;
+  /** Code pays ISO 3166-1 alpha-2 de l'ARTISTE principal (ex. "US"), jamais du
+   * pays de distribution de cette édition — une notion différente. `null` dès
+   * qu'il existe le moindre doute sur l'identité de l'artiste principal
+   * (plusieurs artist-credit, "Various Artists") plutôt qu'une valeur devinée.
+   * Voir docs/DECISIONS.md. */
+  artistCountry: string | null;
 }
 
 export interface ResolveBarcodeResult {

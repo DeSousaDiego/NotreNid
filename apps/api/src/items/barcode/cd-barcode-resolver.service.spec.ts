@@ -3,13 +3,20 @@ import type { ConfigService } from '@nestjs/config';
 import { BarcodeCacheService } from './barcode-cache.service';
 import { CdBarcodeResolverService } from './cd-barcode-resolver.service';
 import { CoverArtArchiveProvider } from './providers/cover-art-archive.provider';
+import { MusicBrainzArtistCacheService } from './providers/musicbrainz-artist-cache.service';
 import type { MusicBrainzRateLimiterService } from './providers/musicbrainz-rate-limiter.service';
 import { MusicBrainzProvider } from './providers/musicbrainz.provider';
 import type { CdProviderLookupResult } from './types/barcode-result.types';
 
 const MATCH_RESULT: CdProviderLookupResult = {
   title: 'Discovery',
-  cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'CD' },
+  cd: {
+    artist: 'Daft Punk',
+    releaseYear: 2001,
+    label: 'Daft Life',
+    format: 'CD',
+    artistCountry: null,
+  },
   coverUrl: 'https://example.test/cover.jpg',
 };
 
@@ -178,6 +185,7 @@ describe('CdBarcodeResolverService', () => {
           configService,
           { schedule: (task: () => unknown) => task() } as unknown as MusicBrainzRateLimiterService,
           new CoverArtArchiveProvider(configService),
+          new MusicBrainzArtistCacheService(),
         ),
         new BarcodeCacheService(),
       );

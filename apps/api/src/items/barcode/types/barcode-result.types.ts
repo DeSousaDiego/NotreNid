@@ -47,11 +47,7 @@ export interface BookProviderLookupResult {
 
 /** Toujours `string | null` / `number | null` — jamais de valeur inventée (même
  * convention que `BookMetadataResult`). Pas de `description` : MusicBrainz n'a
- * pas de notion de résumé/synopsis pour une release (voir docs/DECISIONS.md).
- * Pas de champ pays : aucun signal fiable sur le pays de l'artiste n'est
- * disponible sans requête MusicBrainz supplémentaire par artiste, ce que le
- * budget de requêtes (~1/s) ne permet pas raisonnablement ici — voir
- * docs/DECISIONS.md. */
+ * pas de notion de résumé/synopsis pour une release (voir docs/DECISIONS.md). */
 export interface CdMetadataResult {
   artist: string | null;
   releaseYear: number | null;
@@ -59,6 +55,14 @@ export interface CdMetadataResult {
   /** Type de boîtier/packaging (ex. "Jewel Case", "Digipak"), pas le support
    * (CD, 2×CD…) — déjà connu via la catégorie. Voir docs/DECISIONS.md. */
   format: string | null;
+  /** Code pays ISO 3166-1 alpha-2 de l'ARTISTE principal (ex. "US"), jamais du
+   * pays de distribution de cette édition (`release.country`, une notion
+   * différente — voir `MusicBrainzProvider`). Nécessite un second appel
+   * MusicBrainz par MBID d'artiste, donc `null` par défaut dès qu'il existe le
+   * moindre doute sur l'identité de l'artiste principal (plusieurs
+   * artist-credit, "Various Artists", MBID absent) plutôt qu'une valeur
+   * devinée — voir docs/DECISIONS.md. */
+  artistCountry: string | null;
 }
 
 /** `coverUrl` est rempli par `MusicBrainzProvider` lui-même (via Cover Art

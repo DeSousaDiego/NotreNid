@@ -1,4 +1,5 @@
 import type { ResolveBarcodeResult } from '@notre-nid/api-client';
+import { isValidCountryCode } from '@notre-nid/shared';
 
 import type { ItemFormValues } from '../item-form/schema';
 
@@ -60,12 +61,20 @@ export function buildDraftValuesFromBarcodeResult(
     // Idem `book.format` : valeur brute MusicBrainz, jamais traduite ici.
     if (cd.format) metadata.format = cd.format;
     if (Object.keys(metadata).length > 0) values.metadata = metadata;
-  }
 
-  // Pas de `countryCodes` ("pays de l'artiste") préremplis pour un CD : aucun
-  // signal fiable disponible sans requête MusicBrainz supplémentaire par
-  // artiste — voir docs/DECISIONS.md. Reste à saisir manuellement, comme pour
-  // un livre aujourd'hui.
+    // `cd.artistCountry` ("pays de l'artiste", voir docs/DECISIONS.md) ne
+    // préremplit `countryCodes` que lorsqu'il est un code ISO 3166-1 alpha-2
+    // reconnu par `isValidCountryCode` (même liste que `CountrySelect`,
+    // `packages/shared/countries.ts`) — un code inconnu ou absent laisse la
+    // clé `countryCodes` hors de `values`, donc `AddItemDraftContext.setValues`
+    // ne touche pas à une éventuelle sélection déjà faite par l'utilisateur
+    // (fusion superficielle : une clé absente de `values` n'écrase jamais la
+    // valeur déjà présente dans le brouillon). Jamais de valeur inventée ni de
+    // tableau vide pour "aucun signal" — la clé est simplement absente.
+    if (cd.artistCountry && isValidCountryCode(cd.artistCountry)) {
+      values.countryCodes = [cd.artistCountry];
+    }
+  }
 
   return values;
 }

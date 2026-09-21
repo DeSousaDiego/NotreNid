@@ -32,16 +32,6 @@ export class CdBarcodeResolverService {
 
   async resolve(barcode: string): Promise<BarcodeResolveResponse> {
     const cached = this.cache.get('cd', barcode);
-    // TEMPORAIRE — diagnostic no_match (à retirer une fois la cause confirmée) :
-    // distingue une réponse servie depuis le cache process-local d'un appel
-    // MusicBrainz réellement effectué pour cette requête. `logger.log`, pas
-    // `logger.debug` : niveau garanti visible sur Render (voir main.ts /
-    // AppLogger) — aucun secret, aucun JWT, aucun header Authorization ici.
-    this.logger.log(
-      `[diag] cache ${cached ? 'HIT' : 'MISS'} pour cd:${barcode}${
-        cached ? ` (status caché=${cached.status})` : ''
-      }`,
-    );
     if (cached) return cached;
 
     try {
@@ -80,11 +70,6 @@ export class CdBarcodeResolverService {
     };
     if (cacheTtlMs !== null) {
       this.cache.set('cd', barcode, response, cacheTtlMs);
-      // TEMPORAIRE — diagnostic no_match (à retirer avec les autres logs [diag]) :
-      // confirme explicitement qu'un `no_match` vient d'être écrit en cache
-      // (24h, `NO_MATCH_TTL_MS`) et masquera donc tout nouvel essai sur ce
-      // barcode jusqu'à expiration.
-      this.logger.log(`[diag] mise en cache cd:${barcode} status=${status} ttlMs=${cacheTtlMs}`);
     }
     return response;
   }

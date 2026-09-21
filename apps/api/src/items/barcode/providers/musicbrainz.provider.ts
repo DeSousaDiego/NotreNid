@@ -4,13 +4,14 @@ import { ConfigService } from '@nestjs/config';
 import { BarcodeProviderError } from './barcode-provider.error';
 import type { CdBarcodeProvider } from './cd-provider.interface';
 import { CoverArtArchiveProvider } from './cover-art-archive.provider';
+import { MusicBrainzArtistCacheService } from './musicbrainz-artist-cache.service';
 import { MusicBrainzRateLimiterService } from './musicbrainz-rate-limiter.service';
 import type { CdProviderLookupResult } from '../types/barcode-result.types';
 
 interface MusicBrainzArtistCredit {
   name?: string;
   joinphrase?: string;
-  artist?: { name?: string };
+  artist?: { id?: string; name?: string };
 }
 
 interface MusicBrainzLabelInfo {
@@ -45,6 +46,27 @@ interface MusicBrainzSearchResponse {
   releases?: MusicBrainzRelease[];
 }
 
+/** Réponse de `GET /ws/2/artist/{mbid}` — champs de base uniquement (comme
+ * `packaging` sur une release, `country`/`area` sont retournés sans `inc=`
+ * supplémentaire, vérifié par un appel réel avant implémentation, voir
+ * docs/DECISIONS.md). `begin-area` (lieu de naissance/formation, souvent une
+ * ville) est volontairement absente de ce type : sa sémantique ne correspond
+ * PAS à "pays de l'artiste" (un artiste peut naître ailleurs que dans son pays
+ * d'activité), contrairement à `country`/`area`. */
+interface MusicBrainzArtistLookupResponse {
+  id?: string;
+  /** Code ISO 3166-1 alpha-2 (ex. "US") — dérivé par MusicBrainz de `area`
+   * quand celle-ci est un pays ; source primaire pour `cd.artistCountry`. */
+  country?: string;
+  area?: {
+    /** Non-vide UNIQUEMENT quand `area` représente un pays (l'ISO 3166-1 ne
+     * s'applique qu'aux pays) — repli valide, même sémantique que `country`,
+     * pour le cas rare où `country` serait absent alors que `area` est
+     * renseignée. */
+    'iso-3166-1-codes'?: string[];
+  };
+}
+
 // Requiert un contact identifiable dans le User-Agent (politique MusicBrainz —
 // voir docs/DECISIONS.md pour les sources consultées) ; surchargeable via
 // `MUSICBRAINZ_USER_AGENT` si l'URL de contact change.
@@ -65,6 +87,20 @@ const MIN_ATTEMPT_TIMEOUT_MS = 1000;
 // délai fixe entre tentatives ici : `MusicBrainzRateLimiterService` impose
 // déjà un espacement minimal entre deux requêtes réelles, retries compris.
 const RETRYABLE_HTTP_STATUSES = new Set([429, 503]);
+
+// Même principe que `COVER_ART_ARCHIVE_TIMEOUT_MS` (cover-art-archive.provider.ts) :
+// enrichissement non bloquant, une seule tentative (pas de retry contrairement
+// à la recherche release — voir `fetchArtistCountrySafely`), un budget propre
+// et court plutôt qu'un partage du budget de la recherche.
+const DEFAULT_ARTIST_TIMEOUT_MS = 4000;
+
+// MBID de l'artiste spécial "Various Artists" de MusicBrainz (compilations),
+// vérifié par un appel réel le 2026-09-21 (`GET /ws/2/artist/?query=artist:"Various
+// Artists"&fmt=json` → premier résultat, score 100, type "Other") — voir
+// docs/DECISIONS.md. Ne représente aucun artiste réel : son pays ne doit
+// jamais être exposé comme `cd.artistCountry`, même si MusicBrainz venait un
+// jour à lui assigner une `area`.
+const VARIOUS_ARTISTS_MBID = '89ad4ac3-39f7-470e-963a-56509c546377';
 
 /** `publish_date`-like : MusicBrainz `date` peut être `"2001"`, `"2001-03"` ou
  * `"2001-03-12"` — seuls les 4 premiers chiffres nous intéressent. */
@@ -90,6 +126,47 @@ function joinArtistCredit(credits: MusicBrainzArtistCredit[] | undefined): strin
     .map((credit) => `${credit.name ?? credit.artist?.name ?? ''}${credit.joinphrase ?? ''}`)
     .join('');
   return joined.trim() || null;
+}
+
+/**
+ * Détermine le MBID de l'artiste principal, uniquement quand il est
+ * SANS AMBIGUÏTÉ — voir docs/DECISIONS.md pour la justification complète :
+ *
+ * - Exactement UN `artist-credit` (`joinArtistCredit` peut légitimement en
+ *   concaténer plusieurs pour l'affichage — ex. "Prince & The New Power
+ *   Generation" — mais aucune règle fiable ne permet de désigner lequel des
+ *   deux crédits est "le" pays de l'artiste à retenir) : deux crédits ou plus
+ *   → `null`, jamais un choix arbitraire (premier, plus connu, etc.).
+ * - Ce crédit unique doit exposer un `artist.id` (MBID) — absent → `null`
+ *   (rien à interroger).
+ * - Ce MBID ne doit pas être celui de l'artiste spécial "Various Artists"
+ *   (`VARIOUS_ARTISTS_MBID`) : une compilation n'a pas de pays d'artiste.
+ *
+ * Zéro crédit (`artist-credit` absent/vide) → `null` également : `lookup`
+ * n'appelle cette fonction qu'après avoir déjà trouvé une release, mais un
+ * credit vide reste possible en théorie (donnée MusicBrainz incomplète).
+ */
+export function resolveMainArtistMbid(
+  credits: MusicBrainzArtistCredit[] | undefined,
+): string | null {
+  if (!credits || credits.length !== 1) return null;
+  const mbid = credits[0]?.artist?.id;
+  if (!mbid || mbid === VARIOUS_ARTISTS_MBID) return null;
+  return mbid;
+}
+
+/**
+ * `country` en priorité (déjà un code ISO 3166-1 alpha-2, ex. "US" — vérifié
+ * par un appel réel, voir docs/DECISIONS.md). Repli sur `area['iso-3166-1-codes'][0]`
+ * UNIQUEMENT si `country` est absent : même donnée sous-jacente (l'ISO 3166-1
+ * ne s'applique qu'aux pays, donc un `iso-3166-1-codes` non vide confirme que
+ * `area` représente bien un pays, pas une simple sémantique approchante).
+ * `begin-area` (lieu de naissance/formation) n'est JAMAIS utilisé ici — voir
+ * `MusicBrainzArtistLookupResponse`, sa sémantique ne correspond pas à "pays
+ * de l'artiste" (ex. un artiste ayant émigré aurait un `begin-area` trompeur).
+ */
+export function extractArtistCountry(artist: MusicBrainzArtistLookupResponse): string | null {
+  return artist.country ?? artist.area?.['iso-3166-1-codes']?.[0] ?? null;
 }
 
 /**
@@ -154,6 +231,7 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
     private readonly configService: ConfigService,
     private readonly rateLimiter: MusicBrainzRateLimiterService,
     private readonly coverArtArchive: CoverArtArchiveProvider,
+    private readonly artistCache: MusicBrainzArtistCacheService,
   ) {}
 
   async lookup(barcode: string): Promise<CdProviderLookupResult | null> {
@@ -167,20 +245,7 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
       `barcode:${barcode}`,
     )}&fmt=json&inc=labels+media+artist-credits`;
 
-    // TEMPORAIRE — diagnostic no_match (à retirer une fois la cause confirmée).
-    // Barcode volontairement en clair : ce n'est pas une donnée secrète (code
-    // produit public), et le masquer ici empêcherait justement le diagnostic
-    // demandé (comparaison caractère à caractère avec la valeur MusicBrainz).
-    // `logger.log`, pas `logger.debug` : niveau garanti visible sur Render avec
-    // la configuration actuelle (`AppLogger`, voir main.ts) — aucun secret,
-    // aucun JWT, aucun header Authorization dans ces lignes.
-    this.logger.log(
-      `[diag] barcode demandé="${barcode}" (type=${typeof barcode}, longueur=${barcode.length}) url=${url}`,
-    );
-
     const response = await this.fetchWithRetry(url, budgetMs, userAgent, barcode);
-
-    this.logger.log(`[diag] statut HTTP=${response.status} ok=${response.ok}`);
 
     if (!response.ok) {
       this.logger.warn(`Réponse HTTP ${response.status}`);
@@ -195,45 +260,14 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
     }
 
     const candidates = body.releases ?? [];
-    // Calcul dupliqué à titre purement observationnel (n'influence jamais la
-    // sélection réelle, faite par `selectBestRelease` juste en dessous) :
-    // permet de voir, pour CHAQUE candidat renvoyé, s'il aurait passé le
-    // filtre de correspondance exacte du code-barres, et pourquoi.
-    this.logger.log(
-      `[diag] releases renvoyées=${candidates.length} : ${JSON.stringify(
-        candidates.map((candidate) => ({
-          id: candidate.id,
-          barcode: candidate.barcode,
-          barcodeExactMatch: candidate.barcode === barcode,
-          packaging: candidate.packaging ?? null,
-          mediaFormat: candidate.media?.[0]?.format ?? null,
-          status: candidate.status,
-        })),
-      )}`,
-    );
-
     const release = selectBestRelease(candidates, barcode);
-
-    if (!release) {
-      const exactMatchCount = candidates.filter(
-        (candidate) => candidate.barcode === barcode,
-      ).length;
-      this.logger.log(
-        `[diag] no_match — barcode normalisé comparé="${barcode}", ` +
-          `candidats reçus=${candidates.length}, candidats à barcode exactement identique=${exactMatchCount} ` +
-          '(0 dans les deux cas ⇒ MusicBrainz n’a rien renvoyé/rien d’identique pour cette requête ; ' +
-          'releases>0 mais exactMatchCount=0 ⇒ écart de formatage du champ barcode côté fournisseur)',
-      );
-      return null;
-    }
-
-    this.logger.log(
-      `[diag] release sélectionnée id=${release.id} barcode=${release.barcode} packaging=${
-        release.packaging ?? null
-      } mediaFormat=${release.media?.[0]?.format ?? null}`,
-    );
+    if (!release) return null;
 
     const coverUrl = await this.fetchCoverSafely(release.id);
+    const artistMbid = resolveMainArtistMbid(release['artist-credit']);
+    const artistCountry = artistMbid
+      ? await this.fetchArtistCountrySafely(artistMbid, userAgent)
+      : null;
 
     return {
       title: release.title ?? null,
@@ -245,6 +279,7 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
         // 2×CD… — hors de propos ici : la catégorie dit déjà "CD"). Aucune
         // valeur inventée si MusicBrainz ne fournit pas ce champ.
         format: release.packaging ?? null,
+        artistCountry,
       },
       coverUrl,
     };
@@ -263,6 +298,68 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
     } catch (error) {
       this.logger.warn(
         `Cover Art Archive a levé de façon inattendue — couverture ignorée (${
+          error instanceof Error ? error.message : 'erreur inconnue'
+        })`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Enrichissement non bloquant et best-effort — jamais de retry (contrairement
+   * à `fetchWithRetry`, dont l'échec fait échouer toute la résolution CD) :
+   * une panne, un timeout ou une limite de débit sur CET appel ne doit jamais
+   * transformer un match MusicBrainz déjà valide en `provider_error`, exigence
+   * explicite (voir docs/DECISIONS.md). Passe malgré tout par
+   * `MusicBrainzRateLimiterService.schedule` (même hôte `musicbrainz.org` que
+   * la recherche release, donc soumis au même espacement ~1 req/s) —
+   * contrairement à `CoverArtArchiveProvider`, un hôte distinct non concerné.
+   *
+   * Cache dédié (`MusicBrainzArtistCacheService`, 30 jours) consulté AVANT tout
+   * appel réseau : un HIT (pays trouvé ou son absence déjà confirmée) évite
+   * totalement le second appel, y compris son passage par le rate limiter.
+   * Seule une résolution réussie est mise en cache — jamais un échec technique
+   * (transitoire par nature), pour ne jamais reproduire le problème de cache
+   * d'un résultat transitoire déjà rencontré côté `no_match` (voir
+   * docs/DECISIONS.md).
+   */
+  private async fetchArtistCountrySafely(
+    artistMbid: string,
+    userAgent: string,
+  ): Promise<string | null> {
+    const cached = this.artistCache.get(artistMbid);
+    if (cached !== undefined) return cached;
+
+    const timeoutMs =
+      this.configService.get<number>('MUSICBRAINZ_ARTIST_TIMEOUT_MS') ?? DEFAULT_ARTIST_TIMEOUT_MS;
+    const url = `https://musicbrainz.org/ws/2/artist/${encodeURIComponent(artistMbid)}?fmt=json`;
+
+    try {
+      const response = await this.rateLimiter.schedule(() => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        return fetch(url, {
+          signal: controller.signal,
+          headers: { 'User-Agent': userAgent, Accept: 'application/json' },
+        }).finally(() => clearTimeout(timeout));
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Réponse HTTP ${response.status} — pays de l'artiste ignoré`);
+        return null;
+      }
+
+      const body = (await response.json()) as MusicBrainzArtistLookupResponse;
+      const country = extractArtistCountry(body);
+      this.artistCache.set(artistMbid, country);
+      return country;
+    } catch (error) {
+      const cause =
+        error instanceof Error && error.name === 'AbortError'
+          ? 'timeout'
+          : 'erreur réseau ou réponse illisible';
+      this.logger.warn(
+        `Échec (${cause}) sur l'appel artiste — pays de l'artiste ignoré (${
           error instanceof Error ? error.message : 'erreur inconnue'
         })`,
       );
