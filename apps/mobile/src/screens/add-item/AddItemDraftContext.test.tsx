@@ -11,9 +11,13 @@ describe('useAddItemDraft', () => {
     consoleError.mockRestore();
   });
 
-  it('starts empty', async () => {
+  it('starts empty, with partialWarning false', async () => {
     const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
-    expect(result.current.draft).toEqual({ categoryId: null, values: null });
+    expect(result.current.draft).toEqual({
+      categoryId: null,
+      values: null,
+      partialWarning: false,
+    });
     expect(result.current.hasMeaningfulData).toBe(false);
   });
 
@@ -22,7 +26,11 @@ describe('useAddItemDraft', () => {
 
     await act(async () => result.current.setCategory('cat-cd'));
     await act(async () => result.current.setValues({ title: 'Discovery' }));
-    expect(result.current.draft).toEqual({ categoryId: 'cat-cd', values: { title: 'Discovery' } });
+    expect(result.current.draft).toEqual({
+      categoryId: 'cat-cd',
+      values: { title: 'Discovery' },
+      partialWarning: false,
+    });
 
     // Même catégorie reposée : ne doit pas effacer les valeurs déjà saisies.
     await act(async () => result.current.setCategory('cat-cd'));
@@ -31,7 +39,41 @@ describe('useAddItemDraft', () => {
     // Changement réel de catégorie : efface les valeurs (elles ne s'appliquent qu'à
     // l'ancienne catégorie).
     await act(async () => result.current.setCategory('cat-book'));
-    expect(result.current.draft).toEqual({ categoryId: 'cat-book', values: null });
+    expect(result.current.draft).toEqual({
+      categoryId: 'cat-book',
+      values: null,
+      partialWarning: false,
+    });
+  });
+
+  it('setValues({ partial: true }) marks the draft as partial; normal edits afterward preserve it', async () => {
+    const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
+
+    await act(async () => result.current.setCategory('cat-dvd'));
+    await act(async () =>
+      result.current.setValues({ title: 'Coffret Mystère' }, { partial: true }),
+    );
+    expect(result.current.draft.partialWarning).toBe(true);
+
+    // Une frappe normale (sans `options.partial`) ne doit jamais effacer le drapeau —
+    // l'utilisateur doit avoir eu l'occasion de relire tout le formulaire, pas
+    // seulement le champ qu'il vient de modifier.
+    await act(async () => result.current.setValues({ title: 'Titre corrigé à la main' }));
+    expect(result.current.draft.partialWarning).toBe(true);
+    expect(result.current.draft.values?.title).toBe('Titre corrigé à la main');
+  });
+
+  it('setCategory resets partialWarning to false on an actual category change', async () => {
+    const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
+
+    await act(async () => result.current.setCategory('cat-dvd'));
+    await act(async () =>
+      result.current.setValues({ title: 'Coffret Mystère' }, { partial: true }),
+    );
+    expect(result.current.draft.partialWarning).toBe(true);
+
+    await act(async () => result.current.setCategory('cat-book'));
+    expect(result.current.draft.partialWarning).toBe(false);
   });
 
   it('setValues merges top-level fields rather than replacing the whole draft', async () => {
@@ -89,14 +131,22 @@ describe('useAddItemDraft', () => {
     expect(result.current.draft.values?.customMetadata).toEqual({ color: 'red', size: 'M' });
   });
 
-  it('clearDraft resets to the empty state', async () => {
+  it('clearDraft resets to the empty state, including partialWarning', async () => {
     const { result } = await renderHook(() => useAddItemDraft(), { wrapper: AddItemDraftProvider });
 
-    await act(async () => result.current.setCategory('cat-cd'));
-    await act(async () => result.current.setValues({ title: 'Discovery' }));
+    await act(async () => result.current.setCategory('cat-dvd'));
+    await act(async () =>
+      result.current.setValues({ title: 'Coffret Mystère' }, { partial: true }),
+    );
+    expect(result.current.draft.partialWarning).toBe(true);
+
     await act(async () => result.current.clearDraft());
 
-    expect(result.current.draft).toEqual({ categoryId: null, values: null });
+    expect(result.current.draft).toEqual({
+      categoryId: null,
+      values: null,
+      partialWarning: false,
+    });
     expect(result.current.hasMeaningfulData).toBe(false);
   });
 
