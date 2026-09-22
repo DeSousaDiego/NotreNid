@@ -2,9 +2,11 @@
 
 ## Phase courante
 
-**Bloc 4 — Simplification, refonte visuelle, profil, navigation** : ✅ implémenté et vérifié localement (typecheck/lint/tests/build/`expo export` verts). En attente de l'accord explicite du propriétaire avant commit/push/migration Neon/EAS Update.
+**Bloc 3G — Scan caméra réel (`expo-camera`)** : ✅ implémenté et vérifié localement (typecheck/lint/format/tests verts, voir section dédiée ci-dessous). Dernier incrément du flow d'ajout par code-barres (Livre/CD/DVD), qui remplace la saisie manuelle temporaire du Bloc 3A par un vrai viseur caméra. En attente de l'accord explicite du propriétaire avant commit/push, et d'un nouveau build EAS (module natif) pour toute vérification sur téléphone réel.
 
-Les **Phases 1 à 5** (V1) sont terminées — voir `docs/IMPLEMENTATION_PLAN.md`. Le Bloc 4 est un bloc de polish post-V1 (pas une nouvelle « Phase » du plan initial), demandé par le propriétaire avant la V1 anniversaire : simplification des catégories à Livre/CD/DVD, édition du profil (nom + photo), correctifs de navigation (reset du formulaire Ajouter, retour à la racine du Profil), refonte visuelle de l'écran détail et de l'accueil, bouton flottant d'édition.
+**Bloc 4 — Simplification, refonte visuelle, profil, navigation** : ✅ implémenté et vérifié localement (typecheck/lint/tests/build/`expo export` verts) lors de sa session d'origine (voir section dédiée). Des commits ultérieurs existent dans l'historique Git au-delà de ce que ce document détaille section par section (résolution de code-barres Livre/CD/DVD, Bloc 3E/3F) — cette page n'a pas été tenue à jour pour ces incréments intermédiaires ; s'y fier pour leur statut de commit/push précis serait imprudent, préférer `git log`.
+
+Les **Phases 1 à 5** (V1) sont terminées — voir `docs/IMPLEMENTATION_PLAN.md`. Le Bloc 4 est un bloc de polish post-V1 (pas une nouvelle « Phase » du plan initial), demandé par le propriétaire avant la V1 anniversaire : simplification des catégories à Livre/CD/DVD, édition du profil (nom + photo), correctifs de navigation (reset du formulaire Ajouter, retour à la racine du Profil), refonte visuelle de l'écran détail et de l'accueil, bouton flottant d'édition. Le Bloc 3 (résolution de code-barres) s'est poursuivi en parallèle/après (3C POC, 3D DVD, 3E CD, 3F harnais de test, 3G scan caméra — voir `docs/DECISIONS.md` pour le détail de chaque sous-bloc).
 
 Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3A — Fondations mobiles et parcours de consultation ✅, Phase 3B — Mutations, administration et finalisation mobile ✅, Phase 4 — Qualité ✅, Phase 5 — Livraison ✅ (voir sections dédiées plus bas).
 
@@ -77,6 +79,58 @@ Historique : Phase 1 — Fondation ✅, Phase 2 — Backend métier ✅, Phase 3
 ### Prochaine étape recommandée
 
 Revue par le propriétaire (rapport détaillé fourni séparément) puis, sur accord explicite : commit, éventuel push, et vérification manuelle sur au moins un téléphone réel avant de considérer le Bloc 4 clos.
+
+---
+
+## Bloc 3G — Scan caméra réel (`expo-camera`)
+
+### Éléments terminés
+
+- **Nettoyage préalable demandé (harnais de test DVD manuel)** : audité et confirmé absent du dépôt — `devDvdTestFixtures.ts`, `handleDevInject` et tout bloc `__DEV__` décrits n'ont jamais existé (recherche exhaustive dans `apps/mobile/src` et dans tout l'historique Git). `scan.tsx` était déjà, avant ce bloc, un simple champ de saisie manuelle du code-barres (pas un harnais de démonstration) ; rien à supprimer. Confirmé avec le propriétaire avant de poursuivre.
+- **`apps/mobile/src/app/(app)/add-item/scan.tsx` réécrit** : le champ texte + bouton « Rechercher » (pallier temporaire du Bloc 3A) est remplacé par un vrai viseur `CameraView` (`expo-camera`). Permission caméra demandée automatiquement au premier accès (état de chargement dédié pendant la vérification) ; si refusée, écran dédié avec bouton « redemander » (`canAskAgain: true`) ou renvoi vers les réglages du téléphone (`canAskAgain: false`, `Linking.openSettings()`) — saisie manuelle (« Saisir manuellement à la place », vers le formulaire vierge) toujours accessible dans tous les cas. Formats activés : `ean13`/`ean8`/`upc_a`/`upc_e` (seules formes acceptées par `ResolveBarcodeDto`).
+- **Anti-double-scan robuste** : verrou synchrone (`useRef`, pas `useState`) vérifié et posé dans le même geste que la détection, avant tout appel réseau ; `onBarcodeScanned` est en plus mis à `undefined` dès que l'écran quitte l'état `'scanning'` (désactivation côté natif, pas seulement JS). `no_match`/`unsupported`/`provider_error`/erreur réseau démontent la caméra et affichent un bouton « Scanner à nouveau » qui la remonte (nouvelle `key`) et relève le verrou.
+- **Normalisation du code scanné** (`apps/mobile/src/lib/barcodeScanner.ts`, nouveau) : `trim` + suppression des caractères non numériques, jamais de conversion par `Number` (préserverait mal un zéro initial). Audit du backend avant d'envisager une règle de préfixe UPC-A/EAN-13 : `UpcItemDbProvider.matchesBarcode` tolère déjà les deux sens du zero-padding — aucune normalisation ajoutée côté mobile (voir `docs/DECISIONS.md`).
+- **Réinitialisation au changement de catégorie** (l'utilisateur revient en arrière puis choisit une autre catégorie sans démonter l'écran) : état (`phase`/`cameraKey`) ajusté pendant le rendu, verrou (`scanLockRef`) réinitialisé par un `useLayoutEffect` séparé — split imposé par deux règles ESLint distinctes (`react-hooks/set-state-in-effect`, `react-hooks/refs`), voir `docs/DECISIONS.md`.
+- **Focus d'écran non géré explicitement** (`useFocusEffect`/`useIsFocused`) — audité et jugé inutile : chaque sortie de `scan.tsx` utilise `router.replace`, jamais `router.push`, donc une seule instance de `CameraView` ne peut jamais être montée en même temps qu'une autre dans ce flow. Mise en arrière-plan de l'app : déléguée à la gestion native standard du module caméra (aucun code applicatif requis, comportement identique à toute app utilisant la caméra).
+- **`apps/mobile/app.json`** : plugin `expo-camera` ajouté (`cameraPermission` identique au texte déjà utilisé par `expo-image-picker`, `microphonePermission`/`recordAudioAndroid` désactivés). Aucun `app.json` créé à la racine du dépôt (vérifié). `android.package` (`com.diegodesousa.notrenid`), `ios.bundleIdentifier` (`com.notrenid.app`) et `extra.eas.projectId` (`51422070-7f84-4cd2-888e-357ca6456336`) confirmés inchangés par `npx expo config --type public`.
+
+### Fichiers principaux créés ou modifiés
+
+- `apps/mobile/src/app/(app)/add-item/scan.tsx` (réécrit), `scan.test.tsx` (réécrit — mêmes scénarios que le Bloc 3A/3F, déclenchés via un `CameraView` mocké au lieu d'un champ texte, plus des tests dédiés permission/anti-double-scan/reset catégorie).
+- `apps/mobile/src/lib/barcodeScanner.ts` + `barcodeScanner.test.ts` (nouveaux) : normalisation du code scanné, liste des formats caméra activés.
+- `apps/mobile/app.json`, `apps/mobile/package.json`, `pnpm-lock.yaml` : dépendance `expo-camera` (`~57.0.5`) et son plugin de configuration.
+- Documentation : `docs/DECISIONS.md` (nouvelle section « Bloc 3G »), ce fichier.
+
+### Commandes réellement exécutées et leur résultat
+
+| Commande | Résultat |
+| --- | --- |
+| `npx expo install expo-camera` (`apps/mobile`) | ✅ installé en `~57.0.5`, compatible avec le SDK 57 déjà utilisé par le reste du projet |
+| `pnpm --filter @notre-nid/mobile exec jest` (suite complète) | ✅ 315/315 (2 échecs transitoires observés une fois sous charge parallèle — `CountrySelect.test.tsx`, `profile/join.test.tsx`, fichiers non modifiés ici — reconfirmés passants en isolation et sur une exécution complète ultérieure, flakiness d'environnement déjà documentée au Bloc 4, non liée à ce bloc) |
+| `pnpm --filter @notre-nid/mobile exec jest scan.test.tsx` (isolé) | ✅ 31/31 |
+| `pnpm --filter @notre-nid/mobile typecheck` | ✅ zéro erreur (après correction : `StyleSheet.absoluteFillObject` n'existe pas dans les types RN de ce projet, remplacé par `StyleSheet.absoluteFill`/valeurs littérales) |
+| `pnpm --filter @notre-nid/mobile lint` | ✅ zéro erreur/avertissement (après corrections : `require()` interdit dans un mock Jest → mocks extraits en déclarations `function` nommées `mock*` référençables depuis la factory hissée de `jest.mock` ; `setState` synchrone dans un effet → ajustement pendant le rendu ; mutation de ref pendant le rendu → `useLayoutEffect` séparé ; nom de fonction mock incompatible avec `react-hooks/rules-of-hooks` → désactivation ciblée documentée, propre au double de test) |
+| `npx prettier --check` (fichiers touchés) | ✅ |
+| `npx expo config --type public` (`apps/mobile`) | ✅ config valide, plugin `expo-camera` résolu (`android.permission.CAMERA` ajouté automatiquement), aucun `app.json` racine créé, identifiants Android/iOS/EAS projectId inchangés |
+
+### Problèmes rencontrés et corrigés
+
+- **Mock Jest `useCameraPermissions` non défini au moment de l'exécution de la factory** (`useCameraPermissions is not a function`) : en évitant `require()` (interdit par ESLint) au profit d'un alias `const mockX = function réelle`, la factory hissée de `jest.mock` (exécutée dès le premier `import` du fichier testé, donc potentiellement avant l'exécution du `const` du fichier de test) trouvait un alias encore non initialisé. Corrigé en gardant deux déclarations `function` (intégralement hissées, corps compris) plutôt qu'un `const` — détecté par l'exécution réelle de la suite complète (invisible en exécution isolée du seul fichier `scan.test.tsx`, où l'ordre se trouvait correct par coïncidence), pas par relecture.
+- **`StyleSheet.absoluteFillObject`** utilisé par réflexe (API React Native courante) mais absent des types de cette version — remplacé par `StyleSheet.absoluteFill` (utilisation en tableau de styles) ou par les valeurs de positionnement littérales (dans un objet `StyleSheet.create`, où `absoluteFill` ne peut pas être étalé avec `...`).
+
+### Décisions prises
+
+Voir `docs/DECISIONS.md`, section « Bloc 3G » : verrou anti-double-scan par ref plutôt que par état, absence volontaire de gestion de focus d'écran, normalisation du code sans conversion numérique ni règle de préfixe UPC-A/EAN-13 non prouvée, réinitialisation d'état pendant le rendu plutôt que dans un effet.
+
+### Actions manuelles restantes
+
+- **Aucune vérification visuelle/sur téléphone réel possible dans cet environnement** (limitation déjà documentée aux blocs précédents) : cadrage du viseur, lisibilité du texte d'instruction et du bandeau de chargement sur la caméra, comportement réel des trois états de permission (accordée/refusée/bloquée) sur Android et iOS, détection effective d'un vrai code-barres.
+- **Nouveau build EAS de développement/preview requis** avant toute vérification sur appareil — `expo-camera` est un module natif, une mise à jour OTA seule ne suffit pas. Commande de build preview : `eas build --profile preview --platform android` (ou `--platform ios`), voir `docs/MOBILE_RELEASE.md` pour la procédure complète.
+- **Aucun commit ni push** ne sera exécuté avant l'accord final explicite du propriétaire.
+
+### Prochaine étape recommandée
+
+Revue par le propriétaire puis, sur accord explicite : commit, push, build EAS preview et test manuel du scan sur au moins un téléphone Android et un téléphone iOS réels.
 
 ---
 

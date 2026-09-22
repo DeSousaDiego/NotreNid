@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { useEffect } from 'react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { createElement, useCallback, useEffect, useState } from 'react';
+import { Linking, View } from 'react-native';
 
 import {
   AddItemDraftProvider,
@@ -26,6 +27,56 @@ jest.mock('expo-router', () => ({
     dismissTo: (...args: unknown[]) => mockRouterDismissTo(...args),
   },
   useLocalSearchParams: () => ({ categoryId: mockCurrentCategoryId }),
+}));
+
+// `CameraView` est capturé à chaque rendu (`mockLatestCameraProps`) pour que
+// les tests puissent déclencher `onBarcodeScanned` directement, comme le
+// ferait le module natif — sans dépendre d'une vraie caméra. `useCameraPermissions`
+// est un vrai petit hook (`useState`/`useCallback`) plutôt qu'une valeur figée :
+// `requestPermission` doit réellement re-rendre le composant avec le nouveau
+// statut, exactement comme le hook réel d'expo-camera. Les deux mocks sont des
+// déclarations `function` (pas `const`) : `jest.mock` est hissé au-dessus de
+// TOUT le corps du fichier (babel-plugin-jest-hoist), y compris au-dessus d'un
+// `const`, alors qu'une déclaration `function` l'est aussi — seule une
+// `function` garantit que sa factory (exécutée dès le premier `require` de
+// `expo-camera`, potentiellement avant le reste de ce fichier) trouve une
+// valeur déjà définie. Référencées depuis la factory, elles doivent aussi
+// commencer par `mock` (même contrainte de hissage) — `mockUseCameraPermissions`
+// appelle donc de vrais hooks sans porter un nom de hook valide pour ESLint ;
+// la règle ne s'applique qu'à du code d'app réel, pas à ce double de test.
+type MockPermission = { status: string; granted: boolean; canAskAgain: boolean; expires: 'never' };
+let mockPermissionResponse: MockPermission = {
+  status: 'granted',
+  granted: true,
+  canAskAgain: true,
+  expires: 'never',
+};
+type MockCameraProps = {
+  onBarcodeScanned?: (result: { data: string; type: string }) => void;
+} | null;
+let mockLatestCameraProps: MockCameraProps = null;
+const mockRequestPermissionImpl = jest.fn(async () => mockPermissionResponse);
+
+function mockCameraView(props: MockCameraProps) {
+  mockLatestCameraProps = props;
+  return createElement(View, { testID: 'barcode-camera' });
+}
+
+/* eslint-disable react-hooks/rules-of-hooks -- double de test pour `useCameraPermissions`, pas un hook applicatif (voir commentaire ci-dessus) */
+function mockUseCameraPermissions(): [MockPermission, () => Promise<MockPermission>] {
+  const [state, setState] = useState(() => mockPermissionResponse);
+  const request = useCallback(async () => {
+    const next = await mockRequestPermissionImpl();
+    setState(next);
+    return next;
+  }, []);
+  return [state, request];
+}
+/* eslint-enable react-hooks/rules-of-hooks */
+
+jest.mock('expo-camera', () => ({
+  CameraView: mockCameraView,
+  useCameraPermissions: mockUseCameraPermissions,
 }));
 
 const mockApiClient = {
@@ -185,23 +236,45 @@ function DraftBridge({
   return null;
 }
 
-async function renderScreen(seed?: Partial<ItemFormValues>) {
-  const draftRef: { current: AddItemDraft | null } = { current: null };
+function tree(draftRef: { current: AddItemDraft | null }, seed?: Partial<ItemFormValues>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = await render(
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider fontsLoaded={false}>
         <Harness draftRef={draftRef} seed={seed} />
       </ThemeProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+}
+
+async function renderScreen(seed?: Partial<ItemFormValues>) {
+  const draftRef: { current: AddItemDraft | null } = { current: null };
+  const view = await render(tree(draftRef, seed));
   return { view, draftRef };
+}
+
+/** Simule une détection caméra réelle : attend que `CameraView` soit monté et
+ * scanne, puis invoque directement `onBarcodeScanned` — exactement l'appel
+ * que ferait le module natif. */
+async function scanBarcode(code: string, type = 'ean13') {
+  await waitFor(() => expect(mockLatestCameraProps?.onBarcodeScanned).toBeTruthy());
+  await act(async () => {
+    mockLatestCameraProps!.onBarcodeScanned!({ data: code, type });
+  });
 }
 
 describe('AddItemScanScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCurrentCategoryId = 'cat-book';
+    mockLatestCameraProps = null;
+    mockPermissionResponse = {
+      status: 'granted',
+      granted: true,
+      canAskAgain: true,
+      expires: 'never',
+    };
+    mockRequestPermissionImpl.mockImplementation(async () => mockPermissionResponse);
     (mockApiClient.categories.list as jest.Mock).mockResolvedValue([
       BOOK_CATEGORY,
       CD_CATEGORY,
@@ -209,13 +282,52 @@ describe('AddItemScanScreen', () => {
     ]);
   });
 
-  it('renders a manual barcode input and a search button', async () => {
+  it('renders the camera preview with scan instructions and the manual fallback', async () => {
     const { view } = await renderScreen();
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    expect(view.getByRole('button', { name: 'Rechercher' })).toBeTruthy();
+    await waitFor(() => expect(view.getByTestId('barcode-camera')).toBeTruthy());
+    expect(view.getByText('Placez le code-barres dans le cadre')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Saisir manuellement à la place' })).toBeTruthy();
   });
 
-  it('shows a loading state while the search is in flight', async () => {
+  it('a single scan triggers exactly one resolveBarcode call', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_RESULT);
+    await renderScreen();
+
+    await scanBarcode('9782070368228');
+
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+    expect(mockApiClient.items.resolveBarcode).toHaveBeenCalledTimes(1);
+    expect(mockApiClient.items.resolveBarcode).toHaveBeenCalledWith({
+      barcode: '9782070368228',
+      category: 'book',
+    });
+  });
+
+  it('a duplicate native callback for the same code never triggers a second resolve call', async () => {
+    let resolveLookup!: (value: unknown) => void;
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        resolveLookup = resolve;
+      }),
+    );
+    await renderScreen();
+
+    await waitFor(() => expect(mockLatestCameraProps?.onBarcodeScanned).toBeTruthy());
+    const onScanned = mockLatestCameraProps!.onBarcodeScanned!;
+    // Deux appels synchrones de la MÊME fonction capturée — simule le module
+    // natif qui invoque le callback deux fois avant que React n'ait eu la
+    // chance de re-rendre avec la prop désactivée.
+    await act(async () => {
+      onScanned({ data: '9782070368228', type: 'ean13' });
+      onScanned({ data: '9782070368228', type: 'ean13' });
+    });
+
+    resolveLookup({ ...MATCHED_RESULT });
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+    expect(mockApiClient.items.resolveBarcode).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a loading state while the search is in flight, keeping the camera preview mounted but locked', async () => {
     let resolveLookup!: (value: unknown) => void;
     (mockApiClient.items.resolveBarcode as jest.Mock).mockReturnValue(
       new Promise((resolve) => {
@@ -224,17 +336,17 @@ describe('AddItemScanScreen', () => {
     );
     const { view } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+    await scanBarcode('9782070368228');
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres').props.editable).toBe(false));
+    await waitFor(() => expect(view.getByText('Recherche des informations…')).toBeTruthy());
+    expect(view.getByTestId('barcode-camera')).toBeTruthy();
+    expect(mockLatestCameraProps?.onBarcodeScanned).toBeUndefined();
 
     resolveLookup({ ...MATCHED_RESULT });
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
   });
 
-  it('shows a clean message and does not navigate when nothing matches', async () => {
+  it('shows a clean message and does not navigate when nothing matches, offering a rescan', async () => {
     (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
       barcode: '9782070368228',
       category: 'book',
@@ -246,12 +358,12 @@ describe('AddItemScanScreen', () => {
     });
     const { view } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+    await scanBarcode('9782070368228');
 
     await waitFor(() => expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy());
     expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(view.getByRole('button', { name: 'Scanner à nouveau' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Saisir manuellement à la place' })).toBeTruthy();
   });
 
   it('shows an explicit message for a category the API does not support yet', async () => {
@@ -266,9 +378,7 @@ describe('AddItemScanScreen', () => {
     });
     const { view } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '036000291452');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+    await scanBarcode('036000291452');
 
     await waitFor(() =>
       expect(view.getByText(/n’est pas encore disponible pour cette catégorie/)).toBeTruthy(),
@@ -276,7 +386,7 @@ describe('AddItemScanScreen', () => {
     expect(mockRouterReplace).not.toHaveBeenCalled();
   });
 
-  it('shows a distinct message when every external provider failed (provider_error)', async () => {
+  it('shows a distinct message and a retry option when every external provider failed (provider_error)', async () => {
     (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
       barcode: '9782070368228',
       category: 'book',
@@ -288,21 +398,18 @@ describe('AddItemScanScreen', () => {
     });
     const { view } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+    await scanBarcode('9782070368228');
 
     await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
     expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(view.getByRole('button', { name: 'Scanner à nouveau' })).toBeTruthy();
   });
 
   it('shows an error message when the request itself fails (network/API error)', async () => {
     (mockApiClient.items.resolveBarcode as jest.Mock).mockRejectedValue(new Error('Hors ligne.'));
     const { view } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+    await scanBarcode('9782070368228');
 
     await waitFor(() =>
       expect(view.getByText("Une erreur inattendue s'est produite.")).toBeTruthy(),
@@ -310,13 +417,80 @@ describe('AddItemScanScreen', () => {
     expect(mockRouterReplace).not.toHaveBeenCalled();
   });
 
+  it('resets the scan lock after "Scanner à nouveau" — a fresh scan resolves again', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock)
+      .mockResolvedValueOnce({
+        barcode: '9782070368228',
+        category: 'book',
+        status: 'no_match',
+        match: false,
+        source: null,
+        data: null,
+        cover: null,
+      })
+      .mockResolvedValueOnce(MATCHED_RESULT);
+    const { view } = await renderScreen();
+
+    await scanBarcode('9782070368228');
+    await waitFor(() => expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy());
+
+    await fireEvent.press(view.getByRole('button', { name: 'Scanner à nouveau' }));
+    await waitFor(() => expect(view.getByTestId('barcode-camera')).toBeTruthy());
+    expect(view.queryByText(/Aucun résultat pour ce code-barres/)).toBeNull();
+
+    await scanBarcode('9782070368228');
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
+    expect(mockApiClient.items.resolveBarcode).toHaveBeenCalledTimes(2);
+  });
+
+  it('changing category mid-session discards any previous scan state', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue({
+      barcode: '9782070368228',
+      category: 'book',
+      status: 'no_match',
+      match: false,
+      source: null,
+      data: null,
+      cover: null,
+    });
+    const draftRef: { current: AddItemDraft | null } = { current: null };
+    const view = await render(tree(draftRef));
+
+    await waitFor(() => expect(mockLatestCameraProps?.onBarcodeScanned).toBeTruthy());
+    await act(async () => {
+      mockLatestCameraProps!.onBarcodeScanned!({ data: '9782070368228', type: 'ean13' });
+    });
+    await waitFor(() => expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy());
+
+    mockCurrentCategoryId = 'cat-cd';
+    await view.rerender(tree(draftRef));
+
+    await waitFor(() => expect(view.queryByText(/Aucun résultat pour ce code-barres/)).toBeNull());
+    expect(view.getByTestId('barcode-camera')).toBeTruthy();
+  });
+
+  it('falls back to the manual form via "Saisir manuellement à la place", without calling the API', async () => {
+    const { view } = await renderScreen();
+    await waitFor(() =>
+      expect(view.getByRole('button', { name: 'Saisir manuellement à la place' })).toBeTruthy(),
+    );
+
+    await fireEvent.press(view.getByRole('button', { name: 'Saisir manuellement à la place' }));
+
+    expect(mockApiClient.items.resolveBarcode).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockRouterReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/add-item/form',
+        params: { categoryId: 'cat-book' },
+      }),
+    );
+  });
+
   it('on success, prefills the draft with objective fields only and navigates to the form', async () => {
     (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_RESULT);
-    const { view, draftRef } = await renderScreen();
+    const { draftRef } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+    await scanBarcode('9782070368228');
 
     await waitFor(() =>
       expect(mockRouterReplace).toHaveBeenCalledWith({
@@ -344,12 +518,9 @@ describe('AddItemScanScreen', () => {
 
   it('never prefills condition, rating, notes or ownerIds from a scan result', async () => {
     (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_RESULT);
-    const { view, draftRef } = await renderScreen();
+    const { draftRef } = await renderScreen();
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+    await scanBarcode('9782070368228');
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
     expect(draftRef.current?.values).not.toHaveProperty('condition');
@@ -360,15 +531,12 @@ describe('AddItemScanScreen', () => {
 
   it('a scan result never overwrites unrelated fields already present in the draft', async () => {
     (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_RESULT);
-    const { view, draftRef } = await renderScreen({
+    const { draftRef } = await renderScreen({
       ownerIds: ['user-1'],
       metadata: { publisher: 'Déjà saisi à la main' },
     });
 
-    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-    await fireEvent.changeText(view.getByLabelText('Code-barres'), '9782070368228');
-    await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+    await scanBarcode('9782070368228');
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
     // `ownerIds` (hors de `metadata`) reste intact ; `metadata.publisher` est écrasé
@@ -378,21 +546,66 @@ describe('AddItemScanScreen', () => {
     expect(draftRef.current?.values?.metadata).toMatchObject({ publisher: 'Gallimard' });
   });
 
-  it('falls back to the manual form via "Saisir manuellement à la place", without calling the API', async () => {
-    const { view } = await renderScreen();
-    await waitFor(() =>
-      expect(view.getByRole('button', { name: 'Saisir manuellement à la place' })).toBeTruthy(),
-    );
+  describe('permission handling', () => {
+    it('automatically requests camera permission on first access', async () => {
+      mockPermissionResponse = {
+        status: 'undetermined',
+        granted: false,
+        canAskAgain: true,
+        expires: 'never',
+      };
+      mockRequestPermissionImpl.mockImplementationOnce(async () => ({
+        status: 'granted',
+        granted: true,
+        canAskAgain: true,
+        expires: 'never',
+      }));
+      const { view } = await renderScreen();
 
-    await fireEvent.press(view.getByRole('button', { name: 'Saisir manuellement à la place' }));
+      await waitFor(() => expect(mockRequestPermissionImpl).toHaveBeenCalled());
+      await waitFor(() => expect(view.getByTestId('barcode-camera')).toBeTruthy());
+    });
 
-    expect(mockApiClient.items.resolveBarcode).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect(mockRouterReplace).toHaveBeenCalledWith({
-        pathname: '/(app)/add-item/form',
-        params: { categoryId: 'cat-book' },
-      }),
-    );
+    it('shows an explanation and a retry button when permission is denied but can be asked again', async () => {
+      mockPermissionResponse = {
+        status: 'denied',
+        granted: false,
+        canAskAgain: true,
+        expires: 'never',
+      };
+      const { view } = await renderScreen();
+
+      await waitFor(() =>
+        expect(view.getByRole('button', { name: 'Autoriser l’accès à la caméra' })).toBeTruthy(),
+      );
+      expect(view.getByRole('button', { name: 'Saisir manuellement à la place' })).toBeTruthy();
+
+      await fireEvent.press(view.getByRole('button', { name: 'Autoriser l’accès à la caméra' }));
+      expect(mockRequestPermissionImpl).toHaveBeenCalled();
+    });
+
+    it('directs to Settings when permission is permanently denied, keeping manual entry available', async () => {
+      mockPermissionResponse = {
+        status: 'denied',
+        granted: false,
+        canAskAgain: false,
+        expires: 'never',
+      };
+      const openSettingsSpy = jest
+        .spyOn(Linking, 'openSettings')
+        .mockImplementation(() => Promise.resolve());
+      const { view } = await renderScreen();
+
+      await waitFor(() =>
+        expect(view.getByRole('button', { name: 'Ouvrir les réglages' })).toBeTruthy(),
+      );
+      expect(view.getByRole('button', { name: 'Saisir manuellement à la place' })).toBeTruthy();
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ouvrir les réglages' }));
+      expect(openSettingsSpy).toHaveBeenCalled();
+
+      openSettingsSpy.mockRestore();
+    });
   });
 
   describe('cd', () => {
@@ -402,11 +615,9 @@ describe('AddItemScanScreen', () => {
 
     it('on success, prefills the draft with title, artist, year, label, format and cover', async () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_CD_RESULT);
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('5099969236424');
 
       await waitFor(() =>
         expect(mockRouterReplace).toHaveBeenCalledWith({
@@ -436,12 +647,9 @@ describe('AddItemScanScreen', () => {
           cd: { ...MATCHED_CD_RESULT.data.cd, artistCountry: 'FR' },
         },
       });
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('5099969236424');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values?.countryCodes).toEqual(['FR']);
@@ -449,12 +657,9 @@ describe('AddItemScanScreen', () => {
 
     it('never prefills condition, rating, notes or ownerIds for a cd scan either', async () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_CD_RESULT);
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('5099969236424');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values).not.toHaveProperty('condition');
@@ -473,12 +678,9 @@ describe('AddItemScanScreen', () => {
         },
         cover: null,
       });
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('5099969236424');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values).not.toHaveProperty('coverImageUrl');
@@ -497,9 +699,7 @@ describe('AddItemScanScreen', () => {
       });
       const { view } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('5099969236424');
 
       await waitFor(() =>
         expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy(),
@@ -519,9 +719,7 @@ describe('AddItemScanScreen', () => {
       });
       const { view } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '5099969236424');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('5099969236424');
 
       await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
       expect(mockRouterReplace).not.toHaveBeenCalled();
@@ -535,11 +733,9 @@ describe('AddItemScanScreen', () => {
 
     it('on a full match (UPC + TMDB), prefills title, description, cover and every dvd field', async () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_DVD_RESULT);
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005559');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('883929005559', 'upc_a');
 
       await waitFor(() =>
         expect(mockRouterReplace).toHaveBeenCalledWith({
@@ -568,11 +764,9 @@ describe('AddItemScanScreen', () => {
 
     it('on a partial match (film not resolved by TMDB), prefills only the fields UPCitemdb actually returned and flags the draft as partial', async () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(PARTIAL_DVD_RESULT);
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005560');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('883929005560', 'upc_a');
 
       await waitFor(() =>
         expect(mockRouterReplace).toHaveBeenCalledWith({
@@ -599,12 +793,9 @@ describe('AddItemScanScreen', () => {
 
     it('never prefills condition, rating, notes or ownerIds for a dvd scan either', async () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(MATCHED_DVD_RESULT);
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005559');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('883929005559', 'upc_a');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values).not.toHaveProperty('condition');
@@ -615,15 +806,12 @@ describe('AddItemScanScreen', () => {
 
     it('a partial match never overwrites unrelated fields already present in the draft', async () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(PARTIAL_DVD_RESULT);
-      const { view, draftRef } = await renderScreen({
+      const { draftRef } = await renderScreen({
         ownerIds: ['user-1'],
         metadata: { format: 'Déjà saisi à la main' },
       });
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005560');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('883929005560', 'upc_a');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values?.ownerIds).toEqual(['user-1']);
@@ -642,9 +830,7 @@ describe('AddItemScanScreen', () => {
       });
       const { view } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005561');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('883929005561', 'upc_a');
 
       await waitFor(() =>
         expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy(),
@@ -664,9 +850,7 @@ describe('AddItemScanScreen', () => {
       });
       const { view } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929005559');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
+      await scanBarcode('883929005559', 'upc_a');
 
       await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
       expect(mockRouterReplace).not.toHaveBeenCalled();
@@ -707,12 +891,9 @@ describe('AddItemScanScreen', () => {
         cover: { url: 'https://example-fixture.test/upcitemdb/nine-bluray-cover.jpg' },
       };
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(NINE_RESULT);
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '065935831686');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('065935831686', 'upc_a');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values).toEqual({
@@ -756,12 +937,9 @@ describe('AddItemScanScreen', () => {
       (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(
         DARK_KNIGHT_TRILOGY_RESULT,
       );
-      const { view, draftRef } = await renderScreen();
+      const { draftRef } = await renderScreen();
 
-      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
-      await fireEvent.changeText(view.getByLabelText('Code-barres'), '883929308002');
-      await fireEvent.press(view.getByRole('button', { name: 'Rechercher' }));
-
+      await scanBarcode('883929308002', 'upc_a');
       await waitFor(() => expect(mockRouterReplace).toHaveBeenCalled());
 
       expect(draftRef.current?.values).toEqual({
