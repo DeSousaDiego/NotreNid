@@ -84,7 +84,12 @@ export default function AppLayout() {
       <Tabs.Screen
         name="stats"
         options={{
+          // `title` reste le nom de route/écran complet (« Statistiques », affiché par
+          // l'écran lui-même) ; `tabBarLabel` seul est raccourci — la barre d'onglets a
+          // moins de place que les autres libellés (« Statistiques » y était tronqué en
+          // « Statistiq... » sur mobile).
           title: 'Statistiques',
+          tabBarLabel: 'Stats',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
