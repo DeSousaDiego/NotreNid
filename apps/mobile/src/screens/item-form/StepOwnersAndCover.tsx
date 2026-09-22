@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryName, type Category, type HouseholdMember } from '@notre-nid/shared';
-import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { AppText, BottomSheet, Chip, ConditionBadge } from '../../components';
+import { AppText, BottomSheet, Chip, ConditionBadge, ItemCover } from '../../components';
 import { useTheme } from '../../theme';
 
 import { countryLabelForSlug } from './metadataFields';
@@ -76,6 +75,7 @@ export function StepOwnersAndCover({
         render={({ field }) => (
           <CoverPickerField
             householdId={householdId}
+            categorySlug={category.slug}
             value={field.value ?? ''}
             onChange={field.onChange}
           />
@@ -138,10 +138,12 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 function CoverPickerField({
   householdId,
+  categorySlug,
   value,
   onChange,
 }: {
   householdId: string | null;
+  categorySlug: string;
   value: string;
   onChange: (url: string) => void;
 }) {
@@ -186,10 +188,11 @@ function CoverPickerField({
         {isUploading ? (
           <ActivityIndicator color={theme.colors.primary} />
         ) : previewUri ? (
-          <Image
-            source={{ uri: previewUri }}
+          <ItemCover
+            uri={previewUri}
+            categorySlug={categorySlug}
+            illustrationSize={56}
             style={{ width: '100%', height: '100%' }}
-            contentFit="contain"
           />
         ) : (
           <AppText variant="caption" color="textMuted" style={{ textAlign: 'center', padding: 8 }}>

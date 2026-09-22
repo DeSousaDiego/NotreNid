@@ -1,5 +1,4 @@
 import type { Item } from '@notre-nid/shared';
-import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
@@ -8,7 +7,7 @@ import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
-import { CategoryIllustration } from './CategoryIllustration';
+import { ItemCover } from './ItemCover';
 
 export interface RecentItemRowProps {
   item: Item;
@@ -36,28 +35,18 @@ export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <View
+      <ItemCover
+        uri={item.coverImageUrl}
+        categorySlug={item.category.slug}
+        illustrationSize={32}
+        transition={150}
         style={{
           width: 48,
           height: 64,
           borderRadius: theme.radii.sm,
           backgroundColor: theme.colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
         }}
-      >
-        {item.coverImageUrl ? (
-          <Image
-            source={{ uri: item.coverImageUrl }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="contain"
-            transition={150}
-          />
-        ) : (
-          <CategoryIllustration slug={item.category.slug} size={32} />
-        )}
-      </View>
+      />
 
       <View style={{ flex: 1, gap: 2, justifyContent: 'center' }}>
         <AppText variant="section" numberOfLines={1}>

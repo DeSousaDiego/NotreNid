@@ -16,6 +16,7 @@ export { IconButton } from './IconButton';
 export { InvitationCodeField } from './InvitationCodeField';
 export { ItemCard } from './ItemCard';
 export { ItemCardSkeleton, LoadingSkeleton } from './LoadingSkeleton';
+export { ItemCover } from './ItemCover';
 export { OwnerAvatarGroup } from './OwnerAvatarGroup';
 export { PasswordField } from './PasswordField';
 export { RecentItemRow } from './RecentItemRow';

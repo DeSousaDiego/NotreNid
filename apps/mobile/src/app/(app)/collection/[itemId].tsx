@@ -1,5 +1,4 @@
 import { getCountryName } from '@notre-nid/shared';
-import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -8,12 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   AppText,
-  CategoryIllustration,
   ConditionBadge,
   ConfirmDialog,
   ErrorState,
   FloatingActionButton,
   FLOATING_ACTION_BUTTON_SIZE,
+  ItemCover,
   LoadingSkeleton,
   OwnerAvatarGroup,
   ScreenContainer,
@@ -115,31 +114,17 @@ export default function ItemDetailScreen() {
         >
           <View style={{ gap: theme.spacing.xl }}>
             <View style={{ alignItems: 'center' }}>
-              {item.coverImageUrl ? (
-                <Image
-                  source={{ uri: item.coverImageUrl }}
-                  style={{
-                    width: `${COVER_WIDTH_RATIO * 100}%`,
-                    aspectRatio: 3 / 4,
-                    borderRadius: theme.radii.lg,
-                    backgroundColor: theme.colors.surface,
-                  }}
-                  contentFit="contain"
-                />
-              ) : (
-                <View
-                  style={{
-                    width: `${COVER_WIDTH_RATIO * 100}%`,
-                    aspectRatio: 3 / 4,
-                    borderRadius: theme.radii.lg,
-                    backgroundColor: theme.colors.surface,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CategoryIllustration slug={item.category.slug} size={96} />
-                </View>
-              )}
+              <ItemCover
+                uri={item.coverImageUrl}
+                categorySlug={item.category.slug}
+                illustrationSize={96}
+                style={{
+                  width: `${COVER_WIDTH_RATIO * 100}%`,
+                  aspectRatio: 3 / 4,
+                  borderRadius: theme.radii.lg,
+                  backgroundColor: theme.colors.surface,
+                }}
+              />
             </View>
 
             <View style={{ gap: theme.spacing.xs }}>

@@ -1,5 +1,4 @@
 import type { Item } from '@notre-nid/shared';
-import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
@@ -7,8 +6,8 @@ import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
-import { CategoryIllustration } from './CategoryIllustration';
 import { ConditionBadge } from './ConditionBadge';
+import { ItemCover } from './ItemCover';
 import { OwnerAvatarGroup } from './OwnerAvatarGroup';
 import { StarRating } from './StarRating';
 
@@ -41,28 +40,18 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
         theme.elevation.low,
       ]}
     >
-      <View
+      <ItemCover
+        uri={item.coverImageUrl}
+        categorySlug={item.category.slug}
+        illustrationSize={40}
+        transition={150}
         style={{
           width: 56,
           height: 56,
           borderRadius: theme.radii.sm,
           backgroundColor: theme.colors.background,
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
         }}
-      >
-        {item.coverImageUrl ? (
-          <Image
-            source={{ uri: item.coverImageUrl }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="contain"
-            transition={150}
-          />
-        ) : (
-          <CategoryIllustration slug={item.category.slug} size={40} />
-        )}
-      </View>
+      />
 
       <View style={{ flex: 1, gap: 4 }}>
         <AppText variant="section" numberOfLines={1}>

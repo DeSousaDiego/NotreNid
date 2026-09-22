@@ -97,12 +97,21 @@ export default function CollectionScreen() {
           onRetry={() => void itemsQuery.refetch()}
         />
       ) : items.length === 0 ? (
+        // Un titre distinct pour une bibliothèque réellement vide vs une
+        // recherche/un filtre sans résultat — sinon « Votre nid est encore
+        // vide. » s'affiche même quand le foyer possède déjà des dizaines
+        // d'objets, simplement non retournés par la recherche/le filtre
+        // courant (voir docs/PHASE_STATUS.md).
         <EmptyState
           icon="leaf-outline"
-          title="Votre nid est encore vide."
+          title={
+            filters.search || activeFilterCount > 0
+              ? 'Aucun objet ne correspond à votre recherche.'
+              : 'Votre nid est encore vide.'
+          }
           message={
             filters.search || activeFilterCount > 0
-              ? 'Aucun objet ne correspond à cette recherche.'
+              ? 'Essayez de modifier votre recherche ou vos filtres.'
               : 'Ajoutez votre premier trésor.'
           }
         />
