@@ -82,11 +82,11 @@ export default function AppLayout() {
         listeners={{ tabPress: handleAddTabPress }}
       />
       <Tabs.Screen
-        name="search"
+        name="stats"
         options={{
-          title: 'Recherche',
+          title: 'Statistiques',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
+            <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
         }}
       />

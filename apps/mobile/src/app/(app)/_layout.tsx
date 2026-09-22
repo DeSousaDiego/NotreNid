@@ -9,7 +9,7 @@ import { useAuth } from '../../providers/AuthProvider';
 
 /**
  * Stack racine du groupe (app) : héberge le `(tabs)` (Accueil/Collection/Ajouter/
- * Recherche/Profil) et, en écrans frères hors des tabs, le détail/édition d'item, le
+ * Statistiques/Profil) et, en écrans frères hors des tabs, le détail/édition d'item, le
  * flow d'ajout (`add-item`, Bloc 2 — sous-Stack imbriqué, voir add-item/_layout.tsx)
  * et les sous-pages Profil — pour que la barre d'onglets se masque naturellement (ils
  * ne sont plus des descendants du <Tabs>) et qu'un bouton retour natif apparaisse,
