@@ -1897,7 +1897,8 @@
           "barcode": {
             "type": "string",
             "example": "3600029412578",
-            "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit."
+            "nullable": true,
+            "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite (distinct d'une propriété absente) efface le code-barres existant lors d'une modification — voir `ItemsService.update`."
           },
           "description": {
             "type": "string"
@@ -1986,7 +1987,8 @@
           "barcode": {
             "type": "string",
             "example": "3600029412578",
-            "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit."
+            "nullable": true,
+            "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite (distinct d'une propriété absente) efface le code-barres existant lors d'une modification — voir `ItemsService.update`."
           },
           "description": {
             "type": "string"

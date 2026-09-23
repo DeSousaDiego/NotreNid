@@ -34,6 +34,11 @@ export class CreateItemDto {
   title!: string;
 
   @ApiPropertyOptional({
+    // `type` explicite : TypeScript efface les types à l'exécution, et un type
+    // union (`string | null`) se réfléchit comme `Object` via les métadonnées
+    // `design:type` — sans `type` ici, Swagger générait un schéma `"type":
+    // "object"` erroné à la place de `"type": "string", "nullable": true`.
+    type: String,
     example: '3600029412578',
     nullable: true,
     description:

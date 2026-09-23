@@ -611,10 +611,10 @@ export interface components {
             /** @example Dune */
             title: string;
             /**
-             * @description Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit.
+             * @description Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite (distinct d'une propriété absente) efface le code-barres existant lors d'une modification — voir `ItemsService.update`.
              * @example 3600029412578
              */
-            barcode?: string;
+            barcode?: string | null;
             description?: string;
             /** @enum {string} */
             condition: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
@@ -646,10 +646,10 @@ export interface components {
             /** @example Dune */
             title?: string;
             /**
-             * @description Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit.
+             * @description Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite (distinct d'une propriété absente) efface le code-barres existant lors d'une modification — voir `ItemsService.update`.
              * @example 3600029412578
              */
-            barcode?: string;
+            barcode?: string | null;
             description?: string;
             /** @enum {string} */
             condition?: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
