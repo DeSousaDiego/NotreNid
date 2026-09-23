@@ -153,11 +153,10 @@ export default function ItemDetailScreen() {
                 <OwnerAvatarGroup owners={item.owners} max={6} />
               </InfoRow>
               {hasCountries ? (
-                <InfoRow label={countryLabelForSlug(item.category.slug)} last>
-                  <AppText variant="body">
-                    {item.countryCodes.map((code) => getCountryName(code) ?? code).join(', ')}
-                  </AppText>
-                </InfoRow>
+                <CountriesRow
+                  label={countryLabelForSlug(item.category.slug)}
+                  countryCodes={item.countryCodes}
+                />
               ) : null}
             </View>
 
@@ -274,6 +273,55 @@ function InfoRow({
         {label}
       </AppText>
       {children}
+    </View>
+  );
+}
+
+/**
+ * Bloc "pays" : label au-dessus, pastilles en dessous sur toute la largeur — jamais
+ * la mise en page label/valeur à une seule ligne d'`InfoRow`, qui ne wrap pas
+ * (`flexShrink` par défaut à 0 en React Native) et tronquait la liste dès que
+ * plusieurs pays étaient présents. Toujours en dernière position du bloc
+ * État/Propriétaires/Pays, donc sans bordure basse.
+ */
+function CountriesRow({ label, countryCodes }: { label: string; countryCodes: string[] }) {
+  const theme = useTheme();
+  const names = countryCodes.map((code) => getCountryName(code) ?? code);
+
+  return (
+    <View style={{ gap: theme.spacing.xs, paddingVertical: theme.spacing.sm }}>
+      <AppText variant="label" color="textMuted">
+        {label}
+      </AppText>
+      <View
+        accessibilityLabel={`${label} : ${names.join(', ')}`}
+        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}
+      >
+        {names.map((name, index) => (
+          <CountryChip key={`${countryCodes[index]}-${name}`} label={name} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function CountryChip({ label }: { label: string }) {
+  const theme = useTheme();
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: theme.spacing.sm,
+        paddingVertical: 4,
+        borderRadius: theme.radii.sm,
+        backgroundColor: theme.colors.background,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+      }}
+    >
+      <AppText variant="caption" color="text">
+        {label}
+      </AppText>
     </View>
   );
 }

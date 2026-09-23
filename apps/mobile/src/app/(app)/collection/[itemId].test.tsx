@@ -155,19 +155,82 @@ describe('ItemDetailScreen', () => {
     await waitFor(() => expect(withRating.getByLabelText('Note : 4.5 sur 5')).toBeTruthy());
   });
 
-  it('only shows the country row when the item has country codes, and lists several', async () => {
+  it('shows no country section at all when the item has none', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
-    const withoutCountry = await renderScreen(<ItemDetailScreen />);
-    await waitFor(() => expect(withoutCountry.getByText('Dune')).toBeTruthy());
-    expect(withoutCountry.queryByText("Pays d'origine")).toBeNull();
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(view.queryByText("Pays d'origine")).toBeNull();
+  });
 
+  it('shows a single country as one chip', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      countryCodes: ['CA'],
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText("Pays d'origine")).toBeTruthy());
+    expect(view.getByText('Canada')).toBeTruthy();
+  });
+
+  it('renders every country as its own chip, none lost, for two countries', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       countryCodes: ['US', 'FR'],
     });
-    const withCountries = await renderScreen(<ItemDetailScreen />);
-    await waitFor(() => expect(withCountries.getByText("Pays d'origine")).toBeTruthy());
-    expect(withCountries.getByText('États-Unis, France')).toBeTruthy();
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText("Pays d'origine")).toBeTruthy());
+    expect(view.getByText('États-Unis')).toBeTruthy();
+    expect(view.getByText('France')).toBeTruthy();
+    // Deux pastilles distinctes, jamais une seule chaîne jointe (ancien affichage
+    // texte tronquable) — voir CountriesRow/CountryChip dans [itemId].tsx.
+    expect(view.queryByText('États-Unis, France')).toBeNull();
+  });
+
+  it('renders every country as its own chip when there are enough to wrap onto several lines, none lost', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      countryCodes: ['US', 'FR', 'CA', 'GB', 'JP', 'DE', 'IT', 'BR'],
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText("Pays d'origine")).toBeTruthy());
+    for (const name of [
+      'États-Unis',
+      'France',
+      'Canada',
+      'Royaume-Uni',
+      'Japon',
+      'Allemagne',
+      'Italie',
+      'Brésil',
+    ]) {
+      expect(view.getByText(name)).toBeTruthy();
+    }
+  });
+
+  it('shows the country label matching the item category (cd)', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      category: { ...BASE_ITEM.category, slug: 'cd' },
+      countryCodes: ['GB'],
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText("Pays de l'artiste")).toBeTruthy());
+    expect(view.queryByText("Pays d'origine")).toBeNull();
+  });
+
+  it('lays out the country chips in a wrappable row, not a single fixed line', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      countryCodes: ['US', 'FR'],
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText("Pays d'origine")).toBeTruthy());
+
+    const chipsRow = view.getByLabelText("Pays d'origine : États-Unis, France");
+    const style = [chipsRow.props.style].flat();
+    expect(style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ flexDirection: 'row', flexWrap: 'wrap' })]),
+    );
   });
 
   it('shows every owner', async () => {
