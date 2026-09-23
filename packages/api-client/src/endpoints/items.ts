@@ -16,8 +16,13 @@ export type MetadataInput<T> = Partial<Omit<T, 'itemId'>>;
 export interface ItemInput {
   categoryId: string;
   title: string;
-  /** Code-barres produit (EAN-8/13, UPC-A/E, futurs formats). Jamais unique. */
-  barcode?: string;
+  /**
+   * Code-barres produit (EAN-8/13, UPC-A/E, futurs formats). Jamais unique.
+   * `null` explicite (distinct d'une propriété absente) efface un code-barres
+   * existant lors d'une modification (`ItemsService.update`) ; une propriété
+   * absente laisse la valeur actuelle inchangée.
+   */
+  barcode?: string | null;
   condition: ItemCondition;
   rating?: ItemRating;
   description?: string;

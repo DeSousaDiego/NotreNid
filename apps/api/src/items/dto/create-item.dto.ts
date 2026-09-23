@@ -35,14 +35,17 @@ export class CreateItemDto {
 
   @ApiPropertyOptional({
     example: '3600029412578',
+    nullable: true,
     description:
       'Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : ' +
-      'un foyer peut posséder plusieurs exemplaires du même produit.',
+      'un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite ' +
+      "(distinct d'une propriété absente) efface le code-barres existant lors d'une " +
+      'modification — voir `ItemsService.update`.',
   })
   @IsOptional()
   @IsString()
   @MaxLength(32)
-  barcode?: string;
+  barcode?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

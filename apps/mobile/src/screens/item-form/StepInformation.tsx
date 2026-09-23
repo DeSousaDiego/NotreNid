@@ -1,12 +1,32 @@
 import type { Category } from '@notre-nid/shared';
+import { Fragment } from 'react';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { Pressable, View } from 'react-native';
 
 import { AppText, CategoryIllustration, Chip, CountrySelect, TextField } from '../../components';
+import { normalizeScannedBarcode } from '../../lib/barcodeScanner';
 import { useTheme } from '../../theme';
 
-import { countryLabelForSlug, metadataFieldsForSlug } from './metadataFields';
+import {
+  countryLabelForSlug,
+  metadataFieldsForSlug,
+  type MetadataFieldConfig,
+} from './metadataFields';
 import type { ItemFormValues } from './schema';
+
+/**
+ * Emplacement du champ Code-barres — générique à l'item (`Item.barcode`), jamais
+ * une métadonnée de catégorie (voir docs/DECISIONS.md) : il n'appartient donc à
+ * aucune des listes `BOOK_FIELDS`/`CD_FIELDS`/`DVD_FIELDS`, juste inséré juste
+ * après le champ identifiant le plus proche de la catégorie (ISBN pour un
+ * livre, artiste pour un CD, réalisateur pour un DVD). Catégorie personnalisée
+ * (absente d'ici) : pas de champ Code-barres, comportement inchangé.
+ */
+const BARCODE_FIELD_ANCHOR: Partial<Record<string, MetadataFieldConfig['key']>> = {
+  book: 'isbn',
+  cd: 'artist',
+  dvd: 'director',
+};
 
 export interface StepInformationProps {
   control: Control<ItemFormValues>;
@@ -83,20 +103,39 @@ export function StepInformation({
 
       {systemFields ? (
         systemFields.map((fieldConfig) => (
-          <Controller
-            key={fieldConfig.key}
-            control={control}
-            name={`metadata.${fieldConfig.key}`}
-            render={({ field }) => (
-              <TextField
-                label={fieldConfig.label}
-                value={field.value ?? ''}
-                onChangeText={field.onChange}
-                onBlur={field.onBlur}
-                keyboardType={fieldConfig.numeric ? 'numeric' : 'default'}
+          <Fragment key={fieldConfig.key}>
+            <Controller
+              control={control}
+              name={`metadata.${fieldConfig.key}`}
+              render={({ field }) => (
+                <TextField
+                  label={fieldConfig.label}
+                  value={field.value ?? ''}
+                  onChangeText={field.onChange}
+                  onBlur={field.onBlur}
+                  keyboardType={fieldConfig.numeric ? 'numeric' : 'default'}
+                />
+              )}
+            />
+            {fieldConfig.key === BARCODE_FIELD_ANCHOR[category.slug] ? (
+              <Controller
+                control={control}
+                name="barcode"
+                render={({ field }) => (
+                  <TextField
+                    label="Code-barres"
+                    value={field.value ?? ''}
+                    // Même normalisation que le scan caméra (trim + chiffres
+                    // uniquement, jamais de conversion `Number` — un zéro
+                    // initial reste donc intact) : voir `lib/barcodeScanner.ts`.
+                    onChangeText={(text) => field.onChange(normalizeScannedBarcode(text))}
+                    onBlur={field.onBlur}
+                    keyboardType="numeric"
+                  />
+                )}
               />
-            )}
-          />
+            ) : null}
+          </Fragment>
         ))
       ) : customSchema.length === 0 ? (
         <AppText variant="body" color="textMuted">

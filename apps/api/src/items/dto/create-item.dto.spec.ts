@@ -56,6 +56,10 @@ describe('CreateItemDto — barcode', () => {
     expect(await validateBarcode(undefined)).toHaveLength(0);
   });
 
+  it('accepts an explicit null — distinct from absent, used by ItemsService.update to clear an existing barcode', async () => {
+    expect(await validateBarcode(null)).toHaveLength(0);
+  });
+
   it('accepts a typical EAN-13 barcode', async () => {
     expect(await validateBarcode('3600029412578')).toHaveLength(0);
   });

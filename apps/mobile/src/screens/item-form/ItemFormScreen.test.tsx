@@ -401,4 +401,165 @@ describe('ItemFormScreen', () => {
       );
     });
   });
+
+  describe('barcode field (Bloc 3G)', () => {
+    it('shows a Code-barres field for book, cd and dvd', async () => {
+      const bookView = await renderScreen(
+        <ItemFormScreen mode="create" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(bookView.getByLabelText('Code-barres')).toBeTruthy());
+
+      const cdView = await renderScreen(<ItemFormScreen mode="create" category={CD_CATEGORY} />);
+      await waitFor(() => expect(cdView.getByLabelText('Code-barres')).toBeTruthy());
+
+      const dvdView = await renderScreen(<ItemFormScreen mode="create" category={DVD_CATEGORY} />);
+      await waitFor(() => expect(dvdView.getByLabelText('Code-barres')).toBeTruthy());
+    });
+
+    it('never shows a Code-barres field for a custom category — unchanged current behaviour', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={CUSTOM_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Édition')).toBeTruthy());
+      expect(view.queryByLabelText('Code-barres')).toBeNull();
+    });
+
+    it('prefills the field from an existing item in edit mode', async () => {
+      (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+        ...EXISTING_ITEM,
+        barcode: '9782070368228',
+      });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() =>
+        expect(view.getByLabelText('Code-barres').props.value).toBe('9782070368228'),
+      );
+    });
+
+    it('prefills the field from a barcode scan (initialValues), in create mode', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen
+          mode="create"
+          category={DVD_CATEGORY}
+          initialValues={{ barcode: '065935831686' }}
+        />,
+      );
+      await waitFor(() =>
+        expect(view.getByLabelText('Code-barres').props.value).toBe('065935831686'),
+      );
+    });
+
+    it('strips non-digit characters as the user types, preserving a leading zero — never a Number round-trip', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '0a1b2c');
+      expect(view.getByLabelText('Code-barres').props.value).toBe('012');
+    });
+
+    it('sends the typed barcode to the API when creating manually, with no scan involved', async () => {
+      (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+
+      await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '012345678905');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
+      await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.create).toHaveBeenCalledWith(
+        'household-1',
+        // Zéro initial conservé (jamais de conversion Number).
+        expect.objectContaining({ barcode: '012345678905' }),
+      );
+    });
+
+    it('sends the new barcode value on update when changed', async () => {
+      (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+        ...EXISTING_ITEM,
+        barcode: '9782070368228',
+      });
+      (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+
+      await waitFor(() =>
+        expect(view.getByLabelText('Code-barres').props.value).toBe('9782070368228'),
+      );
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '3600029412578');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.update).toHaveBeenCalledWith(
+        'household-1',
+        'item-1',
+        expect.objectContaining({ barcode: '3600029412578' }),
+      );
+    });
+
+    it('sends an explicit null (not merely omitted) when the barcode is cleared on update', async () => {
+      (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+        ...EXISTING_ITEM,
+        barcode: '9782070368228',
+      });
+      (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+
+      await waitFor(() =>
+        expect(view.getByLabelText('Code-barres').props.value).toBe('9782070368228'),
+      );
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.update).toHaveBeenCalledWith(
+        'household-1',
+        'item-1',
+        expect.objectContaining({ barcode: null }),
+      );
+    });
+
+    it('keeps ISBN and the generic barcode fully independent — never synced with one another', async () => {
+      (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+
+      await waitFor(() => expect(view.getByLabelText('ISBN')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await fireEvent.changeText(view.getByLabelText('ISBN'), '9782070368228');
+      await fireEvent.changeText(view.getByLabelText('Code-barres'), '3600029412578');
+
+      expect(view.getByLabelText('ISBN').props.value).toBe('9782070368228');
+      expect(view.getByLabelText('Code-barres').props.value).toBe('3600029412578');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
+      await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.create).toHaveBeenCalledWith(
+        'household-1',
+        expect.objectContaining({
+          barcode: '3600029412578',
+          book: expect.objectContaining({ isbn: '9782070368228' }),
+        }),
+      );
+    });
+  });
 });

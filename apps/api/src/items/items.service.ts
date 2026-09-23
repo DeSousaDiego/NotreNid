@@ -163,7 +163,13 @@ export class ItemsService {
         data: {
           categoryId,
           title: dto.title ?? existing.title,
-          barcode: dto.barcode ?? existing.barcode,
+          // `=== undefined` (pas `??`) : un `null` explicite (distinct d'une propriété
+          // absente) doit pouvoir effacer un code-barres existant — `??` traiterait
+          // `null` exactement comme une propriété absente et l'ignorerait silencieusement
+          // (bug corrigé ici, scopé à `barcode` uniquement ; `description`/`notes`/
+          // `coverImageUrl`/`rating` ci-dessous partagent la même limitation historique,
+          // hors périmètre de ce correctif).
+          barcode: dto.barcode === undefined ? existing.barcode : dto.barcode,
           description: dto.description ?? existing.description,
           condition: dto.condition ?? existing.condition,
           rating: dto.rating ?? existing.rating,

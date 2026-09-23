@@ -36,8 +36,9 @@ const metadataGroupSchema = z.object({
 
 export const itemFormSchema = z.object({
   title: z.string().min(1, 'Le titre est requis.').max(200, 'Le titre est trop long.'),
-  // Préremplie uniquement par un résultat de scan (Bloc 3A) — pas de champ de
-  // saisie manuelle dans le formulaire pour l'instant (voir docs/DECISIONS.md).
+  // Préremplie par un résultat de scan (Bloc 3A), par l'item existant en édition,
+  // ou saisie manuellement (Bloc 3G) — toujours déjà filtrée aux chiffres à ce
+  // stade (voir `normalizeScannedBarcode`), jamais validée une seconde fois ici.
   barcode: z.string().optional(),
   condition: z.enum(ITEM_CONDITIONS, { message: 'Choisissez un état.' }),
   rating: z
@@ -130,6 +131,22 @@ function toOptionalString(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+/**
+ * `barcode` seul distingue "champ vidé" de "champ non renseigné" : `null`
+ * explicite (jamais `undefined`) pour que `ItemsService.update` efface
+ * réellement un code-barres existant plutôt que de l'ignorer — un `barcode`
+ * absent du payload y est traité comme "ne pas modifier" (voir
+ * `ItemsService.update`, `dto.barcode === undefined ? existing.barcode : …`).
+ * Sans incidence en création : une valeur `null` équivaut à une valeur absente
+ * pour une colonne nullable. Jamais de conversion `Number` (déjà garanti par
+ * `normalizeScannedBarcode` en amont, à la saisie comme au scan) : un zéro
+ * initial reste donc intact.
+ */
+function toBarcodePayloadValue(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function buildCustomMetadataPayload(
   category: Category,
   raw: Record<string, string>,
@@ -156,7 +173,7 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
   const payload: CreateItemInput = {
     categoryId: category.id,
     title: values.title.trim(),
-    barcode: toOptionalString(values.barcode),
+    barcode: toBarcodePayloadValue(values.barcode),
     condition: values.condition,
     // `.refine` valide déjà que la valeur appartient à ITEM_RATING_VALUES ; Zod ne
     // dérive pas un type littéral d'un `.refine` sur `z.number()` comme il le fait

@@ -100,12 +100,26 @@ describe('buildItemPayload', () => {
     expect(payload.notes).toBeUndefined();
     expect(payload.coverImageUrl).toBeUndefined();
     expect(payload.rating).toBeUndefined();
-    expect(payload.barcode).toBeUndefined();
   });
 
-  it('passes a barcode prefilled by a scan through to the payload', () => {
-    const payload = buildItemPayload({ ...baseValues, barcode: '9782070368228' }, BOOK_CATEGORY);
-    expect(payload.barcode).toBe('9782070368228');
+  describe('barcode', () => {
+    it('passes a barcode (from a scan, an edit, or typed manually) through to the payload, trimmed', () => {
+      const payload = buildItemPayload(
+        { ...baseValues, barcode: '  9782070368228  ' },
+        BOOK_CATEGORY,
+      );
+      expect(payload.barcode).toBe('9782070368228');
+    });
+
+    it('preserves a leading zero — never a Number round-trip', () => {
+      const payload = buildItemPayload({ ...baseValues, barcode: '012345678905' }, BOOK_CATEGORY);
+      expect(payload.barcode).toBe('012345678905');
+    });
+
+    it('sends an explicit null (never undefined) when blank — undefined would leave an existing barcode untouched on update instead of clearing it (see ItemsService.update)', () => {
+      const payload = buildItemPayload(baseValues, BOOK_CATEGORY);
+      expect(payload.barcode).toBeNull();
+    });
   });
 
   it('always sends category.id as categoryId, regardless of which category is passed', () => {
