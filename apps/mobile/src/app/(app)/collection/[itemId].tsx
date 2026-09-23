@@ -24,8 +24,12 @@ import { useItem } from '../../../hooks/useItem';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import {
+  BOOK_FIELDS,
+  CD_FIELDS,
   countryLabelForSlug,
-  formatBookFormatLabel,
+  DVD_FIELDS,
+  metadataDisplayRows,
+  type MetadataDisplayRow,
 } from '../../../screens/item-form/metadataFields';
 import { useTheme } from '../../../theme';
 
@@ -274,34 +278,34 @@ function InfoRow({
   );
 }
 
+/**
+ * Champs/ordre/libellés délégués à `metadataFields.ts` — même source de vérité
+ * que le formulaire (`BOOK_FIELDS`/`CD_FIELDS`/`DVD_FIELDS`), plus aucune liste
+ * dupliquée ici. Catégories personnalisées (`customMetadata`) : inchangé,
+ * volontairement hors de cette source commune (clés arbitraires, pas de config
+ * de champs à partager avec un formulaire). Code-barres : ajouté en dernier,
+ * jamais comme métadonnée principale (générique à toutes les catégories, jamais
+ * synchronisé avec `book.isbn`, voir docs/DECISIONS.md).
+ */
 function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem>['data']> }) {
   const theme = useTheme();
-  const rows: [string, string][] = [];
+  let rows: MetadataDisplayRow[] = [];
 
   if (item.book) {
-    if (item.book.author) rows.push(['Auteur', item.book.author]);
-    if (item.book.publisher) rows.push(['Éditeur', item.book.publisher]);
-    if (item.book.publicationYear) rows.push(['Année', String(item.book.publicationYear)]);
-    if (item.book.isbn) rows.push(['ISBN', item.book.isbn]);
-    if (item.book.language) rows.push(['Langue', item.book.language]);
-    if (item.book.pageCount) rows.push(['Pages', String(item.book.pageCount)]);
-    if (item.book.format) rows.push(['Format', formatBookFormatLabel(item.book.format)]);
+    rows = metadataDisplayRows(BOOK_FIELDS, item.book);
   } else if (item.cd) {
-    if (item.cd.artist) rows.push(['Artiste', item.cd.artist]);
-    if (item.cd.releaseYear) rows.push(['Année', String(item.cd.releaseYear)]);
-    if (item.cd.label) rows.push(['Label', item.cd.label]);
-    if (item.cd.format) rows.push(['Format', item.cd.format]);
+    rows = metadataDisplayRows(CD_FIELDS, item.cd);
   } else if (item.dvd) {
-    if (item.dvd.director) rows.push(['Réalisateur', item.dvd.director]);
-    if (item.dvd.releaseYear) rows.push(['Année', String(item.dvd.releaseYear)]);
-    if (item.dvd.edition) rows.push(['Édition', item.dvd.edition]);
-    if (item.dvd.region) rows.push(['Région', item.dvd.region]);
-    if (item.dvd.format) rows.push(['Format', item.dvd.format]);
-    if (item.dvd.durationMinutes) rows.push(['Durée', `${item.dvd.durationMinutes} min`]);
+    rows = metadataDisplayRows(DVD_FIELDS, item.dvd);
   } else if (item.customMetadata) {
-    for (const [key, value] of Object.entries(item.customMetadata)) {
-      rows.push([key, String(value)]);
-    }
+    rows = Object.entries(item.customMetadata).map(([key, value]) => ({
+      label: key,
+      value: String(value),
+    }));
+  }
+
+  if (item.barcode) {
+    rows = [...rows, { label: 'Code-barres', value: item.barcode }];
   }
 
   if (rows.length === 0) return null;
@@ -312,9 +316,9 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
         Détails
       </AppText>
       <View>
-        {rows.map(([label, value], index) => (
+        {rows.map((row, index) => (
           <View
-            key={label}
+            key={row.label}
             style={{
               flexDirection: 'row',
               justifyContent: 'space-between',
@@ -324,9 +328,9 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
             }}
           >
             <AppText variant="body" color="textMuted">
-              {label}
+              {row.label}
             </AppText>
-            <AppText variant="body">{value}</AppText>
+            <AppText variant="body">{row.value}</AppText>
           </View>
         ))}
       </View>

@@ -106,6 +106,19 @@ const BASE_ITEM = {
   updatedBy: ALIX,
 };
 
+/** Aplatit l'arbre rendu en une liste de textes, dans l'ordre du document — sert
+ * uniquement à vérifier un ORDRE d'affichage (ex. les lignes de la section
+ * Détails), ce qu'aucune requête `getBy*` ne peut exprimer directement. */
+function flattenText(node: unknown): string[] {
+  if (node == null) return [];
+  if (typeof node === 'string') return [node];
+  if (Array.isArray(node)) return node.flatMap(flattenText);
+  if (typeof node === 'object' && 'children' in node) {
+    return flattenText((node as { children: unknown }).children);
+  }
+  return [];
+}
+
 function renderScreen(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -304,5 +317,49 @@ describe('ItemDetailScreen', () => {
     await waitFor(() =>
       expect(mockApiClient.items.restore).toHaveBeenCalledWith('household-1', 'item-1'),
     );
+  });
+
+  it('orders book metadata rows exactly as the form does (ISBN right after Auteur, before Éditeur)', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      book: {
+        itemId: 'item-1',
+        author: 'Frank Herbert',
+        isbn: '9782070368228',
+        publisher: 'Gallimard',
+        publicationYear: 1965,
+        language: 'fr',
+        pageCount: 592,
+        format: 'Hardcover',
+      },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText('Auteur')).toBeTruthy());
+
+    const texts = flattenText(view.toJSON());
+    const order = ['Auteur', 'ISBN', 'Éditeur', 'Année', 'Langue', 'Pages', 'Format'].map((label) =>
+      texts.indexOf(label),
+    );
+    expect(order.every((index) => index !== -1)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it('shows the barcode as a discrete "Code-barres" row after the other metadata fields, only when present', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const withoutBarcode = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(withoutBarcode.getByText('Dune')).toBeTruthy());
+    expect(withoutBarcode.queryByText('Code-barres')).toBeNull();
+
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      barcode: '9782070368228',
+      book: { ...BASE_ITEM.book, format: 'Hardcover' },
+    });
+    const withBarcode = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(withBarcode.getByText('Code-barres')).toBeTruthy());
+    expect(withBarcode.getByText('9782070368228')).toBeTruthy();
+
+    const texts = flattenText(withBarcode.toJSON());
+    expect(texts.indexOf('Format')).toBeLessThan(texts.indexOf('Code-barres'));
   });
 });

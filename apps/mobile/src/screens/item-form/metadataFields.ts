@@ -1,3 +1,5 @@
+import type { BookMetadata, CdMetadata, DvdMetadata } from '@notre-nid/shared';
+
 export interface MetadataFieldConfig {
   key:
     | 'author'
@@ -15,33 +17,55 @@ export interface MetadataFieldConfig {
     | 'region'
     | 'durationMinutes';
   label: string;
+  /**
+   * Libellé de la fiche détail, si différent de `label` (champ du formulaire) —
+   * les deux écrans affichaient déjà des libellés distincts pour ces 3 champs
+   * avant ce refactor (« Année », « Pages », « Durée », plus courts) ; ce lot
+   * unifie la source (champs + ordre + valeurs) sans changer un texte déjà
+   * affiché à l'utilisateur. Repli sur `label` si absent.
+   */
+  detailLabel?: string;
   numeric?: boolean;
+  /**
+   * Formatte la valeur brute pour un AFFICHAGE en lecture seule (fiche détail) —
+   * jamais consulté par le formulaire (édition de la valeur brute telle quelle,
+   * voir `StepInformation.tsx`). Repli sur la valeur telle quelle si absent : ce
+   * lot ne traduit délibérément que ce qui l'était déjà (format livre, durée DVD),
+   * jamais les formats CD/DVD (voir docs/DECISIONS.md).
+   */
+  formatDisplayValue?: (rawValue: string) => string;
 }
 
 export const BOOK_FIELDS: MetadataFieldConfig[] = [
   { key: 'author', label: 'Auteur' },
   { key: 'isbn', label: 'ISBN' },
   { key: 'publisher', label: 'Éditeur' },
-  { key: 'publicationYear', label: 'Année de publication', numeric: true },
+  { key: 'publicationYear', label: 'Année de publication', detailLabel: 'Année', numeric: true },
   { key: 'language', label: 'Langue' },
-  { key: 'pageCount', label: 'Nombre de pages', numeric: true },
-  { key: 'format', label: 'Format' },
+  { key: 'pageCount', label: 'Nombre de pages', detailLabel: 'Pages', numeric: true },
+  { key: 'format', label: 'Format', formatDisplayValue: formatBookFormatLabel },
 ];
 
 export const CD_FIELDS: MetadataFieldConfig[] = [
   { key: 'artist', label: 'Artiste' },
-  { key: 'releaseYear', label: 'Année de sortie', numeric: true },
+  { key: 'releaseYear', label: 'Année de sortie', detailLabel: 'Année', numeric: true },
   { key: 'label', label: 'Label' },
   { key: 'format', label: 'Format' },
 ];
 
 export const DVD_FIELDS: MetadataFieldConfig[] = [
   { key: 'director', label: 'Réalisateur' },
-  { key: 'releaseYear', label: 'Année de sortie', numeric: true },
+  { key: 'releaseYear', label: 'Année de sortie', detailLabel: 'Année', numeric: true },
   { key: 'edition', label: 'Édition' },
   { key: 'region', label: 'Région' },
   { key: 'format', label: 'Format' },
-  { key: 'durationMinutes', label: 'Durée (minutes)', numeric: true },
+  {
+    key: 'durationMinutes',
+    label: 'Durée (minutes)',
+    detailLabel: 'Durée',
+    numeric: true,
+    formatDisplayValue: (value) => `${value} min`,
+  },
 ];
 
 export function metadataFieldsForSlug(slug: string): MetadataFieldConfig[] | null {
@@ -49,6 +73,40 @@ export function metadataFieldsForSlug(slug: string): MetadataFieldConfig[] | nul
   if (slug === 'cd') return CD_FIELDS;
   if (slug === 'dvd') return DVD_FIELDS;
   return null;
+}
+
+export interface MetadataDisplayRow {
+  label: string;
+  value: string;
+}
+
+/**
+ * Source unique pour la fiche détail (`collection/[itemId].tsx`) : mêmes champs et
+ * même ORDRE que le formulaire (`BOOK_FIELDS`/`CD_FIELDS`/`DVD_FIELDS` ci-dessus),
+ * libellé identique sauf où `detailLabel` le précise — plus aucune liste dupliquée
+ * à maintenir en double. `metadata` est l'objet `BookMetadata`/`CdMetadata`/
+ * `DvdMetadata` de l'item ; une valeur absente, `null` ou une chaîne vide n'ajoute
+ * simplement aucune ligne (jamais de `—`), même comportement qu'avant ce refactor
+ * (les anciens `if (item.book.xxx)` étaient déjà des vérifications de vérité, pas
+ * de simples `!= null` — un `pageCount`/`releaseYear` à `0` reste donc, comme avant,
+ * silencieusement omis).
+ */
+export function metadataDisplayRows(
+  fields: MetadataFieldConfig[],
+  metadata: BookMetadata | CdMetadata | DvdMetadata,
+): MetadataDisplayRow[] {
+  const rows: MetadataDisplayRow[] = [];
+  const record = metadata as unknown as Record<string, unknown>;
+  for (const field of fields) {
+    const raw = record[field.key];
+    if (!raw) continue;
+    const rawValue = String(raw);
+    rows.push({
+      label: field.detailLabel ?? field.label,
+      value: field.formatDisplayValue ? field.formatDisplayValue(rawValue) : rawValue,
+    });
+  }
+  return rows;
 }
 
 /**

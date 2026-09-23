@@ -1,4 +1,10 @@
-import { formatBookFormatLabel } from './metadataFields';
+import {
+  BOOK_FIELDS,
+  CD_FIELDS,
+  DVD_FIELDS,
+  formatBookFormatLabel,
+  metadataDisplayRows,
+} from './metadataFields';
 
 describe('formatBookFormatLabel', () => {
   it('translates Hardcover to Relié', () => {
@@ -22,5 +28,87 @@ describe('formatBookFormatLabel', () => {
   it('falls back to the raw value for an unrecognized format, never hiding or mistranslating it', () => {
     expect(formatBookFormatLabel('Spiral-bound')).toBe('Spiral-bound');
     expect(formatBookFormatLabel('Library Binding')).toBe('Library Binding');
+  });
+});
+
+describe('metadataDisplayRows', () => {
+  it('orders book rows exactly as BOOK_FIELDS (the same order the form edits them in), with the pre-existing detail labels', () => {
+    const rows = metadataDisplayRows(BOOK_FIELDS, {
+      itemId: 'item-1',
+      author: 'Frank Herbert',
+      isbn: '9782070368228',
+      publisher: 'Gallimard',
+      publicationYear: 1965,
+      language: 'fr',
+      pageCount: 592,
+      format: 'Hardcover',
+    });
+
+    expect(rows).toEqual([
+      { label: 'Auteur', value: 'Frank Herbert' },
+      { label: 'ISBN', value: '9782070368228' },
+      { label: 'Éditeur', value: 'Gallimard' },
+      // « Année », pas « Année de publication » (libellé du formulaire) : le
+      // libellé déjà affiché en fiche détail avant ce refactor est conservé
+      // via `detailLabel`.
+      { label: 'Année', value: '1965' },
+      { label: 'Langue', value: 'fr' },
+      { label: 'Pages', value: '592' },
+      // Traduit, comme avant ce refactor (jamais pour CD/DVD, voir plus bas).
+      { label: 'Format', value: 'Relié' },
+    ]);
+  });
+
+  it('omits a field entirely when its value is null, empty, or falsy (0) — never a placeholder row', () => {
+    const rows = metadataDisplayRows(BOOK_FIELDS, {
+      itemId: 'item-1',
+      author: 'Frank Herbert',
+      isbn: null,
+      publisher: null,
+      publicationYear: 0,
+      language: '',
+      pageCount: null,
+      format: null,
+    });
+
+    expect(rows).toEqual([{ label: 'Auteur', value: 'Frank Herbert' }]);
+  });
+
+  it('never translates a CD format — the raw provider value is shown as-is', () => {
+    const rows = metadataDisplayRows(CD_FIELDS, {
+      itemId: 'item-1',
+      artist: 'Daft Punk',
+      releaseYear: 2001,
+      label: 'Daft Life',
+      format: 'Jewel Case',
+    });
+
+    expect(rows).toEqual([
+      { label: 'Artiste', value: 'Daft Punk' },
+      { label: 'Année', value: '2001' },
+      { label: 'Label', value: 'Daft Life' },
+      { label: 'Format', value: 'Jewel Case' },
+    ]);
+  });
+
+  it('never translates a DVD format either, and appends "min" only to the duration', () => {
+    const rows = metadataDisplayRows(DVD_FIELDS, {
+      itemId: 'item-1',
+      director: 'Christopher Nolan',
+      releaseYear: 2008,
+      edition: 'Édition Collector',
+      region: 'Zone 2',
+      format: 'Blu-ray',
+      durationMinutes: 152,
+    });
+
+    expect(rows).toEqual([
+      { label: 'Réalisateur', value: 'Christopher Nolan' },
+      { label: 'Année', value: '2008' },
+      { label: 'Édition', value: 'Édition Collector' },
+      { label: 'Région', value: 'Zone 2' },
+      { label: 'Format', value: 'Blu-ray' },
+      { label: 'Durée', value: '152 min' },
+    ]);
   });
 });
