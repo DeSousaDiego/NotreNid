@@ -1,6 +1,7 @@
 import type { Item } from '@notre-nid/shared';
 import { Pressable, View } from 'react-native';
 
+import { CONDITION_INFO } from '../constants/condition';
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
 import { useTheme } from '../theme';
 
@@ -9,11 +10,36 @@ import { CategoryBadge } from './CategoryBadge';
 import { ConditionBadge } from './ConditionBadge';
 import { ItemCover } from './ItemCover';
 import { OwnerAvatarGroup } from './OwnerAvatarGroup';
-import { StarRating } from './StarRating';
+import { formatRatingLabel, StarRating } from './StarRating';
 
 export interface ItemCardProps {
   item: Item;
   onPress: () => void;
+}
+
+/**
+ * Titre/catégorie/état/note/propriétaires sont déjà visibles sur la carte, mais
+ * n'atteignent jamais un lecteur d'écran tels quels : `OwnerAvatarGroup` et
+ * `StarRating` portent chacun leur propre `accessibilityLabel`, or ils sont
+ * imbriqués dans ce `Pressable` — dont le label, une fois posé, « avale » tout
+ * label descendant (VoiceOver/TalkBack n'annoncent alors que celui du parent).
+ * Reste volontairement concis (pas d'ISBN/éditeur/date/notes personnelles ici :
+ * ces informations ont leur place en fiche détail, jamais sur une carte de liste).
+ */
+export function itemCardAccessibilityLabel(item: Item): string {
+  const segments = [item.title, item.category.name, CONDITION_INFO[item.condition].label];
+
+  if (item.rating) segments.push(`note ${formatRatingLabel(item.rating)} sur 5`);
+
+  if (item.owners.length === 1) {
+    segments.push(`propriétaire ${item.owners[0]!.displayName}`);
+  } else if (item.owners.length === 2) {
+    segments.push(`propriétaires ${item.owners[0]!.displayName} et ${item.owners[1]!.displayName}`);
+  } else if (item.owners.length > 2) {
+    segments.push(`${item.owners.length} propriétaires`);
+  }
+
+  return segments.join(', ');
 }
 
 /** Carte compacte de la collection : couverture, titre, info secondaire, badges, propriétaires. */
@@ -24,7 +50,7 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${item.category.name}`}
+      accessibilityLabel={itemCardAccessibilityLabel(item)}
       onPress={onPress}
       style={({ pressed }) => [
         {

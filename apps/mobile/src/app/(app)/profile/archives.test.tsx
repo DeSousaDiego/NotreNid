@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
+import { itemCardAccessibilityLabel } from '../../../components/ItemCard';
 import { mockItem } from '../../../test-utils/mockItem';
 import { ThemeProvider } from '../../../theme';
 
@@ -107,7 +108,9 @@ describe('ArchivesScreen', () => {
       expect.objectContaining({ archived: true }),
     );
 
-    await fireEvent.press(view.getByRole('button', { name: 'Les Misérables, Livre' }));
+    await fireEvent.press(
+      view.getByRole('button', { name: itemCardAccessibilityLabel(archivedItem) }),
+    );
 
     expect(mockRouterPush).toHaveBeenCalledWith({
       pathname: '/(app)/collection/[itemId]',

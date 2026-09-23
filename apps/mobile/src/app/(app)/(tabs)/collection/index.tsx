@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
 
 import {
@@ -41,6 +41,12 @@ export default function CollectionScreen() {
   );
 
   const itemsQuery = useItems(householdId, filters);
+  // Verrou synchrone (pas seulement `itemsQuery.isFetchingNextPage`, un état React
+  // qui ne se reflète qu'au rendu suivant) : `onEndReached` peut être invoqué deux
+  // fois de suite avant que ce re-rendu n'ait eu lieu (scroll rapide/irrégulier),
+  // ce qui déclenchait bien une double requête de page suivante en pratique — même
+  // principe que le verrou de scan caméra (`scanLockRef`, voir add-item/scan.tsx).
+  const isFetchingNextPageRef = useRef(false);
 
   const items = itemsQuery.data?.pages.flatMap((page) => page.data) ?? [];
   const activeFilterCount = [
@@ -60,6 +66,7 @@ export default function CollectionScreen() {
             name="options-outline"
             accessibilityLabel={`Filtres${activeFilterCount > 0 ? ` (${activeFilterCount} actifs)` : ''}`}
             color={activeFilterCount > 0 ? 'secondary' : 'text'}
+            badgeCount={activeFilterCount}
             onPress={() => router.push('/(app)/collection/filters')}
           />
         </View>
@@ -86,7 +93,7 @@ export default function CollectionScreen() {
       </View>
 
       {itemsQuery.isLoading ? (
-        <View style={{ gap: theme.spacing.sm }}>
+        <View testID="collection-loading-skeleton" style={{ gap: theme.spacing.sm }}>
           {[0, 1, 2, 3].map((key) => (
             <ItemCardSkeleton key={key} />
           ))}
@@ -117,6 +124,7 @@ export default function CollectionScreen() {
         />
       ) : (
         <FlatList
+          testID="collection-item-list"
           data={items}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: tabBarClearance }}
@@ -130,15 +138,18 @@ export default function CollectionScreen() {
           )}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
-            if (itemsQuery.hasNextPage && !itemsQuery.isFetchingNextPage) {
-              void itemsQuery.fetchNextPage();
-            }
+            if (!itemsQuery.hasNextPage || isFetchingNextPageRef.current) return;
+            isFetchingNextPageRef.current = true;
+            void itemsQuery.fetchNextPage().finally(() => {
+              isFetchingNextPageRef.current = false;
+            });
           }}
           refreshing={itemsQuery.isRefetching && !itemsQuery.isFetchingNextPage}
           onRefresh={() => void itemsQuery.refetch()}
           ListFooterComponent={
             itemsQuery.isFetchingNextPage ? (
               <ActivityIndicator
+                testID="collection-pagination-spinner"
                 style={{ marginTop: theme.spacing.md }}
                 color={theme.colors.primary}
               />
