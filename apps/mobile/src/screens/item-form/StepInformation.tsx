@@ -131,6 +131,14 @@ export function StepInformation({
                     onChangeText={(text) => field.onChange(normalizeScannedBarcode(text))}
                     onBlur={field.onBlur}
                     keyboardType="numeric"
+                    // Livre uniquement : l'ISBN existe déjà comme identifiant, sans lien
+                    // avec ce champ (voir docs/DECISIONS.md) — cette aide évite juste de
+                    // laisser penser que les deux valeurs doivent différer.
+                    helperText={
+                      category.slug === 'book'
+                        ? 'Souvent identique à l’ISBN, mais pas toujours.'
+                        : undefined
+                    }
                   />
                 )}
               />

@@ -561,5 +561,21 @@ describe('ItemFormScreen', () => {
         }),
       );
     });
+
+    it('shows a discreet helper text clarifying the barcode/ISBN relationship for a book only', async () => {
+      const bookView = await renderScreen(
+        <ItemFormScreen mode="create" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(bookView.getByLabelText('Code-barres')).toBeTruthy());
+      expect(bookView.getByText('Souvent identique à l’ISBN, mais pas toujours.')).toBeTruthy();
+
+      const cdView = await renderScreen(<ItemFormScreen mode="create" category={CD_CATEGORY} />);
+      await waitFor(() => expect(cdView.getByLabelText('Code-barres')).toBeTruthy());
+      expect(cdView.queryByText('Souvent identique à l’ISBN, mais pas toujours.')).toBeNull();
+
+      const dvdView = await renderScreen(<ItemFormScreen mode="create" category={DVD_CATEGORY} />);
+      await waitFor(() => expect(dvdView.getByLabelText('Code-barres')).toBeTruthy());
+      expect(dvdView.queryByText('Souvent identique à l’ISBN, mais pas toujours.')).toBeNull();
+    });
   });
 });
