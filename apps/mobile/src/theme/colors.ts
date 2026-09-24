@@ -14,6 +14,14 @@ export const colors = {
   textMuted: '#687269',
   border: '#D8E2D1',
   danger: '#A64236',
+  /**
+   * Surfaces teintées douces (sauge, pêche, miel) — dérivées du vert forêt, du
+   * terracotta et de l'accent miel. Réservées aux fonds (tuiles, pastilles,
+   * couvertures de repli), jamais au texte : `text`/`primary` y restent lisibles.
+   */
+  tintSage: '#E4EDD9',
+  tintPeach: '#FBE2D0',
+  tintHoney: '#F8E9C6',
   /** Texte/icônes affichés sur un fond `primary` ou `secondary` (contraste). */
   onPrimary: '#FFFCF4',
 } as const;

@@ -2,6 +2,8 @@ import { SYSTEM_CATEGORY_SLUGS } from '@notre-nid/shared';
 import type { Ionicons } from '@expo/vector-icons';
 import type { ImageSourcePropType } from 'react-native';
 
+import type { ColorToken } from '../theme';
+
 type IconName = keyof typeof Ionicons.glyphMap;
 
 const ICONS_BY_SLUG: Record<string, IconName> = {
@@ -11,6 +13,18 @@ const ICONS_BY_SLUG: Record<string, IconName> = {
 };
 
 const DEFAULT_ICON: IconName = 'pricetag-outline';
+
+const TINTS_BY_SLUG: Record<string, ColorToken> = {
+  [SYSTEM_CATEGORY_SLUGS.BOOK]: 'tintSage',
+  [SYSTEM_CATEGORY_SLUGS.CD]: 'tintPeach',
+  [SYSTEM_CATEGORY_SLUGS.DVD]: 'tintHoney',
+};
+
+/** Surface teintée associée à une catégorie (tuiles d'accueil, couverture de repli) —
+ * `surface` neutre pour une catégorie personnalisée. */
+export function getCategoryTint(slug: string): ColorToken {
+  return TINTS_BY_SLUG[slug] ?? 'surface';
+}
 
 export function getCategoryIcon(slug: string): IconName {
   return ICONS_BY_SLUG[slug] ?? DEFAULT_ICON;

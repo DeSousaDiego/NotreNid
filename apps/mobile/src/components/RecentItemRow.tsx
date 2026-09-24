@@ -1,6 +1,7 @@
 import type { Item } from '@notre-nid/shared';
 import { Pressable, View } from 'react-native';
 
+import { getCategoryTint } from '../constants/category-icons';
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
 import { formatRelativeDate } from '../lib/relativeDate';
 import { useTheme } from '../theme';
@@ -8,10 +9,29 @@ import { useTheme } from '../theme';
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
 import { ItemCover } from './ItemCover';
+import { LoadingSkeleton } from './LoadingSkeleton';
 
 export interface RecentItemRowProps {
   item: Item;
   onPress: () => void;
+}
+
+const COVER_WIDTH = 48;
+const COVER_HEIGHT = 64;
+
+/**
+ * Label concis : le `Pressable` avale les labels descendants, donc tout ce qui est
+ * visible (titre, catégorie, auteur, « Ajouté par… · date ») doit y figurer.
+ */
+export function recentItemAccessibilityLabel(item: Item, now?: Date): string {
+  const segments = [item.title, item.category.name];
+  const subtitle = secondaryInfoForItem(item);
+  if (subtitle) segments.push(subtitle);
+  segments.push(
+    `ajouté par ${item.createdBy.displayName}`,
+    formatRelativeDate(item.createdAt, now).toLowerCase(),
+  );
+  return segments.join(', ');
 }
 
 /**
@@ -22,16 +42,20 @@ export interface RecentItemRowProps {
 export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
   const theme = useTheme();
   const subtitle = secondaryInfoForItem(item);
+  // Sans couverture, le repli affiche déjà l'illustration de la catégorie : le badge
+  // la répéterait à l'identique juste à côté. (Une URL présente mais cassée garde le
+  // badge — cas rare, pas de remontée d'état depuis `ItemCover` pour si peu.)
+  const showCategoryBadge = Boolean(item.coverImageUrl);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${item.category.name}`}
+      accessibilityLabel={recentItemAccessibilityLabel(item)}
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
         gap: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
+        paddingVertical: theme.spacing.md,
         opacity: pressed ? 0.85 : 1,
       })}
     >
@@ -41,10 +65,10 @@ export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
         illustrationSize={32}
         transition={150}
         style={{
-          width: 48,
-          height: 64,
+          width: COVER_WIDTH,
+          height: COVER_HEIGHT,
           borderRadius: theme.radii.sm,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors[getCategoryTint(item.category.slug)],
         }}
       />
 
@@ -57,13 +81,32 @@ export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
             {subtitle}
           </AppText>
         ) : null}
-        <View style={{ marginTop: 2 }}>
-          <CategoryBadge name={item.category.name} slug={item.category.slug} />
-        </View>
+        {showCategoryBadge ? (
+          <View style={{ marginTop: 2 }}>
+            <CategoryBadge name={item.category.name} slug={item.category.slug} />
+          </View>
+        ) : null}
         <AppText variant="caption" color="textMuted" numberOfLines={1}>
           Ajouté par {item.createdBy.displayName} · {formatRelativeDate(item.createdAt)}
         </AppText>
       </View>
     </Pressable>
+  );
+}
+
+/** Squelette de `RecentItemRow` : même couverture et mêmes lignes, sans carte. */
+export function RecentItemRowSkeleton() {
+  const theme = useTheme();
+  return (
+    <View
+      style={{ flexDirection: 'row', gap: theme.spacing.md, paddingVertical: theme.spacing.md }}
+    >
+      <LoadingSkeleton width={COVER_WIDTH} height={COVER_HEIGHT} radius={theme.radii.sm} />
+      <View style={{ flex: 1, gap: 6, justifyContent: 'center' }}>
+        <LoadingSkeleton width="65%" height={18} />
+        <LoadingSkeleton width="40%" height={12} />
+        <LoadingSkeleton width="55%" height={12} />
+      </View>
+    </View>
   );
 }

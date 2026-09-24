@@ -19,7 +19,7 @@ export { ItemCardSkeleton, LoadingSkeleton } from './LoadingSkeleton';
 export { ItemCover } from './ItemCover';
 export { OwnerAvatarGroup } from './OwnerAvatarGroup';
 export { PasswordField } from './PasswordField';
-export { RecentItemRow } from './RecentItemRow';
+export { RecentItemRow, RecentItemRowSkeleton } from './RecentItemRow';
 export { ScreenContainer } from './ScreenContainer';
 export { SearchField } from './SearchField';
 export { Select } from './Select';
