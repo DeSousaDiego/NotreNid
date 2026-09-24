@@ -315,6 +315,23 @@ describe('ItemDetailScreen', () => {
     expect(view.queryByText('Album')).toBeNull();
   });
 
+  it('humanizes customMetadata keys for a custom category (camelCase/snake_case), leaving values untouched', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      category: { ...BASE_ITEM.category, slug: 'vinyles', name: 'Vinyles', isSystem: false },
+      book: null,
+      customMetadata: { releaseFormat: '180g', purchase_date: '2026-01-01' },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Release format')).toBeTruthy());
+    expect(view.getByText('180g')).toBeTruthy();
+    expect(view.getByText('Purchase date')).toBeTruthy();
+    expect(view.getByText('2026-01-01')).toBeTruthy();
+    expect(view.queryByText('releaseFormat')).toBeNull();
+    expect(view.queryByText('purchase_date')).toBeNull();
+  });
+
   it('shows the floating edit button for an active item, navigating to the edit screen', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
     const view = await renderScreen(<ItemDetailScreen />);

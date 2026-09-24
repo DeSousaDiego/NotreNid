@@ -55,7 +55,12 @@ export function LoadingSkeleton({
   );
 }
 
-/** Squelette d'une carte de collection (voir ItemCard). */
+/**
+ * Squelette d'une carte de collection (voir ItemCard) : quatre bandes reprenant
+ * l'empilement réel (titre, info secondaire, badges, propriétaires) plutôt que
+ * trois barres génériques — réduit le saut visuel au chargement sans reproduire
+ * chaque détail (pas de forme par badge/avatar, juste le bon nombre de lignes).
+ */
 export function ItemCardSkeleton() {
   const theme = useTheme();
   return (
@@ -71,10 +76,19 @@ export function ItemCardSkeleton() {
       }}
     >
       <LoadingSkeleton width={56} height={56} radius={theme.radii.sm} />
-      <View style={{ flex: 1, gap: theme.spacing.xs, justifyContent: 'center' }}>
+      <View style={{ flex: 1, gap: 4 }}>
         <LoadingSkeleton width="70%" height={16} />
         <LoadingSkeleton width="40%" height={12} />
-        <LoadingSkeleton width="50%" height={20} />
+        <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginTop: 4 }}>
+          <LoadingSkeleton width={64} height={22} radius={theme.radii.sm} />
+          <LoadingSkeleton width={56} height={22} radius={theme.radii.sm} />
+        </View>
+        <LoadingSkeleton
+          width={72}
+          height={20}
+          radius={theme.radii.full}
+          style={{ marginTop: 4 }}
+        />
       </View>
     </View>
   );

@@ -20,7 +20,6 @@ export const DEFAULT_COLLECTION_FILTERS: CollectionFiltersState = {
 interface CollectionFiltersContextValue {
   filters: CollectionFiltersState;
   setFilters: (filters: CollectionFiltersState) => void;
-  resetFilters: () => void;
 }
 
 const CollectionFiltersContext = createContext<CollectionFiltersContextValue | null>(null);
@@ -33,14 +32,7 @@ const CollectionFiltersContext = createContext<CollectionFiltersContextValue | n
 export function CollectionFiltersProvider({ children }: { children: ReactNode }) {
   const [filters, setFilters] = useState<CollectionFiltersState>(DEFAULT_COLLECTION_FILTERS);
 
-  const value = useMemo<CollectionFiltersContextValue>(
-    () => ({
-      filters,
-      setFilters,
-      resetFilters: () => setFilters(DEFAULT_COLLECTION_FILTERS),
-    }),
-    [filters],
-  );
+  const value = useMemo<CollectionFiltersContextValue>(() => ({ filters, setFilters }), [filters]);
 
   return (
     <CollectionFiltersContext.Provider value={value}>{children}</CollectionFiltersContext.Provider>

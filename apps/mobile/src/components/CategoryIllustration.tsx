@@ -33,5 +33,12 @@ export function CategoryIllustration({ slug, size }: CategoryIllustrationProps) 
     );
   }
 
-  return <Ionicons name={getCategoryIcon(slug)} size={size} color={theme.colors.primaryMuted} />;
+  return (
+    <Ionicons
+      name={getCategoryIcon(slug)}
+      size={size}
+      color={theme.colors.primaryMuted}
+      accessible={false}
+    />
+  );
 }

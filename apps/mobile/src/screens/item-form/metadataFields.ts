@@ -147,6 +147,23 @@ export function formatBookFormatLabel(rawFormat: string): string {
 }
 
 /**
+ * Humanise la clé brute d'un champ `customMetadata` (catégorie personnalisée) pour
+ * l'affichage en fiche détail — jamais un dictionnaire de traductions, juste
+ * camelCase/snake_case/kebab-case découpé en mots. Volontairement pas de gestion
+ * des sigles/acronymes (ex. « URL » resterait « Url ») : la variété réelle des clés
+ * saisies par les foyers ne justifie pas plus qu'un découpage générique.
+ */
+export function humanizeMetadataKey(key: string): string {
+  const words = key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .trim();
+  if (!words) return key;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
  * Libellé du champ pays (générique sur `Item`, voir docs/NOTRE_NID_PRD.md — Bloc 1, point
  * 1C), adapté à la catégorie pour rester parlant (ex. « Pays de l'artiste » pour un CD).
  */

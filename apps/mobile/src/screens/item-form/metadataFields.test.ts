@@ -3,6 +3,7 @@ import {
   CD_FIELDS,
   DVD_FIELDS,
   formatBookFormatLabel,
+  humanizeMetadataKey,
   metadataDisplayRows,
 } from './metadataFields';
 
@@ -110,5 +111,24 @@ describe('metadataDisplayRows', () => {
       { label: 'Format', value: 'Blu-ray' },
       { label: 'Durée', value: '152 min' },
     ]);
+  });
+});
+
+describe('humanizeMetadataKey', () => {
+  it('splits camelCase into words, capitalizing only the first', () => {
+    expect(humanizeMetadataKey('releaseFormat')).toBe('Release format');
+    expect(humanizeMetadataKey('specialEdition')).toBe('Special edition');
+  });
+
+  it('splits snake_case into words', () => {
+    expect(humanizeMetadataKey('purchase_date')).toBe('Purchase date');
+  });
+
+  it('splits kebab-case into words', () => {
+    expect(humanizeMetadataKey('purchase-date')).toBe('Purchase date');
+  });
+
+  it('leaves an already-plain key capitalized, unchanged otherwise', () => {
+    expect(humanizeMetadataKey('edition')).toBe('Edition');
   });
 });

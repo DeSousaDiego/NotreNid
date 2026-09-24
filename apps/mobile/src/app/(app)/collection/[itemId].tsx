@@ -28,6 +28,7 @@ import {
   CD_FIELDS,
   countryLabelForSlug,
   DVD_FIELDS,
+  humanizeMetadataKey,
   metadataDisplayRows,
   type MetadataDisplayRow,
 } from '../../../screens/item-form/metadataFields';
@@ -347,7 +348,7 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
     rows = metadataDisplayRows(DVD_FIELDS, item.dvd);
   } else if (item.customMetadata) {
     rows = Object.entries(item.customMetadata).map(([key, value]) => ({
-      label: key,
+      label: humanizeMetadataKey(key),
       value: String(value),
     }));
   }
