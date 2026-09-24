@@ -1,10 +1,16 @@
 import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useState, type ReactElement } from 'react';
 import { Pressable } from 'react-native';
 
 import { AppText, ToastProvider } from '../../components';
+import {
+  GO_BACK_ACTION,
+  isRemovalGuarded,
+  resetPreventRemoveMock,
+  simulateBackAttempt,
+} from '../../test-utils/preventRemoveMock';
 import { ThemeProvider } from '../../theme';
 
 import { ItemFormScreen } from './ItemFormScreen';
@@ -43,10 +49,37 @@ jest.mock('../../providers/HouseholdProvider', () => ({
 
 const mockRouterReplace = jest.fn();
 const mockRouterBack = jest.fn();
+const mockNavigationDispatch = jest.fn();
 jest.mock('expo-router', () => ({
   router: {
     replace: (...args: unknown[]) => mockRouterReplace(...args),
     back: () => mockRouterBack(),
+  },
+  useNavigation: () => ({ dispatch: mockNavigationDispatch }),
+}));
+
+// Garde de retour arrière (`usePreventRemove`) : double contrôlable, voir test-utils.
+jest.mock('expo-router/react-navigation', () => ({
+  usePreventRemove: (...args: [boolean, never]) =>
+    jest.requireActual('../../test-utils/preventRemoveMock').recordPreventRemove(...args),
+}));
+
+// Sélection d'image : toujours « une image choisie dans la galerie », sans picker
+// natif — seul le téléversement (contrôlé par chaque test) nous intéresse ici.
+jest.mock('../../lib/imagePicker', () => ({
+  pickImageFromLibrary: jest.fn(async () => ({
+    status: 'picked',
+    asset: { uri: 'file:///cover.jpg' },
+  })),
+  pickImageFromCamera: jest.fn(),
+}));
+
+jest.mock('expo-file-system', () => ({
+  File: class MockFile {
+    mockUri: string;
+    constructor(mockUri: string) {
+      this.mockUri = mockUri;
+    }
   },
 }));
 
@@ -54,6 +87,7 @@ function createMockApiClient() {
   return {
     households: { listMembers: jest.fn() },
     items: { create: jest.fn(), update: jest.fn(), get: jest.fn() },
+    uploads: { upload: jest.fn(), remove: jest.fn() },
   } as unknown as import('@notre-nid/api-client').ApiClient;
 }
 
@@ -576,6 +610,350 @@ describe('ItemFormScreen', () => {
       const dvdView = await renderScreen(<ItemFormScreen mode="create" category={DVD_CATEGORY} />);
       await waitFor(() => expect(dvdView.getByLabelText('Code-barres')).toBeTruthy());
       expect(dvdView.queryByText('Souvent identique à l’ISBN, mais pas toujours.')).toBeNull();
+    });
+  });
+});
+
+describe('ItemFormScreen — robustesse (Lot 1)', () => {
+  const NETWORK_ERROR_MESSAGE = new NetworkError().message;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetPreventRemoveMock();
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(EXISTING_ITEM);
+  });
+
+  type View = Awaited<ReturnType<typeof renderScreen>>;
+
+  /** Remplit le titre, passe les deux premières étapes et coche le propriétaire. */
+  async function goToLastStepInCreate(view: View) {
+    await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByRole('button', { name: 'Alix' })).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+  }
+
+  async function goToLastStepInEdit(view: View) {
+    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() =>
+      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy(),
+    );
+  }
+
+  function isDisabled(view: View, name: string): boolean {
+    return Boolean(view.getByRole('button', { name }).props.accessibilityState?.disabled);
+  }
+
+  /** Lance un upload de couverture qui reste en cours tant que le test ne le résout pas. */
+  async function startPendingCoverUpload(view: View) {
+    let finishUpload!: (value: unknown) => void;
+    (mockApiClient.uploads.upload as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        finishUpload = resolve;
+      }),
+    );
+    await fireEvent.press(view.getByLabelText('Ajouter une couverture'));
+    await fireEvent.press(view.getByLabelText('Choisir dans la galerie'));
+    await waitFor(() =>
+      expect(
+        view.getByText('Envoi de la couverture en cours… Patientez avant de continuer.'),
+      ).toBeTruthy(),
+    );
+    return finishUpload;
+  }
+
+  describe('cover upload', () => {
+    it('disables the final CTA and "Précédent" while the cover is uploading, and re-enables them afterwards', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      const finishUpload = await startPendingCoverUpload(view);
+      expect(isDisabled(view, 'Ajouter au nid')).toBe(true);
+      expect(isDisabled(view, 'Précédent')).toBe(true);
+
+      await act(async () => {
+        finishUpload({ id: 'upload-1', url: 'https://cdn.test/cover.jpg' });
+      });
+
+      await waitFor(() => expect(isDisabled(view, 'Ajouter au nid')).toBe(false));
+      expect(isDisabled(view, 'Précédent')).toBe(false);
+      expect(
+        view.queryByText('Envoi de la couverture en cours… Patientez avant de continuer.'),
+      ).toBeNull();
+    });
+
+    it('never submits while the cover is uploading, then sends it with the uploaded cover', async () => {
+      (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      const finishUpload = await startPendingCoverUpload(view);
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      expect(mockApiClient.items.create).not.toHaveBeenCalled();
+
+      await act(async () => {
+        finishUpload({ id: 'upload-1', url: 'https://cdn.test/cover.jpg' });
+      });
+      await waitFor(() => expect(isDisabled(view, 'Ajouter au nid')).toBe(false));
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.create).toHaveBeenCalledWith(
+        'household-1',
+        expect.objectContaining({ coverImageUrl: 'https://cdn.test/cover.jpg' }),
+      );
+    });
+
+    it('ignores a system back attempt while the cover is uploading', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+      await startPendingCoverUpload(view);
+
+      await act(async () => {
+        expect(simulateBackAttempt()).toBe(true);
+      });
+
+      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy();
+    });
+  });
+
+  describe('double submit', () => {
+    it('sends a single create request for two immediate taps', async () => {
+      let finishCreate!: (value: unknown) => void;
+      (mockApiClient.items.create as jest.Mock).mockReturnValue(
+        new Promise((resolve) => {
+          finishCreate = resolve;
+        }),
+      );
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      // Même élément, deux appuis dans la même frame — avant tout re-rendu qui
+      // désactiverait le bouton.
+      const submitButton = view.getByRole('button', { name: 'Ajouter au nid' });
+      await act(async () => {
+        void fireEvent.press(submitButton);
+        void fireEvent.press(submitButton);
+      });
+
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        finishCreate({ id: 'item-1' });
+      });
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      expect(mockApiClient.items.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends a single update request for two immediate taps', async () => {
+      let finishUpdate!: (value: unknown) => void;
+      (mockApiClient.items.update as jest.Mock).mockReturnValue(
+        new Promise((resolve) => {
+          finishUpdate = resolve;
+        }),
+      );
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await goToLastStepInEdit(view);
+
+      const submitButton = view.getByRole('button', { name: 'Enregistrer' });
+      await act(async () => {
+        void fireEvent.press(submitButton);
+        void fireEvent.press(submitButton);
+      });
+
+      await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        finishUpdate({ ...EXISTING_ITEM });
+      });
+      await waitFor(() => expect(mockRouterBack).toHaveBeenCalledTimes(1));
+      expect(mockApiClient.items.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the lock after a failed submit so the user can retry', async () => {
+      (mockApiClient.items.create as jest.Mock)
+        .mockRejectedValueOnce(new NetworkError())
+        .mockResolvedValueOnce({ id: 'item-1' });
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() => expect(view.getByTestId('item-form-submit-error')).toBeTruthy());
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+    });
+  });
+
+  describe('submit error', () => {
+    it('shows the API error in the always-visible footer, above the buttons', async () => {
+      (mockApiClient.items.create as jest.Mock).mockRejectedValue(new NetworkError());
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+
+      await waitFor(() => expect(view.getByTestId('item-form-submit-error')).toBeTruthy());
+      expect(view.getByText(NETWORK_ERROR_MESSAGE)).toBeTruthy();
+      // Les boutons restent disponibles pour réessayer.
+      expect(isDisabled(view, 'Ajouter au nid')).toBe(false);
+    });
+
+    it('clears the error as soon as a new attempt starts, and keeps it gone on success', async () => {
+      let finishRetry!: (value: unknown) => void;
+      (mockApiClient.items.create as jest.Mock)
+        .mockRejectedValueOnce(new NetworkError())
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishRetry = resolve;
+          }),
+        );
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() => expect(view.getByTestId('item-form-submit-error')).toBeTruthy());
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(2));
+      expect(view.queryByTestId('item-form-submit-error')).toBeNull();
+
+      await act(async () => {
+        finishRetry({ id: 'item-1' });
+      });
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      expect(view.queryByTestId('item-form-submit-error')).toBeNull();
+    });
+  });
+
+  describe('back navigation — create', () => {
+    it('goes back one step at a time from step 3, then lets step 1 leave the form', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      await act(async () => {
+        expect(simulateBackAttempt()).toBe(true);
+      });
+      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+
+      await act(async () => {
+        expect(simulateBackAttempt()).toBe(true);
+      });
+      await waitFor(() => expect(view.getByText('Étape 1 sur 3 — Informations')).toBeTruthy());
+      // Les données saisies sont toujours là.
+      expect(view.getByLabelText('Titre').props.value).toBe('Dune');
+
+      // Étape 1 : comportement de sortie inchangé (retour vers l'écran précédent du
+      // flow, brouillon conservé par AddItemDraftContext) — aucune interception.
+      expect(isRemovalGuarded()).toBe(false);
+      expect(simulateBackAttempt()).toBe(false);
+      expect(mockNavigationDispatch).not.toHaveBeenCalled();
+    });
+
+    it('never intercepts the success navigation after creating', async () => {
+      (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      expect(isRemovalGuarded()).toBe(false);
+    });
+  });
+
+  describe('back navigation — edit', () => {
+    it('goes back one step at a time from step 3 to step 1', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await goToLastStepInEdit(view);
+
+      await act(async () => {
+        expect(simulateBackAttempt()).toBe(true);
+      });
+      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+
+      await act(async () => {
+        expect(simulateBackAttempt()).toBe(true);
+      });
+      await waitFor(() => expect(view.getByText('Étape 1 sur 3 — Informations')).toBeTruthy());
+    });
+
+    it('leaves step 1 without any confirmation when nothing was changed', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+
+      expect(isRemovalGuarded()).toBe(false);
+      expect(simulateBackAttempt()).toBe(false);
+      expect(view.queryByText('Quitter sans enregistrer ?')).toBeNull();
+    });
+
+    it('asks for confirmation before leaving step 1 with unsaved changes — "Continuer la modification" stays', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (collector)');
+
+      await waitFor(() => expect(isRemovalGuarded()).toBe(true));
+      await act(async () => {
+        expect(simulateBackAttempt()).toBe(true);
+      });
+
+      await waitFor(() => expect(view.getByText('Quitter sans enregistrer ?')).toBeTruthy());
+      expect(view.getByText('Vos modifications sur cet objet seront perdues.')).toBeTruthy();
+
+      await fireEvent.press(view.getByRole('button', { name: 'Continuer la modification' }));
+      await waitFor(() => expect(view.queryByText('Quitter sans enregistrer ?')).toBeNull());
+      expect(mockNavigationDispatch).not.toHaveBeenCalled();
+      expect(view.getByLabelText('Titre').props.value).toBe('Dune (collector)');
+    });
+
+    it('leaves with the original navigation action once "Quitter sans enregistrer" is confirmed', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (collector)');
+      await waitFor(() => expect(isRemovalGuarded()).toBe(true));
+
+      await act(async () => {
+        simulateBackAttempt();
+      });
+      await waitFor(() => expect(view.getByText('Quitter sans enregistrer ?')).toBeTruthy());
+      await fireEvent.press(view.getByRole('button', { name: 'Quitter sans enregistrer' }));
+
+      await waitFor(() => expect(mockNavigationDispatch).toHaveBeenCalledWith(GO_BACK_ACTION));
+      // Garde désarmée avant la navigation : la sortie confirmée n'est pas ré-interceptée.
+      expect(isRemovalGuarded()).toBe(false);
+    });
+
+    it('never shows the unsaved-changes confirmation after a successful save', async () => {
+      (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (collector)');
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() => expect(mockRouterBack).toHaveBeenCalledTimes(1));
+      expect(isRemovalGuarded()).toBe(false);
+      expect(view.queryByText('Quitter sans enregistrer ?')).toBeNull();
+      expect(mockNavigationDispatch).not.toHaveBeenCalled();
     });
   });
 });

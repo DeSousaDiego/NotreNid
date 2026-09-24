@@ -125,6 +125,9 @@ describe('AddItemModeScreen', () => {
     await fireEvent.press(view.getByLabelText('Changer de catégorie'));
 
     await waitFor(() => expect(view.getByText('Changer de catégorie ?')).toBeTruthy());
+    // Message exact : `clearDraft()` efface TOUT le brouillon, pas seulement les
+    // champs propres à la catégorie.
+    expect(view.getByText('Les informations déjà saisies seront perdues.')).toBeTruthy();
     expect(mockRouterDismissTo).not.toHaveBeenCalled();
 
     await fireEvent.press(view.getByRole('button', { name: 'Changer' }));

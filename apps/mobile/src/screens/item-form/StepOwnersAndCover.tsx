@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { getCountryName, type Category, type HouseholdMember } from '@notre-nid/shared';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
@@ -18,6 +18,9 @@ export interface StepOwnersAndCoverProps {
   category: Category;
   householdId: string | null;
   values: ItemFormValues;
+  /** Remonte l'état d'envoi de la couverture au formulaire, qui bloque la
+   * soumission et « Précédent » tant qu'il est vrai (voir `ItemFormScreen`). */
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 /** Étape 3 sur 3 — Propriétaires, couverture et récapitulatif (Bloc 2). */
@@ -28,6 +31,7 @@ export function StepOwnersAndCover({
   category,
   householdId,
   values,
+  onUploadingChange,
 }: StepOwnersAndCoverProps) {
   const theme = useTheme();
 
@@ -78,6 +82,7 @@ export function StepOwnersAndCover({
             categorySlug={category.slug}
             value={field.value ?? ''}
             onChange={field.onChange}
+            onUploadingChange={onUploadingChange}
           />
         )}
       />
@@ -141,11 +146,13 @@ function CoverPickerField({
   categorySlug,
   value,
   onChange,
+  onUploadingChange,
 }: {
   householdId: string | null;
   categorySlug: string;
   value: string;
   onChange: (url: string) => void;
+  onUploadingChange?: (isUploading: boolean) => void;
 }) {
   const theme = useTheme();
   const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
@@ -162,6 +169,13 @@ function CoverPickerField({
     value,
     onChange,
   });
+
+  useEffect(() => {
+    onUploadingChange?.(isUploading);
+  }, [isUploading, onUploadingChange]);
+  // Jamais d'état « envoi en cours » bloqué chez le parent si ce champ se démonte
+  // (ex. sortie du formulaire) pendant un upload.
+  useEffect(() => () => onUploadingChange?.(false), [onUploadingChange]);
 
   return (
     <View>
@@ -200,6 +214,11 @@ function CoverPickerField({
           </AppText>
         )}
       </Pressable>
+      {isUploading ? (
+        <AppText variant="helper" color="textMuted" style={{ marginTop: 6 }}>
+          Envoi de l’image en cours…
+        </AppText>
+      ) : null}
       {previewUri && !isUploading ? (
         <Pressable
           accessibilityRole="button"
