@@ -15,13 +15,15 @@ import { useAddItemDraft } from '../../../screens/add-item/AddItemDraftContext';
 import { buildDraftValuesFromBarcodeResult } from '../../../screens/add-item/barcodeResultMapping';
 import { useTheme } from '../../../theme';
 
+// Les phases de résultat portent le code lu : il est affiché (« Code lu : … »)
+// pour confirmer que le scan lui-même a fonctionné, même sans résultat.
 type ScanPhase =
   | { kind: 'scanning' }
   | { kind: 'loading' }
-  | { kind: 'no_match' }
-  | { kind: 'unsupported' }
-  | { kind: 'provider_error' }
-  | { kind: 'error'; message: string };
+  | { kind: 'no_match'; barcode: string }
+  | { kind: 'unsupported'; barcode: string }
+  | { kind: 'provider_error'; barcode: string }
+  | { kind: 'error'; barcode: string; message: string };
 
 function isBarcodeCategory(slug: string): slug is BarcodeCategory {
   return slug === 'book' || slug === 'cd' || slug === 'dvd';
@@ -143,6 +145,12 @@ export default function AddItemScanScreen() {
   };
 
   const resolve = async (barcode: string) => {
+    // Conservé dans le brouillon dès la lecture, avant toute résolution : si la
+    // recherche échoue (no_match, provider_error, erreur réseau), « Saisir
+    // manuellement » ouvre quand même le formulaire avec ce code déjà rempli —
+    // et rien d'autre (aucune donnée inventée). Un succès le réécrit à
+    // l'identique via `buildDraftValuesFromBarcodeResult`.
+    draft.setValues({ barcode });
     setPhase({ kind: 'loading' });
     try {
       const result = await resolveBarcode.mutateAsync({ barcode, category: barcodeCategory });
@@ -164,10 +172,10 @@ export default function AddItemScanScreen() {
         return;
       }
 
-      setPhase({ kind: result.status });
+      setPhase({ kind: result.status, barcode });
     } catch (error) {
       if (!isMountedRef.current) return;
-      setPhase({ kind: 'error', message: getErrorMessage(error) });
+      setPhase({ kind: 'error', barcode, message: getErrorMessage(error) });
     }
   };
 
@@ -263,6 +271,9 @@ export default function AddItemScanScreen() {
               style={{ textAlign: 'center' }}
             >
               {message}
+            </AppText>
+            <AppText variant="caption" color="textMuted" style={{ textAlign: 'center' }}>
+              Code lu : {phase.barcode}
             </AppText>
           </View>
 

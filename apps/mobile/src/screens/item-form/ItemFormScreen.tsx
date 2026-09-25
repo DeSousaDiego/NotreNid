@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { router } from 'expo-router';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { router, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { View } from 'react-native';
 import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
@@ -10,6 +11,7 @@ import type { Category } from '@notre-nid/shared';
 import {
   AppText,
   Button,
+  ConfirmDialog,
   ErrorState,
   LoadingSkeleton,
   ScreenContainer,
@@ -73,6 +75,21 @@ const SCREEN_EDGES: Edge[] = ['top', 'left', 'right', 'bottom'];
 // ici doublerait ce padding.
 const FORM_SCREEN_EDGES: Edge[] = ['top', 'left', 'right'];
 
+type PreventedNavigationAction = Parameters<
+  Parameters<typeof usePreventRemove>[1]
+>[0]['data']['action'];
+
+/**
+ * Sortie de l'écran décidée par le formulaire lui-même. Toujours exécutée dans un
+ * effet, APRÈS le rendu qui désarme `usePreventRemove` (`exitIntent !== null`) :
+ * une navigation de succès ou une sortie confirmée ne repasse donc jamais par la
+ * garde « retour arrière » (pas de confirmation parasite après `router.back()`).
+ */
+type ExitIntent =
+  | { kind: 'created' }
+  | { kind: 'updated' }
+  | { kind: 'discard'; action: PreventedNavigationAction };
+
 function mergeWithEmpty(partial: Partial<ItemFormValues> | undefined): ItemFormValues {
   return {
     ...EMPTY_ITEM_FORM_VALUES,
@@ -106,8 +123,18 @@ function ItemFormScreenComponent({
   const createItem = useCreateItem(householdId);
   const updateItem = useUpdateItem(householdId);
 
+  const navigation = useNavigation();
   const [step, setStep] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [exitIntent, setExitIntent] = useState<ExitIntent | null>(null);
+  const [pendingDiscardAction, setPendingDiscardAction] =
+    useState<PreventedNavigationAction | null>(null);
+  // Verrou synchrone (même principe que `scanLockRef` du scan) : `isBusy` ne
+  // désactive le bouton qu'au rendu suivant — deux appuis dans la même frame
+  // enverraient sinon deux créations/mises à jour.
+  const submitLockRef = useRef(false);
+  const submitSucceededRef = useRef(false);
 
   // Mémoïsé : `values` ci-dessous (RHF, mode édition) ne doit se resynchroniser que
   // lorsque l'item chargé change réellement, jamais à chaque rendu — un nouvel objet
@@ -128,7 +155,7 @@ function ItemFormScreenComponent({
     trigger,
     clearErrors,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<ItemFormValues>({
     resolver: zodResolver(itemFormSchema),
     defaultValues,
@@ -165,6 +192,33 @@ function ItemFormScreenComponent({
     });
     return () => subscription.unsubscribe();
   }, [mode, watch, onValuesChange]);
+
+  const isBusy = isSubmitting || createItem.isPending || updateItem.isPending;
+
+  // Retour système (Android), bouton retour du header et geste de retour iOS (la
+  // native stack bloque le swipe tant que la garde est active et renvoie
+  // l'intention ici) : revient d'abord à l'étape précédente ; à l'étape 1 en
+  // édition, confirme avant d'abandonner des modifications non enregistrées. En
+  // création, l'étape 1 quitte librement — le brouillon survit dans
+  // `AddItemDraftContext` tant qu'on reste dans le flow.
+  const shouldGuardRemoval = exitIntent === null && (step > 0 || (mode === 'edit' && isDirty));
+  usePreventRemove(shouldGuardRemoval, ({ data }) => {
+    // Rien ne bouge pendant un envoi (couverture ou soumission) : ni étape, ni sortie.
+    if (isBusy || isUploadingCover) return;
+    if (step > 0) {
+      setSubmitError(null);
+      setStep((current) => Math.max(current - 1, 0));
+      return;
+    }
+    setPendingDiscardAction(data.action);
+  });
+
+  useEffect(() => {
+    if (!exitIntent) return;
+    if (exitIntent.kind === 'created') router.replace('/collection');
+    else if (exitIntent.kind === 'updated') router.back();
+    else navigation.dispatch(exitIntent.action);
+  }, [exitIntent, navigation]);
 
   if (mode === 'edit' && itemQuery.isLoading) {
     return (
@@ -229,20 +283,33 @@ function ItemFormScreenComponent({
       const payload = buildItemPayload(formValues, category);
       if (mode === 'create') {
         await createItem.mutateAsync(payload);
+        submitSucceededRef.current = true;
         showToast('Cet objet a rejoint votre nid.', 'success');
-        router.replace('/collection');
+        setExitIntent({ kind: 'created' });
       } else if (itemId) {
         await updateItem.mutateAsync({ itemId, input: payload });
+        submitSucceededRef.current = true;
         showToast('Objet modifié.', 'success');
-        router.back();
+        setExitIntent({ kind: 'updated' });
       }
     } catch (error) {
       setSubmitError(getErrorMessage(error));
     }
   });
 
+  const submit = async () => {
+    if (submitLockRef.current || isUploadingCover) return;
+    submitLockRef.current = true;
+    try {
+      await onSubmit();
+    } finally {
+      // Relâché après un échec (validation ou API) pour permettre de réessayer ;
+      // conservé après un succès, l'écran est en train de se fermer.
+      if (!submitSucceededRef.current) submitLockRef.current = false;
+    }
+  };
+
   const isLastStep = step === STEP_TITLES.length - 1;
-  const isBusy = isSubmitting || createItem.isPending || updateItem.isPending;
 
   return (
     <ScreenContainer
@@ -257,7 +324,6 @@ function ItemFormScreenComponent({
         // retrouver hors champ (bug constaté en test manuel Android).
         <View
           style={{
-            flexDirection: 'row',
             gap: theme.spacing.sm,
             paddingHorizontal: theme.spacing.lg,
             paddingTop: theme.spacing.sm,
@@ -267,19 +333,51 @@ function ItemFormScreenComponent({
             borderTopColor: theme.colors.border,
           }}
         >
-          {step > 0 ? (
-            <Button label="Précédent" variant="ghost" onPress={goBack} disabled={isBusy} />
+          {/* Erreur de soumission ancrée au footer, jamais dans le contenu défilant :
+           * toujours visible au moment où l'utilisateur vient d'appuyer, jusqu'à la
+           * prochaine tentative (remise à zéro au début de chaque essai). */}
+          {submitError ? (
+            <View
+              testID="item-form-submit-error"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              style={{ flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.xs }}
+            >
+              <Ionicons
+                name="alert-circle-outline"
+                size={theme.iconSizes.md}
+                color={theme.colors.danger}
+              />
+              <AppText variant="label" color="danger" style={{ flex: 1 }}>
+                {submitError}
+              </AppText>
+            </View>
+          ) : isUploadingCover ? (
+            <AppText variant="helper" color="textMuted" accessibilityLiveRegion="polite">
+              Envoi de la couverture en cours… Patientez avant de continuer.
+            </AppText>
           ) : null}
-          <View style={{ flex: 1 }} />
-          {isLastStep ? (
-            <Button
-              label={mode === 'create' ? 'Ajouter au nid' : 'Enregistrer'}
-              onPress={() => void onSubmit()}
-              loading={isBusy}
-            />
-          ) : (
-            <Button label="Suivant" onPress={() => void goNext()} disabled={isBusy} />
-          )}
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            {step > 0 ? (
+              <Button
+                label="Précédent"
+                variant="ghost"
+                onPress={goBack}
+                disabled={isBusy || isUploadingCover}
+              />
+            ) : null}
+            <View style={{ flex: 1 }} />
+            {isLastStep ? (
+              <Button
+                label={mode === 'create' ? 'Ajouter au nid' : 'Enregistrer'}
+                onPress={() => void submit()}
+                loading={isBusy}
+                disabled={isUploadingCover}
+              />
+            ) : (
+              <Button label="Suivant" onPress={() => void goNext()} disabled={isBusy} />
+            )}
+          </View>
         </View>
       }
     >
@@ -339,17 +437,27 @@ function ItemFormScreenComponent({
                 category={category}
                 householdId={householdId}
                 values={values}
+                onUploadingChange={setIsUploadingCover}
               />
             ) : null}
           </>
         )}
-
-        {submitError ? (
-          <AppText variant="helper" color="danger">
-            {submitError}
-          </AppText>
-        ) : null}
       </View>
+
+      <ConfirmDialog
+        visible={pendingDiscardAction !== null}
+        title="Quitter sans enregistrer ?"
+        message="Vos modifications sur cet objet seront perdues."
+        confirmLabel="Quitter sans enregistrer"
+        cancelLabel="Continuer la modification"
+        destructive
+        onConfirm={() => {
+          const action = pendingDiscardAction;
+          setPendingDiscardAction(null);
+          if (action) setExitIntent({ kind: 'discard', action });
+        }}
+        onCancel={() => setPendingDiscardAction(null)}
+      />
     </ScreenContainer>
   );
 }

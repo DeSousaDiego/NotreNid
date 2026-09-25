@@ -1,8 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { useEffect, type ReactNode } from 'react';
 
 import { ToastProvider } from '../../../components';
-import { AddItemDraftProvider } from '../../../screens/add-item/AddItemDraftContext';
+import {
+  AddItemDraftProvider,
+  useAddItemDraft,
+} from '../../../screens/add-item/AddItemDraftContext';
+import type { ItemFormValues } from '../../../screens/item-form/schema';
 import { ThemeProvider } from '../../../theme';
 
 import AddItemFormScreen from './form';
@@ -24,6 +29,12 @@ jest.mock('expo-router', () => ({
     dismissTo: (...args: unknown[]) => mockRouterDismissTo(...args),
   },
   useLocalSearchParams: () => ({ categoryId: 'cat-cd' }),
+  useNavigation: () => ({ dispatch: jest.fn() }),
+}));
+
+jest.mock('expo-router/react-navigation', () => ({
+  usePreventRemove: (...args: [boolean, never]) =>
+    jest.requireActual('../../../test-utils/preventRemoveMock').recordPreventRemove(...args),
 }));
 
 const mockApiClient = {
@@ -67,14 +78,35 @@ const MEMBER = {
   },
 };
 
-function renderScreen() {
+/**
+ * Reproduit l'arrivée depuis le scan : le brouillon (catégorie + valeurs) est déjà
+ * rempli AVANT le montage du formulaire, qui ne lit ses valeurs initiales qu'une fois.
+ */
+function SeededDraft({ seed, children }: { seed: Partial<ItemFormValues>; children: ReactNode }) {
+  const draft = useAddItemDraft();
+  useEffect(() => {
+    draft.setCategory('cat-cd');
+    draft.setValues(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- amorçage unique au montage
+  }, []);
+  // Le formulaire ne se monte qu'une fois le brouillon réellement amorcé.
+  return draft.draft.values ? children : null;
+}
+
+function renderScreen(seed?: Partial<ItemFormValues>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider fontsLoaded={false}>
         <ToastProvider>
           <AddItemDraftProvider>
-            <AddItemFormScreen />
+            {seed ? (
+              <SeededDraft seed={seed}>
+                <AddItemFormScreen />
+              </SeededDraft>
+            ) : (
+              <AddItemFormScreen />
+            )}
           </AddItemDraftProvider>
         </ToastProvider>
       </ThemeProvider>
@@ -123,5 +155,26 @@ describe('AddItemFormScreen (create wrapper)', () => {
 
     // Le brouillon est encore vide à ce stade (aucun champ rempli) : pas de confirmation.
     expect(mockRouterDismissTo).toHaveBeenCalledWith('/(app)/add-item/category');
+    expect(view.queryByText('Changer de catégorie ?')).toBeNull();
+  });
+
+  it('asks with the exact message once data was entered — the whole draft is cleared, not only category fields', async () => {
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Discovery');
+    await fireEvent.press(view.getByLabelText('Changer de catégorie'));
+
+    await waitFor(() => expect(view.getByText('Changer de catégorie ?')).toBeTruthy());
+    expect(view.getByText('Les informations déjà saisies seront perdues.')).toBeTruthy();
+    expect(mockRouterDismissTo).not.toHaveBeenCalled();
+  });
+
+  it('prefills the Code-barres field from a barcode kept after a failed scan, leading zero intact', async () => {
+    const view = await renderScreen({ barcode: '065935831686' });
+
+    await waitFor(() => expect(view.getByLabelText('Code-barres')).toBeTruthy());
+    expect(view.getByLabelText('Code-barres').props.value).toBe('065935831686');
+    // Rien d'autre n'est inventé : le titre reste vide.
+    expect(view.getByLabelText('Titre').props.value).toBe('');
   });
 });

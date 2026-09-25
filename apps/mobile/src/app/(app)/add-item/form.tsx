@@ -92,7 +92,7 @@ export default function AddItemFormScreen() {
       />
       <ConfirmDialog
         title="Changer de catégorie ?"
-        message="Les informations spécifiques à cette catégorie seront perdues."
+        message="Les informations déjà saisies seront perdues."
         confirmLabel="Changer"
         destructive
         {...confirmDialogProps}

@@ -953,3 +953,88 @@ describe('AddItemScanScreen', () => {
     });
   });
 });
+
+describe('AddItemScanScreen — code-barres conservé après un échec de résolution (Lot 1)', () => {
+  // UPC avec zéro initial : doit rester une chaîne intacte de bout en bout.
+  const SCANNED = '065935831686';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCurrentCategoryId = 'cat-dvd';
+    mockLatestCameraProps = null;
+    mockPermissionResponse = {
+      status: 'granted',
+      granted: true,
+      canAskAgain: true,
+      expires: 'never',
+    };
+    mockRequestPermissionImpl.mockImplementation(async () => mockPermissionResponse);
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([
+      BOOK_CATEGORY,
+      CD_CATEGORY,
+      DVD_CATEGORY,
+    ]);
+  });
+
+  function unresolved(status: 'no_match' | 'provider_error') {
+    return {
+      barcode: SCANNED,
+      category: 'dvd',
+      status,
+      match: false,
+      source: null,
+      data: null,
+      cover: null,
+    };
+  }
+
+  it('no_match: keeps the scanned barcode in the draft — and nothing else — and shows the code read', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(unresolved('no_match'));
+    const { view, draftRef } = await renderScreen();
+
+    await scanBarcode(SCANNED, 'upc_a');
+
+    await waitFor(() => expect(view.getByText(/Aucun résultat pour ce code-barres/)).toBeTruthy());
+    expect(view.getByText(`Code lu : ${SCANNED}`)).toBeTruthy();
+    expect(draftRef.current?.values).toEqual({ barcode: SCANNED });
+    expect(draftRef.current?.partialWarning).toBe(false);
+  });
+
+  it('provider_error: keeps the scanned barcode in the draft and shows the code read', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(
+      unresolved('provider_error'),
+    );
+    const { view, draftRef } = await renderScreen();
+
+    await scanBarcode(SCANNED, 'upc_a');
+
+    await waitFor(() => expect(view.getByText(/momentanément indisponible/)).toBeTruthy());
+    expect(view.getByText(`Code lu : ${SCANNED}`)).toBeTruthy();
+    expect(draftRef.current?.values).toEqual({ barcode: SCANNED });
+  });
+
+  it('request failure: still keeps the scanned barcode for manual entry', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockRejectedValue(new Error('boom'));
+    const { view, draftRef } = await renderScreen();
+
+    await scanBarcode(SCANNED, 'upc_a');
+
+    await waitFor(() => expect(view.getByText(`Code lu : ${SCANNED}`)).toBeTruthy());
+    expect(draftRef.current?.values).toEqual({ barcode: SCANNED });
+  });
+
+  it('"Saisir manuellement à la place" after a no_match opens the form with the barcode kept in the draft', async () => {
+    (mockApiClient.items.resolveBarcode as jest.Mock).mockResolvedValue(unresolved('no_match'));
+    const { view, draftRef } = await renderScreen();
+
+    await scanBarcode(SCANNED, 'upc_a');
+    await waitFor(() => expect(view.getByText(`Code lu : ${SCANNED}`)).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Saisir manuellement à la place' }));
+
+    expect(mockRouterReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/add-item/form',
+      params: { categoryId: 'cat-dvd' },
+    });
+    expect(draftRef.current?.values?.barcode).toBe(SCANNED);
+  });
+});
