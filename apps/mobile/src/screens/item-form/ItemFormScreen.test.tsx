@@ -711,6 +711,29 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
       );
     });
 
+    it('never stays locked when the upload fails: buttons come back and the error is shown', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await goToLastStepInCreate(view);
+
+      let failUpload!: (reason: unknown) => void;
+      (mockApiClient.uploads.upload as jest.Mock).mockReturnValue(
+        new Promise((_resolve, reject) => {
+          failUpload = reject;
+        }),
+      );
+      await fireEvent.press(view.getByLabelText('Ajouter une couverture'));
+      await fireEvent.press(view.getByLabelText('Choisir dans la galerie'));
+      await waitFor(() => expect(isDisabled(view, 'Ajouter au nid')).toBe(true));
+
+      await act(async () => {
+        failUpload(new NetworkError());
+      });
+
+      await waitFor(() => expect(isDisabled(view, 'Ajouter au nid')).toBe(false));
+      expect(isDisabled(view, 'Précédent')).toBe(false);
+      expect(view.getByText(NETWORK_ERROR_MESSAGE)).toBeTruthy();
+    });
+
     it('ignores a system back attempt while the cover is uploading', async () => {
       const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
       await goToLastStepInCreate(view);
