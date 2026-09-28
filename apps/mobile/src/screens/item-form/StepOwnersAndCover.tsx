@@ -168,11 +168,11 @@ function CoverPickerField({
     householdId,
     value,
     onChange,
+    // Transmis tel quel (jamais relayé par un effet) : le hook l'appelle de façon
+    // synchrone dès l'appui sur une source d'image, avant tout `await`.
+    onUploadingChange,
   });
 
-  useEffect(() => {
-    onUploadingChange?.(isUploading);
-  }, [isUploading, onUploadingChange]);
   // Jamais d'état « envoi en cours » bloqué chez le parent si ce champ se démonte
   // (ex. sortie du formulaire) pendant un upload.
   useEffect(() => () => onUploadingChange?.(false), [onUploadingChange]);

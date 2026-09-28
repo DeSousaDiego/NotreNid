@@ -2,9 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { View } from 'react-native';
+import { BackHandler, View } from 'react-native';
 import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import type { Category } from '@notre-nid/shared';
 
@@ -80,15 +80,12 @@ type PreventedNavigationAction = Parameters<
 >[0]['data']['action'];
 
 /**
- * Sortie de l'écran décidée par le formulaire lui-même. Toujours exécutée dans un
- * effet, APRÈS le rendu qui désarme `usePreventRemove` (`exitIntent !== null`) :
- * une navigation de succès ou une sortie confirmée ne repasse donc jamais par la
- * garde « retour arrière » (pas de confirmation parasite après `router.back()`).
+ * Sortie confirmée (« Quitter sans enregistrer ») : exécutée dans un effet, APRÈS
+ * le rendu qui désarme `usePreventRemove` (`exitIntent !== null`), avec l'action
+ * de navigation d'origine. Les sorties après succès, elles, ne passent PAS par ici :
+ * voir `leaveAfterSuccess`.
  */
-type ExitIntent =
-  | { kind: 'created' }
-  | { kind: 'updated' }
-  | { kind: 'discard'; action: PreventedNavigationAction };
+type ExitIntent = { kind: 'discard'; action: PreventedNavigationAction };
 
 function mergeWithEmpty(partial: Partial<ItemFormValues> | undefined): ItemFormValues {
   return {
@@ -127,6 +124,10 @@ function ItemFormScreenComponent({
   const [step, setStep] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  // Soumission en cours (posé de façon synchrone au premier appui) : désarme la
+  // garde de retour arrière DÈS LE DÉBUT de l'envoi, pas au succès — voir
+  // `shouldGuardRemoval` et `leaveAfterSuccess`.
+  const [isSubmitInFlight, setIsSubmitInFlight] = useState(false);
   const [exitIntent, setExitIntent] = useState<ExitIntent | null>(null);
   const [pendingDiscardAction, setPendingDiscardAction] =
     useState<PreventedNavigationAction | null>(null);
@@ -135,6 +136,16 @@ function ItemFormScreenComponent({
   // enverraient sinon deux créations/mises à jour.
   const submitLockRef = useRef(false);
   const submitSucceededRef = useRef(false);
+  const hasLeftAfterSuccessRef = useRef(false);
+  // Verrou d'upload lu de façon synchrone (le state `isUploadingCover` ne sert
+  // qu'à l'affichage) : `useCoverPicker` le pose avant tout `await`, dès l'appui
+  // sur une source d'image — aucune fenêtre où un appui sur « Précédent » ou le
+  // CTA final partirait avant que le rendu n'ait désactivé les boutons.
+  const uploadLockRef = useRef(false);
+  const handleUploadingChange = useCallback((isUploading: boolean) => {
+    uploadLockRef.current = isUploading;
+    setIsUploadingCover(isUploading);
+  }, []);
 
   // Mémoïsé : `values` ci-dessous (RHF, mode édition) ne doit se resynchroniser que
   // lorsque l'item chargé change réellement, jamais à chaque rendu — un nouvel objet
@@ -201,10 +212,17 @@ function ItemFormScreenComponent({
   // édition, confirme avant d'abandonner des modifications non enregistrées. En
   // création, l'étape 1 quitte librement — le brouillon survit dans
   // `AddItemDraftContext` tant qu'on reste dans le flow.
-  const shouldGuardRemoval = exitIntent === null && (step > 0 || (mode === 'edit' && isDirty));
+  //
+  // Désarmée pendant toute soumission (`isSubmitInFlight`) : la navigation de
+  // succès part ainsi d'un écran déjà non gardé depuis au moins un aller-retour
+  // réseau, exactement comme avant l'introduction de cette garde — jamais dans
+  // la même frame qu'un changement d'état de prévention (écran noir constaté sur
+  // appareil quand la garde était désarmée au moment même du succès).
+  const shouldGuardRemoval =
+    exitIntent === null && !isSubmitInFlight && (step > 0 || (mode === 'edit' && isDirty));
   usePreventRemove(shouldGuardRemoval, ({ data }) => {
-    // Rien ne bouge pendant un envoi (couverture ou soumission) : ni étape, ni sortie.
-    if (isBusy || isUploadingCover) return;
+    // Rien ne bouge pendant un envoi de couverture : ni étape, ni sortie.
+    if (isBusy || uploadLockRef.current) return;
     if (step > 0) {
       setSubmitError(null);
       setStep((current) => Math.max(current - 1, 0));
@@ -213,11 +231,16 @@ function ItemFormScreenComponent({
     setPendingDiscardAction(data.action);
   });
 
+  // Pendant la soumission, la garde est désarmée : le bouton retour Android est
+  // bloqué ici, en JS pur (aucun état de prévention natif modifié).
   useEffect(() => {
-    if (!exitIntent) return;
-    if (exitIntent.kind === 'created') router.replace('/collection');
-    else if (exitIntent.kind === 'updated') router.back();
-    else navigation.dispatch(exitIntent.action);
+    if (!isSubmitInFlight) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [isSubmitInFlight]);
+
+  useEffect(() => {
+    if (exitIntent) navigation.dispatch(exitIntent.action);
   }, [exitIntent, navigation]);
 
   if (mode === 'edit' && itemQuery.isLoading) {
@@ -272,8 +295,21 @@ function ItemFormScreenComponent({
   };
 
   const goBack = () => {
+    if (uploadLockRef.current) return;
     setSubmitError(null);
     setStep((current) => Math.max(current - 1, 0));
+  };
+
+  /**
+   * Navigation après succès : directement depuis le gestionnaire (même chemin
+   * qu'avant la garde de retour, validé sur appareil), une seule fois, depuis un
+   * écran dont la garde est déjà désarmée depuis le début de la soumission.
+   */
+  const leaveAfterSuccess = (target: 'collection' | 'previous') => {
+    if (hasLeftAfterSuccessRef.current) return;
+    hasLeftAfterSuccessRef.current = true;
+    if (target === 'collection') router.replace('/collection');
+    else router.back();
   };
 
   const onSubmit = handleSubmit(async (formValues) => {
@@ -285,12 +321,12 @@ function ItemFormScreenComponent({
         await createItem.mutateAsync(payload);
         submitSucceededRef.current = true;
         showToast('Cet objet a rejoint votre nid.', 'success');
-        setExitIntent({ kind: 'created' });
+        leaveAfterSuccess('collection');
       } else if (itemId) {
         await updateItem.mutateAsync({ itemId, input: payload });
         submitSucceededRef.current = true;
         showToast('Objet modifié.', 'success');
-        setExitIntent({ kind: 'updated' });
+        leaveAfterSuccess('previous');
       }
     } catch (error) {
       setSubmitError(getErrorMessage(error));
@@ -298,14 +334,18 @@ function ItemFormScreenComponent({
   });
 
   const submit = async () => {
-    if (submitLockRef.current || isUploadingCover) return;
+    if (submitLockRef.current || uploadLockRef.current) return;
     submitLockRef.current = true;
+    setIsSubmitInFlight(true);
     try {
       await onSubmit();
     } finally {
-      // Relâché après un échec (validation ou API) pour permettre de réessayer ;
-      // conservé après un succès, l'écran est en train de se fermer.
-      if (!submitSucceededRef.current) submitLockRef.current = false;
+      // Relâchés après un échec (validation ou API) pour permettre de réessayer —
+      // la garde se réarme ; conservés après un succès, l'écran se ferme.
+      if (!submitSucceededRef.current) {
+        submitLockRef.current = false;
+        setIsSubmitInFlight(false);
+      }
     }
   };
 
@@ -437,7 +477,7 @@ function ItemFormScreenComponent({
                 category={category}
                 householdId={householdId}
                 values={values}
-                onUploadingChange={setIsUploadingCover}
+                onUploadingChange={handleUploadingChange}
               />
             ) : null}
           </>
@@ -450,6 +490,8 @@ function ItemFormScreenComponent({
         message="Vos modifications sur cet objet seront perdues."
         confirmLabel="Quitter sans enregistrer"
         cancelLabel="Continuer la modification"
+        // Libellés longs : empilés pleine largeur, jamais côte à côte sur mobile.
+        actionsLayout="stacked"
         destructive
         onConfirm={() => {
           const action = pendingDiscardAction;

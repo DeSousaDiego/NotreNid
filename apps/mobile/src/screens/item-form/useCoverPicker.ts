@@ -10,6 +10,15 @@ export interface UseCoverPickerOptions {
   /** URL de couverture actuelle (mode édition) ou déjà téléversée durant cette session. */
   value: string;
   onChange: (url: string) => void;
+  /**
+   * Appelé de façon SYNCHRONE avec `true` dès que l'utilisateur lance une sélection
+   * (galerie ou appareil photo) — avant tout `await` (permission, picker, upload) —
+   * puis avec `false` dans un `finally` (annulation, refus, erreur ou succès). Le
+   * formulaire s'en sert comme verrou immédiat : aucune fenêtre entre la
+   * confirmation de l'image et le début réel de l'envoi où « Précédent » ou le CTA
+   * final resteraient actifs (bug constaté sur appareil).
+   */
+  onUploadingChange?: (isUploading: boolean) => void;
 }
 
 /**
@@ -18,12 +27,32 @@ export interface UseCoverPickerOptions {
  * jamais un chemin local temporaire comme référence persistante : `onChange`
  * n'est appelé qu'avec l'URL distante renvoyée par l'API après téléversement.
  */
-export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerOptions) {
+export function useCoverPicker({
+  householdId,
+  value,
+  onChange,
+  onUploadingChange,
+}: UseCoverPickerOptions) {
   const uploadMutation = useUploadCover(householdId);
   const deleteMutation = useDeleteUpload(householdId);
   const [localPreviewUri, setLocalPreviewUri] = useState<string | null>(null);
   const [uploadedId, setUploadedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // État d'UI immédiat (spinner) : `uploadMutation.isPending` ne passe à `true`
+  // qu'au rendu suivant l'appel, et pas du tout pendant la phase picker.
+  const [isPicking, setIsPicking] = useState(false);
+
+  /** Encadre tout le parcours sélection + envoi par le verrou synchrone. */
+  const runLocked = async (pick: () => Promise<void>) => {
+    onUploadingChange?.(true);
+    setIsPicking(true);
+    try {
+      await pick();
+    } finally {
+      setIsPicking(false);
+      onUploadingChange?.(false);
+    }
+  };
 
   const uploadAsset = async (asset: ImagePicker.ImagePickerAsset) => {
     setLocalPreviewUri(asset.uri);
@@ -52,27 +81,29 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
     }
   };
 
-  const pickFromLibrary = async () => {
-    setError(null);
-    const result = await pickImageFromLibrary();
-    if (result.status === 'denied' || result.status === 'failed') {
-      setError(result.message);
-      return;
-    }
-    if (result.status === 'cancelled') return;
-    await uploadAsset(result.asset);
-  };
+  const pickFromLibrary = () =>
+    runLocked(async () => {
+      setError(null);
+      const result = await pickImageFromLibrary();
+      if (result.status === 'denied' || result.status === 'failed') {
+        setError(result.message);
+        return;
+      }
+      if (result.status === 'cancelled') return;
+      await uploadAsset(result.asset);
+    });
 
-  const pickFromCamera = async () => {
-    setError(null);
-    const result = await pickImageFromCamera();
-    if (result.status === 'denied' || result.status === 'failed') {
-      setError(result.message);
-      return;
-    }
-    if (result.status === 'cancelled') return;
-    await uploadAsset(result.asset);
-  };
+  const pickFromCamera = () =>
+    runLocked(async () => {
+      setError(null);
+      const result = await pickImageFromCamera();
+      if (result.status === 'denied' || result.status === 'failed') {
+        setError(result.message);
+        return;
+      }
+      if (result.status === 'cancelled') return;
+      await uploadAsset(result.asset);
+    });
 
   const removeImage = async () => {
     setError(null);
@@ -95,7 +126,7 @@ export function useCoverPicker({ householdId, value, onChange }: UseCoverPickerO
 
   return {
     previewUri: value || localPreviewUri,
-    isUploading: uploadMutation.isPending,
+    isUploading: isPicking || uploadMutation.isPending,
     isRemoving: deleteMutation.isPending,
     error,
     pickFromLibrary,

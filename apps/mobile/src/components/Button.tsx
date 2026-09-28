@@ -66,7 +66,9 @@ export function Button({
       {loading ? (
         <ActivityIndicator color={textColor} />
       ) : (
-        <AppText variant="label" style={{ color: textColor }}>
+        // `flexShrink` + centrage : un libellé long passe à la ligne à l'intérieur du
+        // bouton quand celui-ci est contraint en largeur, au lieu de déborder.
+        <AppText variant="label" style={{ color: textColor, textAlign: 'center', flexShrink: 1 }}>
           {label}
         </AppText>
       )}

@@ -267,3 +267,93 @@ describe('useCoverPicker', () => {
     });
   });
 });
+
+describe('useCoverPicker — verrou onUploadingChange (hotfix)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  async function renderPicker(onUploadingChange: jest.Mock) {
+    const { wrapper } = createQueryWrapper();
+    return renderHook(
+      () =>
+        useCoverPicker({
+          householdId: HOUSEHOLD_ID,
+          value: '',
+          onChange: jest.fn(),
+          onUploadingChange,
+        }),
+      { wrapper },
+    );
+  }
+
+  it('reports true synchronously, before the permission/picker/upload awaits even start', async () => {
+    // Permission jamais résolue : si le verrou n'était posé qu'après un `await`,
+    // aucun appel ne serait visible ici.
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockReturnValue(new Promise(() => undefined));
+    const onUploadingChange = jest.fn();
+    const { result } = await renderPicker(onUploadingChange);
+
+    const callsRightAfterTap: unknown[][] = [];
+    await act(async () => {
+      void result.current.pickFromLibrary();
+      // Lu dans la même pile d'appel que l'appui, avant tout `await`.
+      callsRightAfterTap.push(...onUploadingChange.mock.calls);
+    });
+
+    expect(callsRightAfterTap).toEqual([[true]]);
+  });
+
+  it('releases the lock (false) once the upload succeeds', async () => {
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/cover.jpg' }],
+    });
+    (mockApiClient.uploads.upload as jest.Mock).mockResolvedValue({
+      id: 'file-1',
+      url: 'http://api.test/uploads/file-1.jpg',
+    });
+    const onUploadingChange = jest.fn();
+    const { result } = await renderPicker(onUploadingChange);
+
+    await act(async () => {
+      await result.current.pickFromLibrary();
+    });
+
+    expect(onUploadingChange.mock.calls).toEqual([[true], [false]]);
+    expect(result.current.isUploading).toBe(false);
+  });
+
+  it('releases the lock (false) when the upload fails, keeping the upload error', async () => {
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true });
+    ImagePicker.launchImageLibraryAsync.mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///tmp/cover.jpg' }],
+    });
+    (mockApiClient.uploads.upload as jest.Mock).mockRejectedValue(new Error('boom'));
+    const onUploadingChange = jest.fn();
+    const { result } = await renderPicker(onUploadingChange);
+
+    await act(async () => {
+      await result.current.pickFromLibrary();
+    });
+
+    expect(onUploadingChange.mock.calls).toEqual([[true], [false]]);
+    expect(result.current.error).toBeTruthy();
+  });
+
+  it('releases the lock (false) when the user cancels the picker, and for the camera too', async () => {
+    ImagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: true });
+    ImagePicker.launchCameraAsync.mockResolvedValue({ canceled: true, assets: null });
+    const onUploadingChange = jest.fn();
+    const { result } = await renderPicker(onUploadingChange);
+
+    await act(async () => {
+      await result.current.pickFromCamera();
+    });
+
+    expect(onUploadingChange.mock.calls).toEqual([[true], [false]]);
+    expect(mockApiClient.uploads.upload).not.toHaveBeenCalled();
+  });
+});

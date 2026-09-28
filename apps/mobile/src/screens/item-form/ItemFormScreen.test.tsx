@@ -2,7 +2,7 @@ import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useState, type ReactElement } from 'react';
-import { Pressable } from 'react-native';
+import { BackHandler, Pressable } from 'react-native';
 
 import { AppText, ToastProvider } from '../../components';
 import {
@@ -977,6 +977,198 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
       expect(isRemovalGuarded()).toBe(false);
       expect(view.queryByText('Quitter sans enregistrer ?')).toBeNull();
       expect(mockNavigationDispatch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('ItemFormScreen — régressions appareil (hotfix)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetPreventRemoveMock();
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(EXISTING_ITEM);
+  });
+
+  type View = Awaited<ReturnType<typeof renderScreen>>;
+
+  async function reachLastStepInCreate(view: View) {
+    await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByRole('button', { name: 'Alix' })).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+  }
+
+  async function reachLastStepInEditWithChange(view: View) {
+    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+    await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (collector)');
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() =>
+      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy(),
+    );
+  }
+
+  function pending<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  /** Capture le gestionnaire « retour matériel » Android enregistré par l'écran. */
+  function spyOnHardwareBack() {
+    type HardwareBackHandler = Parameters<typeof BackHandler.addEventListener>[1];
+    const handlers: HardwareBackHandler[] = [];
+    const removed: HardwareBackHandler[] = [];
+    const spy = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation((_event, handler) => {
+        handlers.push(handler);
+        return {
+          remove: () => {
+            removed.push(handler);
+          },
+        };
+      });
+    return { spy, handlers, removed };
+  }
+
+  describe('success navigation (black screen)', () => {
+    it('create: disarms the guard as soon as the submit starts, then replaces to Collection exactly once, never with the guard armed', async () => {
+      const request = pending<unknown>();
+      (mockApiClient.items.create as jest.Mock).mockReturnValue(request.promise);
+      const guardAtNavigation: boolean[] = [];
+      mockRouterReplace.mockImplementation(() => guardAtNavigation.push(isRemovalGuarded()));
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await reachLastStepInCreate(view);
+      // Étape 3 : garde armée (retour = étape précédente).
+      expect(isRemovalGuarded()).toBe(true);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
+
+      // Requête encore en vol : garde déjà désarmée (rendu commis), aucune navigation.
+      expect(isRemovalGuarded()).toBe(false);
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+
+      await act(async () => {
+        request.resolve({ id: 'item-1' });
+      });
+
+      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledTimes(1));
+      expect(mockRouterReplace).toHaveBeenCalledWith('/collection');
+      expect(guardAtNavigation).toEqual([false]);
+      // Jamais réarmée après le succès, jamais de sortie « confirmée » parasite.
+      expect(isRemovalGuarded()).toBe(false);
+      expect(mockNavigationDispatch).not.toHaveBeenCalled();
+      expect(mockRouterBack).not.toHaveBeenCalled();
+    });
+
+    it('edit: disarms the guard as soon as the submit starts, then goes back exactly once, never with the guard armed and without confirmation', async () => {
+      const request = pending<unknown>();
+      (mockApiClient.items.update as jest.Mock).mockReturnValue(request.promise);
+      const guardAtNavigation: boolean[] = [];
+      mockRouterBack.mockImplementation(() => guardAtNavigation.push(isRemovalGuarded()));
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await reachLastStepInEditWithChange(view);
+      expect(isRemovalGuarded()).toBe(true);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+      await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+      expect(isRemovalGuarded()).toBe(false);
+      expect(mockRouterBack).not.toHaveBeenCalled();
+
+      await act(async () => {
+        request.resolve({ ...EXISTING_ITEM, title: 'Dune (collector)' });
+      });
+
+      await waitFor(() => expect(mockRouterBack).toHaveBeenCalledTimes(1));
+      expect(guardAtNavigation).toEqual([false]);
+      expect(isRemovalGuarded()).toBe(false);
+      expect(view.queryByText('Quitter sans enregistrer ?')).toBeNull();
+      expect(mockNavigationDispatch).not.toHaveBeenCalled();
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+    });
+
+    it('blocks the Android hardware back button during the submit (JS only), and re-arms the guard after a failure', async () => {
+      const hardwareBack = spyOnHardwareBack();
+      const request = pending<unknown>();
+      (mockApiClient.items.create as jest.Mock).mockReturnValue(request.promise);
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await reachLastStepInCreate(view);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() => expect(hardwareBack.handlers).toHaveLength(1));
+      // Consommé : ni étape précédente, ni sortie pendant l'envoi.
+      expect(
+        hardwareBack.handlers[0]!({} as Parameters<(typeof hardwareBack.handlers)[number]>[0]),
+      ).toBe(true);
+      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy();
+
+      await act(async () => {
+        request.reject(new NetworkError());
+      });
+
+      await waitFor(() => expect(view.getByTestId('item-form-submit-error')).toBeTruthy());
+      expect(hardwareBack.removed).toEqual(hardwareBack.handlers);
+      // Garde réarmée : un retour ramène de nouveau à l'étape 2.
+      expect(isRemovalGuarded()).toBe(true);
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+      hardwareBack.spy.mockRestore();
+    });
+  });
+
+  describe('cover upload lock window', () => {
+    const imagePicker = jest.requireMock('../../lib/imagePicker') as {
+      pickImageFromLibrary: jest.Mock;
+    };
+
+    it('locks the CTA and "Précédent" synchronously when an image source is chosen — a tap in the same frame never submits', async () => {
+      const picker = pending<unknown>();
+      imagePicker.pickImageFromLibrary.mockReturnValueOnce(picker.promise);
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await reachLastStepInCreate(view);
+
+      await fireEvent.press(view.getByLabelText('Ajouter une couverture'));
+      await waitFor(() => expect(view.getByLabelText('Choisir dans la galerie')).toBeTruthy());
+      const galleryOption = view.getByLabelText('Choisir dans la galerie');
+      // Éléments capturés AVANT tout re-rendu : leurs props sont encore « actives ».
+      const submitButton = view.getByRole('button', { name: 'Ajouter au nid' });
+      const previousButton = view.getByRole('button', { name: 'Précédent' });
+
+      await act(async () => {
+        void fireEvent.press(galleryOption);
+        void fireEvent.press(submitButton);
+        void fireEvent.press(previousButton);
+      });
+
+      expect(mockApiClient.items.create).not.toHaveBeenCalled();
+      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy();
+      expect(
+        view.getByRole('button', { name: 'Ajouter au nid' }).props.accessibilityState?.disabled,
+      ).toBe(true);
+      expect(
+        view.getByRole('button', { name: 'Précédent' }).props.accessibilityState?.disabled,
+      ).toBe(true);
+
+      // Sélection annulée : déverrouillage (finally), soumission de nouveau possible.
+      await act(async () => {
+        picker.resolve({ status: 'cancelled' });
+      });
+      await waitFor(() =>
+        expect(
+          view.getByRole('button', { name: 'Ajouter au nid' }).props.accessibilityState?.disabled,
+        ).toBe(false),
+      );
     });
   });
 });

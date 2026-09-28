@@ -15,6 +15,14 @@ export interface ConfirmDialogProps {
   /** Style « danger » pour les actions destructrices (archivage, suppression). */
   destructive?: boolean;
   loading?: boolean;
+  /**
+   * `row` (défaut) : boutons côte à côte, alignés à droite, chacun autorisé à
+   * rétrécir (libellé sur plusieurs lignes plutôt qu'un débordement hors du
+   * dialogue). `stacked` : boutons empilés pleine largeur, action de
+   * confirmation en premier — à préférer dès que les libellés sont longs
+   * (ex. « Continuer la modification » / « Quitter sans enregistrer »).
+   */
+  actionsLayout?: 'row' | 'stacked';
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -28,6 +36,7 @@ export function ConfirmDialog({
   cancelLabel = 'Annuler',
   destructive = false,
   loading = false,
+  actionsLayout = 'row',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -61,22 +70,56 @@ export function ConfirmDialog({
             <AppText variant="section">{title}</AppText>
             {message ? <AppText variant="body">{message}</AppText> : null}
           </ScrollView>
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: theme.spacing.sm,
-              justifyContent: 'flex-end',
-              marginTop: theme.spacing.md,
-            }}
-          >
-            <Button label={cancelLabel} variant="ghost" onPress={onCancel} disabled={loading} />
-            <Button
-              label={confirmLabel}
-              variant={destructive ? 'danger' : 'primary'}
-              onPress={onConfirm}
-              loading={loading}
-            />
-          </View>
+          {actionsLayout === 'stacked' ? (
+            <View
+              testID="confirm-dialog-actions"
+              style={{
+                flexDirection: 'column',
+                gap: theme.spacing.sm,
+                marginTop: theme.spacing.md,
+              }}
+            >
+              <Button
+                label={confirmLabel}
+                variant={destructive ? 'danger' : 'primary'}
+                onPress={onConfirm}
+                loading={loading}
+                style={styles.stackedButton}
+              />
+              <Button
+                label={cancelLabel}
+                variant="ghost"
+                onPress={onCancel}
+                disabled={loading}
+                style={styles.stackedButton}
+              />
+            </View>
+          ) : (
+            <View
+              testID="confirm-dialog-actions"
+              style={{
+                flexDirection: 'row',
+                gap: theme.spacing.sm,
+                justifyContent: 'flex-end',
+                marginTop: theme.spacing.md,
+              }}
+            >
+              <Button
+                label={cancelLabel}
+                variant="ghost"
+                onPress={onCancel}
+                disabled={loading}
+                style={styles.rowButton}
+              />
+              <Button
+                label={confirmLabel}
+                variant={destructive ? 'danger' : 'primary'}
+                onPress={onConfirm}
+                loading={loading}
+                style={styles.rowButton}
+              />
+            </View>
+          )}
         </View>
       </SafeAreaView>
     </Modal>
@@ -106,5 +149,13 @@ const styles = StyleSheet.create({
   // déborder silencieusement au-delà de maxHeight (même piège que BottomSheet).
   scrollArea: {
     flexShrink: 1,
+  },
+  // Jamais de largeur fixe : un bouton peut rétrécir (son libellé passe alors à la
+  // ligne) plutôt que de pousser l'autre hors du dialogue (bug constaté sur appareil).
+  rowButton: {
+    flexShrink: 1,
+  },
+  stackedButton: {
+    alignSelf: 'stretch',
   },
 });
