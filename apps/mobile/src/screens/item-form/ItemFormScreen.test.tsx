@@ -48,11 +48,13 @@ jest.mock('../../providers/HouseholdProvider', () => ({
 }));
 
 const mockRouterReplace = jest.fn();
+const mockRouterDismissTo = jest.fn();
 const mockRouterBack = jest.fn();
 const mockNavigationDispatch = jest.fn();
 jest.mock('expo-router', () => ({
   router: {
     replace: (...args: unknown[]) => mockRouterReplace(...args),
+    dismissTo: (...args: unknown[]) => mockRouterDismissTo(...args),
     back: () => mockRouterBack(),
   },
   useNavigation: () => ({ dispatch: mockNavigationDispatch }),
@@ -284,7 +286,7 @@ describe('ItemFormScreen', () => {
         ownerIds: ['user-1'],
       }),
     );
-    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+    await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith('/collection'));
   });
 
   it('shows a cd form with no Album field anywhere in step 1', async () => {
@@ -770,7 +772,7 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
       await act(async () => {
         finishCreate({ id: 'item-1' });
       });
-      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith('/collection'));
       expect(mockApiClient.items.create).toHaveBeenCalledTimes(1);
     });
 
@@ -812,7 +814,7 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
 
       await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
       await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(2));
-      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith('/collection'));
     });
   });
 
@@ -852,7 +854,7 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
       await act(async () => {
         finishRetry({ id: 'item-1' });
       });
-      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith('/collection'));
       expect(view.queryByTestId('item-form-submit-error')).toBeNull();
     });
   });
@@ -888,7 +890,7 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
 
       await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
 
-      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/collection'));
+      await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith('/collection'));
       expect(isRemovalGuarded()).toBe(false);
     });
   });
@@ -1045,7 +1047,7 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
       const request = pending<unknown>();
       (mockApiClient.items.create as jest.Mock).mockReturnValue(request.promise);
       const guardAtNavigation: boolean[] = [];
-      mockRouterReplace.mockImplementation(() => guardAtNavigation.push(isRemovalGuarded()));
+      mockRouterDismissTo.mockImplementation(() => guardAtNavigation.push(isRemovalGuarded()));
       const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
       await reachLastStepInCreate(view);
       // Étape 3 : garde armée (retour = étape précédente).
@@ -1056,15 +1058,17 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
 
       // Requête encore en vol : garde déjà désarmée (rendu commis), aucune navigation.
       expect(isRemovalGuarded()).toBe(false);
-      expect(mockRouterReplace).not.toHaveBeenCalled();
+      expect(mockRouterDismissTo).not.toHaveBeenCalled();
 
       await act(async () => {
         request.resolve({ id: 'item-1' });
       });
 
-      await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledTimes(1));
-      expect(mockRouterReplace).toHaveBeenCalledWith('/collection');
+      await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledTimes(1));
+      expect(mockRouterDismissTo).toHaveBeenCalledWith('/collection');
       expect(guardAtNavigation).toEqual([false]);
+      // Jamais `replace` : il empilait une seconde instance de (tabs) (écran noir).
+      expect(mockRouterReplace).not.toHaveBeenCalled();
       // Jamais réarmée après le succès, jamais de sortie « confirmée » parasite.
       expect(isRemovalGuarded()).toBe(false);
       expect(mockNavigationDispatch).not.toHaveBeenCalled();
@@ -1096,7 +1100,7 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
       expect(isRemovalGuarded()).toBe(false);
       expect(view.queryByText('Quitter sans enregistrer ?')).toBeNull();
       expect(mockNavigationDispatch).not.toHaveBeenCalled();
-      expect(mockRouterReplace).not.toHaveBeenCalled();
+      expect(mockRouterDismissTo).not.toHaveBeenCalled();
     });
 
     it('blocks the Android hardware back button during the submit (JS only), and re-arms the guard after a failure', async () => {
@@ -1122,7 +1126,7 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
       expect(hardwareBack.removed).toEqual(hardwareBack.handlers);
       // Garde réarmée : un retour ramène de nouveau à l'étape 2.
       expect(isRemovalGuarded()).toBe(true);
-      expect(mockRouterReplace).not.toHaveBeenCalled();
+      expect(mockRouterDismissTo).not.toHaveBeenCalled();
       hardwareBack.spy.mockRestore();
     });
   });

@@ -36,6 +36,7 @@ import {
 import { StepCopy } from './StepCopy';
 import { StepInformation } from './StepInformation';
 import { StepOwnersAndCover } from './StepOwnersAndCover';
+import { leaveAddFlowToCollection } from './successNavigation';
 
 export interface ItemFormScreenProps {
   mode: 'create' | 'edit';
@@ -308,7 +309,7 @@ function ItemFormScreenComponent({
   const leaveAfterSuccess = (target: 'collection' | 'previous') => {
     if (hasLeftAfterSuccessRef.current) return;
     hasLeftAfterSuccessRef.current = true;
-    if (target === 'collection') router.replace('/collection');
+    if (target === 'collection') leaveAddFlowToCollection();
     else router.back();
   };
 
