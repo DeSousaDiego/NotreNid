@@ -1605,3 +1605,54 @@ describe('ItemFormScreen — hiérarchie et identité visuelle (Lot 3)', () => {
     });
   });
 });
+
+describe('ItemFormScreen — « Retirer la note » discret (Lot 3.1)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetPreventRemoveMock();
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM, rating: 4 });
+    (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM, rating: null });
+  });
+
+  async function openStep2InEdit() {
+    const view = await renderScreen(
+      <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+    );
+    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() =>
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+    );
+    return view;
+  }
+
+  it('is an accessible secondary action: button role, full label, 44 px target, never filled nor red', async () => {
+    const view = await openStep2InEdit();
+
+    const clear = view.getByRole('button', { name: 'Retirer la note' });
+    const outer = StyleSheet.flatten(clear.props.style) as ViewStyle;
+    expect(outer.minHeight).toBeGreaterThanOrEqual(44);
+    // Pastille visuelle interne : fond neutre de surface, contour discret.
+    const pill = StyleSheet.flatten(view.getByTestId('rating-clear-pill').props.style) as ViewStyle;
+    expect(pill.backgroundColor).toBe(colors.surface);
+    expect(pill.borderColor).toBe(colors.border);
+    expect([colors.danger, colors.secondary, colors.primary]).not.toContain(pill.backgroundColor);
+    expect(view.getByText('Retirer')).toBeTruthy();
+  });
+
+  it('removes the rating and saves rating: null (Lot 2 contract intact)', async () => {
+    const view = await openStep2InEdit();
+    expect(view.getByTestId('rating-value')).toBeTruthy();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Retirer la note' }));
+    expect(view.queryByTestId('rating-value')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Retirer la note' })).toBeNull();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+    expect((mockApiClient.items.update as jest.Mock).mock.calls[0]![2]).toMatchObject({
+      rating: null,
+    });
+  });
+});

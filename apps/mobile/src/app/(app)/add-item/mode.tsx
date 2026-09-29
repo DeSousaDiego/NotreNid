@@ -99,7 +99,7 @@ export default function AddItemModeScreen() {
         <SelectionCard
           title="Scanner un code-barres"
           subtitle="Rechercher automatiquement les informations"
-          tint="tintSage"
+          tint="tintMoss"
           icon={<Ionicons name="barcode-outline" size={36} color={theme.colors.primary} />}
           onPress={() =>
             router.push({ pathname: '/(app)/add-item/scan', params: { categoryId: category.id } })
@@ -108,7 +108,7 @@ export default function AddItemModeScreen() {
         <SelectionCard
           title="Saisir manuellement"
           subtitle="Remplir les informations vous-même"
-          tint="tintPeach"
+          tint="tintLinen"
           icon={<Ionicons name="create-outline" size={36} color={theme.colors.primary} />}
           onPress={() =>
             router.push({ pathname: '/(app)/add-item/form', params: { categoryId: category.id } })

@@ -49,7 +49,15 @@ export function StepCopy({ control, errors }: StepCopyProps) {
         name="rating"
         render={({ field }) => (
           <View>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm }}>
+            {/* Hauteur fixe : la ligne ne « saute » pas quand la note apparaît/disparaît. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.sm,
+                minHeight: 44,
+              }}
+            >
               <AppText variant="label" color="textMuted">
                 Note (optionnelle)
               </AppText>
@@ -58,35 +66,48 @@ export function StepCopy({ control, errors }: StepCopyProps) {
                   {formatRatingLabel(field.value)} / 5
                 </AppText>
               ) : null}
+              <View style={{ flex: 1 }} />
+              {field.value ? (
+                // Action secondaire discrète : petite pastille neutre, jamais un bouton
+                // plein ni rouge ; zone tactile ≥ 44 portée par le Pressable englobant.
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retirer la note"
+                  onPress={() => field.onChange(null)}
+                  testID="rating-clear"
+                  style={({ pressed }) => ({
+                    minHeight: 44,
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <View
+                    testID="rating-clear-pill"
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: theme.spacing.sm,
+                      paddingVertical: 4,
+                      borderRadius: theme.radii.full,
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                    }}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={theme.iconSizes.sm}
+                      color={theme.colors.textMuted}
+                    />
+                    <AppText variant="caption" color="textMuted">
+                      Retirer
+                    </AppText>
+                  </View>
+                </Pressable>
+              ) : null}
             </View>
             <StarRating value={field.value} onChange={field.onChange} />
-            {field.value ? (
-              // Retirer la note était possible (re-toucher l'étoile courante) mais
-              // invisible : action explicite, cible tactile ≥ 44.
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Retirer la note"
-                onPress={() => field.onChange(null)}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  alignSelf: 'flex-start',
-                  gap: theme.spacing.xs,
-                  minHeight: 44,
-                  paddingRight: theme.spacing.sm,
-                  opacity: pressed ? 0.6 : 1,
-                })}
-              >
-                <Ionicons
-                  name="close-circle-outline"
-                  size={theme.iconSizes.md}
-                  color={theme.colors.textMuted}
-                />
-                <AppText variant="label" color="textMuted">
-                  Retirer la note
-                </AppText>
-              </Pressable>
-            ) : null}
           </View>
         )}
       />

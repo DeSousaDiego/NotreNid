@@ -216,6 +216,16 @@ export function ScreenContainer({
     if (pending) performScrollIntoView(pending.node, pending.margin);
   }, [performScrollIntoView]);
 
+  // Dès que l'utilisateur fait défiler lui-même, on abandonne la tentative différée :
+  // sinon chaque `onLayout` suivant (frames de l'animation clavier Android en
+  // `height`, fermeture du clavier, footer qui change de hauteur) relançait un
+  // `scrollTo` animé vers le dernier champ focus, en sens contraire du doigt —
+  // sensation de scroll qui « accroche » constatée sur l'étape 1. Un nouveau focus
+  // réarme le comportement normalement.
+  const handleScrollBeginDrag = useCallback(() => {
+    pendingFieldRef.current = null;
+  }, []);
+
   const basePadding = theme.spacing.lg;
   const scrollableContent = (
     <ScrollView
@@ -234,6 +244,8 @@ export function ScreenContainer({
       onScroll={keyboardAware ? handleScroll : undefined}
       scrollEventThrottle={keyboardAware ? 16 : undefined}
       onLayout={keyboardAware ? handleScrollViewLayout : undefined}
+      onScrollBeginDrag={keyboardAware ? handleScrollBeginDrag : undefined}
+      testID="screen-container-scroll"
     >
       {children}
     </ScrollView>

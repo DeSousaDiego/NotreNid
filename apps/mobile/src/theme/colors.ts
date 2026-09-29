@@ -22,6 +22,13 @@ export const colors = {
   tintSage: '#E4EDD9',
   tintPeach: '#FBE2D0',
   tintHoney: '#F8E9C6',
+  /**
+   * Surfaces d'ACTION (écran « Scanner / Saisir manuellement ») : jamais une couleur de
+   * catégorie — les trois teintes ci-dessus identifient Livre/CD/DVD. Mousse (vert-gris
+   * très pâle, plus froid que le sauge) et lin (beige noisette, ni pêche ni miel).
+   */
+  tintMoss: '#E8EEE6',
+  tintLinen: '#F1E9DC',
   /** Texte/icônes affichés sur un fond `primary` ou `secondary` (contraste). */
   onPrimary: '#FFFCF4',
 } as const;

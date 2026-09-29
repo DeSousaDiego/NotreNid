@@ -1,9 +1,15 @@
-import { Platform } from 'react-native';
+import { fireEvent } from '@testing-library/react-native';
+import { Platform, Pressable, Text } from 'react-native';
+
+import { renderWithTheme } from '../test-utils/renderWithTheme';
 
 import {
   computeScrollIntoViewDelta,
   isKeyboardAwareLayout,
   resolveKeyboardAvoidingBehavior,
+  ScreenContainer,
+  useScrollFocusedFieldIntoView,
+  type MeasurableNode,
 } from './ScreenContainer';
 
 describe('resolveKeyboardAvoidingBehavior', () => {
@@ -80,5 +86,61 @@ describe('computeScrollIntoViewDelta', () => {
     expect(smallMargin).toBe(26);
     expect(largeMargin).toBe(34);
     expect(largeMargin - smallMargin).toBe(8);
+  });
+});
+
+describe('ScreenContainer — reprise du défilement par l’utilisateur (Lot 3.1)', () => {
+  /** Enfant qui déclenche un « focus » avec un nœud mesurable factice. */
+  function FocusTrigger({ node }: { node: MeasurableNode }) {
+    const scrollIntoView = useScrollFocusedFieldIntoView();
+    return (
+      <Pressable accessibilityRole="button" onPress={() => scrollIntoView?.(node)}>
+        <Text>focus</Text>
+      </Pressable>
+    );
+  }
+
+  async function renderKeyboardAware(node: MeasurableNode) {
+    return renderWithTheme(
+      <ScreenContainer scroll androidKeyboardBehavior="height">
+        <FocusTrigger node={node} />
+      </ScreenContainer>,
+    );
+  }
+
+  it('retries the scroll-into-view on the next layout after a focus (keyboard opening)', async () => {
+    const node = { measureInWindow: jest.fn() };
+    const view = await renderKeyboardAware(node);
+
+    await fireEvent.press(view.getByRole('button', { name: 'focus' }));
+    expect(node.measureInWindow).toHaveBeenCalledTimes(1);
+
+    await fireEvent(view.getByTestId('screen-container-scroll'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 400 } },
+    });
+    expect(node.measureInWindow).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops auto-scrolling back to the last focused field once the user drags the list', async () => {
+    const node = { measureInWindow: jest.fn() };
+    const view = await renderKeyboardAware(node);
+    const scrollView = view.getByTestId('screen-container-scroll');
+
+    await fireEvent.press(view.getByRole('button', { name: 'focus' }));
+    expect(node.measureInWindow).toHaveBeenCalledTimes(1);
+
+    await fireEvent(scrollView, 'scrollBeginDrag');
+    // Frames d'animation clavier / fermeture du clavier : plus aucune tentative.
+    await fireEvent(scrollView, 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 600 } },
+    });
+    await fireEvent(scrollView, 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 700 } },
+    });
+    expect(node.measureInWindow).toHaveBeenCalledTimes(1);
+
+    // Un nouveau focus réarme le comportement normal.
+    await fireEvent.press(view.getByRole('button', { name: 'focus' }));
+    expect(node.measureInWindow).toHaveBeenCalledTimes(2);
   });
 });
