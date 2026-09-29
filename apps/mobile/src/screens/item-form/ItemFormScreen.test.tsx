@@ -2,7 +2,7 @@ import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useState, type ReactElement } from 'react';
-import { BackHandler, Pressable, StyleSheet, type ViewStyle } from 'react-native';
+import { BackHandler, Platform, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 
 import { AppText, ToastProvider } from '../../components';
 import {
@@ -1654,5 +1654,37 @@ describe('ItemFormScreen — « Retirer la note » discret (Lot 3.1)', () => {
     expect((mockApiClient.items.update as jest.Mock).mock.calls[0]![2]).toMatchObject({
       rating: null,
     });
+  });
+});
+
+describe('ItemFormScreen — glisser depuis un champ (Lot 3.2, Android)', () => {
+  const originalOS = Platform.OS;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
+    Object.defineProperty(Platform, 'OS', { configurable: true, get: () => 'android' });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, get: () => originalOS });
+  });
+
+  it('opts every step-1 text field in — single-line and the multiline Description alike', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+    await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+
+    for (const label of [
+      'Titre',
+      'Auteur',
+      'Nombre de pages',
+      'ISBN',
+      'Code-barres',
+      'Description',
+    ]) {
+      expect(view.getByLabelText(label).props.pointerEvents).toBe('none');
+    }
+    // Livre : titre, 6 champs de l'œuvre, description, ISBN, code-barres.
+    expect(view.getAllByTestId('text-field-touch-shield')).toHaveLength(10);
   });
 });

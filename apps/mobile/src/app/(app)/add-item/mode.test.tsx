@@ -100,6 +100,11 @@ describe('AddItemModeScreen', () => {
       StyleSheet.flatten(view.getByRole('button', { name }).props.style) as ViewStyle;
     expect(style('Scanner un code-barres').backgroundColor).toBe(colors.tintMoss);
     expect(style('Saisir manuellement').backgroundColor).toBe(colors.tintLinen);
+    // Lin chaud (papier / bois clair), jamais le beige grisé d'avant ni la teinte de Scanner.
+    expect(colors.tintLinen).toBe('#EFE0CB');
+    expect(style('Saisir manuellement').backgroundColor).not.toBe(
+      style('Scanner un code-barres').backgroundColor,
+    );
     // Surfaces d'action : jamais une teinte de catégorie (Livre/CD/DVD).
     const categoryTints: string[] = [colors.tintSage, colors.tintPeach, colors.tintHoney];
     expect(categoryTints).not.toContain(style('Scanner un code-barres').backgroundColor);

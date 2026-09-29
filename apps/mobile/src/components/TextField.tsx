@@ -1,5 +1,20 @@
-import { forwardRef, useMemo, useRef, useState, type Ref, type RefCallback } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  forwardRef,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+  type RefCallback,
+} from 'react';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 
 import { useTheme } from '../theme';
 
@@ -10,6 +25,18 @@ export interface TextFieldProps extends TextInputProps {
   label: string;
   errorMessage?: string;
   helperText?: string;
+  /**
+   * Android uniquement : laisse le `ScrollView` parent récupérer un glissement vertical
+   * COMMENCÉ sur ce champ tant qu'il n'a pas le focus. Le `EditText` natif interdit
+   * au parent d'intercepter le geste dès le toucher (`requestDisallowInterceptTouchEvent`,
+   * voir `ReactEditText.onTouchEvent`) et ne le rend que s'il ne peut défiler dans
+   * AUCUNE direction — un texte qui déborde, ou quelques pixels d'écart entre la hauteur
+   * mesurée et celle réellement dessinée, suffisent à bloquer la page. Hors focus, le
+   * toucher arrive donc sur un `Pressable` englobant (tap court = focus) ; une fois
+   * focalisé, le champ retrouve tout son comportement natif (curseur, sélection,
+   * défilement interne). Opt-in : réservé aux formulaires longs (Ajout/Édition).
+   */
+  allowScrollFromField?: boolean;
 }
 
 /** Combine une ref externe (transmise par l'appelant, ex. RHF) et une ref
@@ -27,7 +54,17 @@ function mergeRefs<T>(...refs: (Ref<T> | undefined)[]): RefCallback<T> {
 
 /** Champ de texte standard : label, aide, erreur, états focus/erreur/désactivé. */
 export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
-  { label, errorMessage, helperText, editable = true, style, onFocus, onBlur, ...inputProps },
+  {
+    label,
+    errorMessage,
+    helperText,
+    editable = true,
+    allowScrollFromField = false,
+    style,
+    onFocus,
+    onBlur,
+    ...inputProps
+  },
   forwardedRef,
 ) {
   const theme = useTheme();
@@ -44,6 +81,12 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   // stable via `useRef`.
   const setInputRef = useMemo(() => mergeRefs<TextInput>(forwardedRef, inputRef), [forwardedRef]);
 
+  // Structure stable : l'enveloppe existe toujours quand l'option est active (jamais
+  // ajoutée/retirée au focus, ce qui remonterait le `TextInput` et lui ferait perdre le
+  // focus) — seuls `pointerEvents` et `disabled` basculent.
+  const touchShield = allowScrollFromField && Platform.OS === 'android';
+  const shieldActive = touchShield && !focused && editable;
+
   const borderColor = hasError
     ? theme.colors.danger
     : focused
@@ -55,36 +98,43 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       <AppText variant="label" color="textMuted" style={styles.label}>
         {label}
       </AppText>
-      <TextInput
-        ref={setInputRef}
-        editable={editable}
-        accessibilityLabel={label}
-        placeholderTextColor={theme.colors.textMuted}
-        onFocus={(e) => {
-          setFocused(true);
-          if (inputRef.current) scrollFocusedFieldIntoView?.(inputRef.current);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        style={[
-          {
-            minHeight: 44,
-            borderWidth: 1,
-            borderColor,
-            borderRadius: theme.radii.sm,
-            paddingHorizontal: theme.spacing.md,
-            fontFamily: theme.fonts.regular,
-            fontSize: theme.typography.body.fontSize,
-            color: theme.colors.text,
-            backgroundColor: editable ? theme.colors.surface : theme.colors.border,
-          },
-          style,
-        ]}
-        {...inputProps}
-      />
+      <FieldTouchShield
+        enabled={touchShield}
+        active={shieldActive}
+        onPress={() => inputRef.current?.focus()}
+      >
+        <TextInput
+          ref={setInputRef}
+          editable={editable}
+          pointerEvents={shieldActive ? 'none' : 'auto'}
+          accessibilityLabel={label}
+          placeholderTextColor={theme.colors.textMuted}
+          onFocus={(e) => {
+            setFocused(true);
+            if (inputRef.current) scrollFocusedFieldIntoView?.(inputRef.current);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          style={[
+            {
+              minHeight: 44,
+              borderWidth: 1,
+              borderColor,
+              borderRadius: theme.radii.sm,
+              paddingHorizontal: theme.spacing.md,
+              fontFamily: theme.fonts.regular,
+              fontSize: theme.typography.body.fontSize,
+              color: theme.colors.text,
+              backgroundColor: editable ? theme.colors.surface : theme.colors.border,
+            },
+            style,
+          ]}
+          {...inputProps}
+        />
+      </FieldTouchShield>
       {hasError ? (
         <AppText variant="helper" color="danger" style={styles.helper}>
           {errorMessage}
@@ -97,6 +147,33 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     </View>
   );
 });
+
+/** Enveloppe tactile du champ (voir `allowScrollFromField`) — transparente sinon. */
+function FieldTouchShield({
+  enabled,
+  active,
+  onPress,
+  children,
+}: {
+  enabled: boolean;
+  active: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  if (!enabled) return <>{children}</>;
+  return (
+    <Pressable
+      testID="text-field-touch-shield"
+      // Aucun nœud d'accessibilité supplémentaire : TalkBack active directement le champ.
+      accessible={false}
+      importantForAccessibility="no"
+      disabled={!active}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
   label: { marginBottom: 6 },

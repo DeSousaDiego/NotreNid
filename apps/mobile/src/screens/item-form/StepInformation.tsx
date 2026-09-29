@@ -63,6 +63,7 @@ export function StepInformation({
       name={`metadata.${fieldConfig.key}`}
       render={({ field }) => (
         <TextField
+          allowScrollFromField
           label={fieldConfig.label}
           placeholder={PLACEHOLDERS[`${category.slug}.${fieldConfig.key}`]}
           value={field.value ?? ''}
@@ -89,6 +90,7 @@ export function StepInformation({
           name="title"
           render={({ field }) => (
             <TextField
+              allowScrollFromField
               label="Titre"
               value={field.value}
               onChangeText={field.onChange}
@@ -139,6 +141,7 @@ export function StepInformation({
 
                 return (
                   <TextField
+                    allowScrollFromField
                     label={fieldSchema.required ? `${fieldSchema.label} *` : fieldSchema.label}
                     value={field.value ?? ''}
                     onChangeText={field.onChange}
@@ -168,6 +171,7 @@ export function StepInformation({
           name="description"
           render={({ field }) => (
             <TextField
+              allowScrollFromField
               label="Description"
               placeholder="Le résumé, le synopsis ou la présentation de l’œuvre…"
               helperText="La présentation de l’œuvre elle-même, indépendamment de votre exemplaire."
@@ -195,6 +199,7 @@ export function StepInformation({
             name="barcode"
             render={({ field }) => (
               <TextField
+                allowScrollFromField
                 label="Code-barres"
                 value={field.value ?? ''}
                 // Même normalisation que le scan caméra (trim + chiffres uniquement,

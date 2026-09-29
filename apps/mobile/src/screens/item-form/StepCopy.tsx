@@ -117,6 +117,7 @@ export function StepCopy({ control, errors }: StepCopyProps) {
         name="notes"
         render={({ field }) => (
           <TextField
+            allowScrollFromField
             label="Notes"
             placeholder="Votre avis, une anecdote, l’état constaté, une dédicace…"
             helperText="Votre commentaire personnel sur cet exemplaire précis."
