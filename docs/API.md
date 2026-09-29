@@ -45,6 +45,8 @@ Ce document explique la structure générale ; pour le détail exact d'une route
 | Statistiques | `/households/:id/stats` | Compteurs et ajouts récents. |
 | Exports | `/households/:id/exports/{json,csv}` | Export complet de la collection. |
 
+**Modification d'un item (`PATCH /households/:id/items/:itemId`) — champs facultatifs.** Pour `barcode`, `description`, `notes`, `coverImageUrl`, `rating` et chaque champ de `book`/`cd`/`dvd` : propriété **absente** = ne pas modifier ; **`null`** explicite = effacer la valeur existante ; toute autre valeur = remplacer. Les colonnes de métadonnées sont effacées (mises à `null`), jamais supprimées. Retirer une couverture (`coverImageUrl: null`) n'efface que la référence, pas le fichier stocké.
+
 Détail complet des paramètres, du format de pagination (`{ data, meta: { page, pageSize, totalItems, totalPages } }`) et des schémas de requête/réponse : voir `docs/openapi.json` ou `/api/v1/docs`.
 
 ## Client typé

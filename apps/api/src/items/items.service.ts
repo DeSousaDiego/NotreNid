@@ -163,18 +163,18 @@ export class ItemsService {
         data: {
           categoryId,
           title: dto.title ?? existing.title,
-          // `=== undefined` (pas `??`) : un `null` explicite (distinct d'une propriété
-          // absente) doit pouvoir effacer un code-barres existant — `??` traiterait
-          // `null` exactement comme une propriété absente et l'ignorerait silencieusement
-          // (bug corrigé ici, scopé à `barcode` uniquement ; `description`/`notes`/
-          // `coverImageUrl`/`rating` ci-dessous partagent la même limitation historique,
-          // hors périmètre de ce correctif).
+          // Champs facultatifs effaçables : `=== undefined` (jamais `??`). Propriété
+          // absente = ne pas modifier ; `null` explicite = effacer la valeur existante ;
+          // toute autre valeur la remplace. `??` traiterait `null` exactement comme une
+          // propriété absente et l'ignorerait silencieusement (l'utilisateur voyait un
+          // succès, puis l'ancienne valeur revenait).
           barcode: dto.barcode === undefined ? existing.barcode : dto.barcode,
-          description: dto.description ?? existing.description,
+          description: dto.description === undefined ? existing.description : dto.description,
           condition: dto.condition ?? existing.condition,
-          rating: dto.rating ?? existing.rating,
-          notes: dto.notes ?? existing.notes,
-          coverImageUrl: dto.coverImageUrl ?? existing.coverImageUrl,
+          rating: dto.rating === undefined ? existing.rating : dto.rating,
+          notes: dto.notes === undefined ? existing.notes : dto.notes,
+          coverImageUrl:
+            dto.coverImageUrl === undefined ? existing.coverImageUrl : dto.coverImageUrl,
           customMetadata: category.isSystem
             ? undefined
             : ((dto.customMetadata as Prisma.InputJsonValue | undefined) ??
@@ -187,6 +187,9 @@ export class ItemsService {
           countries: dto.countryCodes
             ? { create: dto.countryCodes.map((countryCode) => ({ countryCode })) }
             : undefined,
+          // Même contrat, champ par champ, via Prisma : une clé absente de `dto.book`
+          // (etc.) est ignorée par `update`, une clé à `null` efface la colonne. Les
+          // colonnes de métadonnées sont toutes nullables — aucune ligne supprimée.
           bookMetadata: dto.book ? { upsert: { create: dto.book, update: dto.book } } : undefined,
           cdMetadata: dto.cd ? { upsert: { create: dto.cd, update: dto.cd } } : undefined,
           dvdMetadata: dto.dvd ? { upsert: { create: dto.dvd, update: dto.dvd } } : undefined,

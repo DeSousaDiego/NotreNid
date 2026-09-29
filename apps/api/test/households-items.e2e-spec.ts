@@ -412,4 +412,130 @@ describe('Households / Invitations / Items (e2e)', () => {
       expect(exportCsv.text).toContain('Item stats');
     });
   });
+  describe('items: clearing optional fields on update (null vs absent)', () => {
+    // Un seul registerUser pour tout le bloc (quota /auth/register, voir 'items: barcode').
+    let sam: { email: string; id: string; accessToken: string };
+    let householdId: string;
+    const categoryIdBySlug: Record<string, string> = {};
+
+    beforeAll(async () => {
+      sam = await registerUser('sam-clear');
+      householdId = await createHousehold(sam.accessToken, 'Foyer effacement');
+      const categories = await request(server())
+        .get(`/api/v1/households/${householdId}/categories`)
+        .set('Authorization', `Bearer ${sam.accessToken}`);
+      for (const category of categories.body as { id: string; slug: string }[]) {
+        categoryIdBySlug[category.slug] = category.id;
+      }
+    });
+
+    async function createFull(slug: 'book' | 'cd' | 'dvd', metadata: Record<string, unknown>) {
+      const response = await request(server())
+        .post(`/api/v1/households/${householdId}/items`)
+        .set('Authorization', `Bearer ${sam.accessToken}`)
+        .send({
+          categoryId: categoryIdBySlug[slug],
+          title: `Objet ${slug}`,
+          condition: 'GOOD',
+          ownerIds: [sam.id],
+          barcode: '3600029412578',
+          description: 'Une description.',
+          notes: 'Une note personnelle.',
+          rating: 4.5,
+          coverImageUrl: 'https://cdn.test/cover.jpg',
+          [slug]: metadata,
+        });
+      expect(response.status).toBe(201);
+      return response.body.id as string;
+    }
+
+    async function patch(itemId: string, body: Record<string, unknown>) {
+      const response = await request(server())
+        .patch(`/api/v1/households/${householdId}/items/${itemId}`)
+        .set('Authorization', `Bearer ${sam.accessToken}`)
+        .send(body);
+      expect(response.status).toBe(200);
+    }
+
+    async function read(itemId: string) {
+      const response = await request(server())
+        .get(`/api/v1/households/${householdId}/items/${itemId}`)
+        .set('Authorization', `Bearer ${sam.accessToken}`);
+      return response.body as Record<string, unknown> & {
+        book: Record<string, unknown> | null;
+        cd: Record<string, unknown> | null;
+        dvd: Record<string, unknown> | null;
+      };
+    }
+
+    it('keeps every optional field when it is absent from the patch, clears exactly those sent as null', async () => {
+      const itemId = await createFull('book', {
+        author: 'Frank Herbert',
+        publisher: 'Gallimard',
+        publicationYear: 1970,
+        pageCount: 592,
+        language: 'fr',
+      });
+
+      await patch(itemId, { title: 'Dune (poche)' });
+      let item = await read(itemId);
+      expect(item).toMatchObject({
+        description: 'Une description.',
+        notes: 'Une note personnelle.',
+        rating: 4.5,
+        coverImageUrl: 'https://cdn.test/cover.jpg',
+        barcode: '3600029412578',
+      });
+      expect(item.book).toMatchObject({ author: 'Frank Herbert', publicationYear: 1970 });
+
+      await patch(itemId, {
+        description: null,
+        notes: null,
+        rating: null,
+        coverImageUrl: null,
+        book: { author: null, publicationYear: null, pageCount: null },
+      });
+      item = await read(itemId);
+      expect(item.description).toBeNull();
+      expect(item.notes).toBeNull();
+      expect(item.rating).toBeNull();
+      expect(item.coverImageUrl).toBeNull();
+      expect(item.book).toMatchObject({
+        author: null,
+        publicationYear: null,
+        pageCount: null,
+        // Absents du patch `book` : conservés.
+        publisher: 'Gallimard',
+        language: 'fr',
+      });
+      // barcode, non envoyé : inchangé.
+      expect(item.barcode).toBe('3600029412578');
+    });
+
+    it('clears cd and dvd metadata sent as null, including numeric ones', async () => {
+      const cdId = await createFull('cd', {
+        artist: 'Daft Punk',
+        label: 'Virgin',
+        releaseYear: 2001,
+      });
+      await patch(cdId, { cd: { label: null, releaseYear: null } });
+      expect((await read(cdId)).cd).toMatchObject({
+        artist: 'Daft Punk',
+        label: null,
+        releaseYear: null,
+      });
+
+      const dvdId = await createFull('dvd', {
+        director: 'Denis Villeneuve',
+        edition: 'Collector',
+        durationMinutes: 155,
+      });
+      await patch(dvdId, { dvd: { director: null, durationMinutes: null } });
+      expect((await read(dvdId)).dvd).toMatchObject({
+        director: null,
+        durationMinutes: null,
+        edition: 'Collector',
+      });
+    });
+  });
 });

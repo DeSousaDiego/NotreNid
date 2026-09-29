@@ -1820,25 +1820,32 @@
         "type": "object",
         "properties": {
           "author": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "isbn": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "publisher": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "publicationYear": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
           },
           "language": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "pageCount": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
           },
           "format": {
             "type": "string",
+            "nullable": true,
             "example": "Hardcover",
             "description": "Format physique de l’édition (ex. \"Hardcover\", \"Paperback\", \"Mass Market Paperback\"). Texte libre, non normalisé — même convention que CdMetadataDto.format/DvdMetadataDto.format."
           }
@@ -1848,16 +1855,20 @@
         "type": "object",
         "properties": {
           "artist": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "releaseYear": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
           },
           "label": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "format": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -1865,22 +1876,28 @@
         "type": "object",
         "properties": {
           "director": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "releaseYear": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
           },
           "edition": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "region": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "format": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "durationMinutes": {
-            "type": "number"
+            "type": "number",
+            "nullable": true
           }
         }
       },
@@ -1901,7 +1918,9 @@
             "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite (distinct d'une propriété absente) efface le code-barres existant lors d'une modification — voir `ItemsService.update`."
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "condition": {
             "type": "string",
@@ -1927,13 +1946,18 @@
               4.5,
               5
             ],
-            "description": "Note sur 5, par pas de 0,5. Absente = pas de note."
+            "nullable": true,
+            "description": "Note sur 5, par pas de 0,5. Absente = pas de note. `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "notes": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "coverImageUrl": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "ownerIds": {
             "description": "IDs des membres propriétaires (au moins un)",
@@ -1991,7 +2015,9 @@
             "description": "Code-barres produit (EAN-8, EAN-13, UPC-A, UPC-E ou futur format). Jamais unique : un foyer peut posséder plusieurs exemplaires du même produit. `null` explicite (distinct d'une propriété absente) efface le code-barres existant lors d'une modification — voir `ItemsService.update`."
           },
           "description": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "condition": {
             "type": "string",
@@ -2017,13 +2043,18 @@
               4.5,
               5
             ],
-            "description": "Note sur 5, par pas de 0,5. Absente = pas de note."
+            "nullable": true,
+            "description": "Note sur 5, par pas de 0,5. Absente = pas de note. `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "notes": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "coverImageUrl": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`."
           },
           "ownerIds": {
             "description": "IDs des membres propriétaires (au moins un)",

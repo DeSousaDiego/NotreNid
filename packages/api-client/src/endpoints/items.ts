@@ -24,10 +24,16 @@ export interface ItemInput {
    */
   barcode?: string | null;
   condition: ItemCondition;
-  rating?: ItemRating;
-  description?: string;
-  notes?: string;
-  coverImageUrl?: string;
+  /**
+   * Champs facultatifs effaçables — même contrat que `barcode` : propriété absente =
+   * ne pas modifier, `null` explicite = effacer la valeur existante (modification),
+   * valeur = remplacer. Idem pour chaque champ de `book`/`cd`/`dvd` (types
+   * partagés déjà nullables).
+   */
+  rating?: ItemRating | null;
+  description?: string | null;
+  notes?: string | null;
+  coverImageUrl?: string | null;
   ownerIds: string[];
   /** Codes pays ISO 3166-1 alpha-2. Absent = ne pas modifier ; tableau vide = aucun pays. */
   countryCodes?: string[];

@@ -27,6 +27,7 @@ import { useTheme } from '../../theme';
 import { categoryAddTitle } from './metadataFields';
 import {
   buildItemPayload,
+  buildItemUpdatePayload,
   EMPTY_ITEM_FORM_VALUES,
   findMissingRequiredCustomFields,
   itemFormSchema,
@@ -317,14 +318,20 @@ function ItemFormScreenComponent({
     setSubmitError(null);
 
     try {
-      const payload = buildItemPayload(formValues, category);
       if (mode === 'create') {
-        await createItem.mutateAsync(payload);
+        await createItem.mutateAsync(buildItemPayload(formValues, category));
         submitSucceededRef.current = true;
         showToast('Cet objet a rejoint votre nid.', 'success');
         leaveAfterSuccess('collection');
-      } else if (itemId) {
-        await updateItem.mutateAsync({ itemId, input: payload });
+      } else if (itemId && itemQuery.data) {
+        // `null` explicite pour un champ facultatif vidé : comparé à l'item tel que
+        // chargé à l'ouverture (voir `buildItemUpdatePayload`).
+        const input = buildItemUpdatePayload(
+          formValues,
+          category,
+          itemToFormValues(itemQuery.data),
+        );
+        await updateItem.mutateAsync({ itemId, input });
         submitSucceededRef.current = true;
         showToast('Objet modifié.', 'success');
         leaveAfterSuccess('previous');

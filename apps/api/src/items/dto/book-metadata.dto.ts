@@ -1,44 +1,52 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
+/**
+ * Tous les champs sont nullables : `null` explicite (distinct d'une propriété absente)
+ * efface la valeur existante lors d'une modification — voir `ItemsService.update`.
+ * `type` explicite dans chaque décorateur : l'union `T | null` s'efface en `Object` via
+ * les métadonnées `design:type`, ce qui produirait un schéma OpenAPI `object` erroné.
+ */
 export class BookMetadataDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(200)
-  author?: string;
+  author?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(20)
-  isbn?: string;
+  isbn?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(200)
-  publisher?: string;
+  publisher?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: Number, nullable: true })
   @IsOptional()
   @IsInt()
   @Min(0)
-  publicationYear?: number;
+  publicationYear?: number | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  language?: string;
+  language?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: Number, nullable: true })
   @IsOptional()
   @IsInt()
   @Min(0)
-  pageCount?: number;
+  pageCount?: number | null;
 
   @ApiPropertyOptional({
+    type: String,
+    nullable: true,
     example: 'Hardcover',
     description:
       'Format physique de l’édition (ex. "Hardcover", "Paperback", "Mass Market ' +
@@ -48,5 +56,5 @@ export class BookMetadataDto {
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  format?: string;
+  format?: string | null;
 }

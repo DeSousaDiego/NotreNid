@@ -580,31 +580,31 @@ export interface components {
             metadataSchema?: components["schemas"]["CategoryFieldSchemaDto"][];
         };
         BookMetadataDto: {
-            author?: string;
-            isbn?: string;
-            publisher?: string;
-            publicationYear?: number;
-            language?: string;
-            pageCount?: number;
+            author?: string | null;
+            isbn?: string | null;
+            publisher?: string | null;
+            publicationYear?: number | null;
+            language?: string | null;
+            pageCount?: number | null;
             /**
              * @description Format physique de l’édition (ex. "Hardcover", "Paperback", "Mass Market Paperback"). Texte libre, non normalisé — même convention que CdMetadataDto.format/DvdMetadataDto.format.
              * @example Hardcover
              */
-            format?: string;
+            format?: string | null;
         };
         CdMetadataDto: {
-            artist?: string;
-            releaseYear?: number;
-            label?: string;
-            format?: string;
+            artist?: string | null;
+            releaseYear?: number | null;
+            label?: string | null;
+            format?: string | null;
         };
         DvdMetadataDto: {
-            director?: string;
-            releaseYear?: number;
-            edition?: string;
-            region?: string;
-            format?: string;
-            durationMinutes?: number;
+            director?: string | null;
+            releaseYear?: number | null;
+            edition?: string | null;
+            region?: string | null;
+            format?: string | null;
+            durationMinutes?: number | null;
         };
         CreateItemDto: {
             categoryId: string;
@@ -615,16 +615,19 @@ export interface components {
              * @example 3600029412578
              */
             barcode?: string | null;
-            description?: string;
+            /** @description `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`. */
+            description?: string | null;
             /** @enum {string} */
             condition: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
             /**
-             * @description Note sur 5, par pas de 0,5. Absente = pas de note.
-             * @enum {number}
+             * @description Note sur 5, par pas de 0,5. Absente = pas de note. `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`.
+             * @enum {number|null}
              */
-            rating?: 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
-            notes?: string;
-            coverImageUrl?: string;
+            rating?: 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5 | null;
+            /** @description `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`. */
+            notes?: string | null;
+            /** @description `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`. */
+            coverImageUrl?: string | null;
             /** @description IDs des membres propriétaires (au moins un) */
             ownerIds: string[];
             book?: components["schemas"]["BookMetadataDto"];
@@ -650,16 +653,19 @@ export interface components {
              * @example 3600029412578
              */
             barcode?: string | null;
-            description?: string;
+            /** @description `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`. */
+            description?: string | null;
             /** @enum {string} */
             condition?: "NEW" | "VERY_GOOD" | "GOOD" | "FAIR" | "POOR";
             /**
-             * @description Note sur 5, par pas de 0,5. Absente = pas de note.
-             * @enum {number}
+             * @description Note sur 5, par pas de 0,5. Absente = pas de note. `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`.
+             * @enum {number|null}
              */
-            rating?: 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5;
-            notes?: string;
-            coverImageUrl?: string;
+            rating?: 0.5 | 1 | 1.5 | 2 | 2.5 | 3 | 3.5 | 4 | 4.5 | 5 | null;
+            /** @description `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`. */
+            notes?: string | null;
+            /** @description `null` explicite (distinct d'une propriété absente) efface la valeur existante lors d'une modification — voir `ItemsService.update`. */
+            coverImageUrl?: string | null;
             /** @description IDs des membres propriétaires (au moins un) */
             ownerIds?: string[];
             book?: components["schemas"]["BookMetadataDto"];

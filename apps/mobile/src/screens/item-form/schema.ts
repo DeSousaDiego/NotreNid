@@ -8,6 +8,8 @@ import {
 } from '@notre-nid/shared';
 import { z } from 'zod';
 
+import { metadataFieldsForSlug } from './metadataFields';
+
 const RATING_VALUES_SET: readonly number[] = ITEM_RATING_VALUES;
 
 /**
@@ -219,11 +221,94 @@ export function buildItemPayload(values: ItemFormValues, category: Category): Cr
   return payload;
 }
 
+function isBlank(value: string | undefined): boolean {
+  return !value || value.trim() === '';
+}
+
+/**
+ * `null` uniquement pour un champ qui AVAIT une valeur à l'ouverture de l'édition
+ * et que l'utilisateur a vidé ; sinon la valeur telle que la création l'enverrait
+ * (`undefined` pour un champ resté vide — jamais de changement inutile).
+ */
+function clearedOr<T>(current: string | undefined, initial: string | undefined, value: T) {
+  return isBlank(current) && !isBlank(initial) ? null : value;
+}
+
+type MetadataPatch = Record<string, string | number | null | undefined>;
+
+/**
+ * Métadonnées de la catégorie système en édition — même règle champ par champ.
+ * Un champ numérique n'est effacé que s'il a été réellement vidé : une saisie
+ * invalide (« 12a ») garde le comportement de la création (ignorée), jamais un
+ * effacement accidentel de la valeur existante.
+ */
+function buildMetadataUpdate(
+  category: Category,
+  values: ItemFormValues['metadata'],
+  initial: ItemFormValues['metadata'],
+  created: MetadataPatch | undefined,
+): MetadataPatch | undefined {
+  const fields = metadataFieldsForSlug(category.slug);
+  if (!fields || !created) return created;
+  const patch: MetadataPatch = { ...created };
+  for (const field of fields) {
+    patch[field.key] = clearedOr(values[field.key], initial[field.key], created[field.key]);
+  }
+  return patch;
+}
+
+/**
+ * Payload de MODIFICATION : identique à `buildItemPayload`, sauf pour les champs
+ * facultatifs effaçables (description, notes, couverture, note, métadonnées Livre/
+ * CD/DVD) : `null` explicite quand l'utilisateur a vidé un champ qui avait une
+ * valeur — l'API traite une propriété absente comme « ne pas modifier » (voir
+ * `ItemsService.update`), un simple `undefined` laissait donc l'ancienne valeur
+ * revenir après un « succès ». `initialValues` = l'item tel que chargé à
+ * l'ouverture (`itemToFormValues`). `barcode` garde sa règle existante
+ * (`toBarcodePayloadValue`, `null` dès qu'il est vide).
+ */
 export function buildItemUpdatePayload(
   values: ItemFormValues,
   category: Category,
+  initialValues: ItemFormValues,
 ): UpdateItemInput {
-  return buildItemPayload(values, category);
+  const created = buildItemPayload(values, category);
+  const payload: UpdateItemInput = {
+    ...created,
+    description: clearedOr(values.description, initialValues.description, created.description),
+    notes: clearedOr(values.notes, initialValues.notes, created.notes),
+    coverImageUrl: clearedOr(
+      values.coverImageUrl,
+      initialValues.coverImageUrl,
+      created.coverImageUrl,
+    ),
+    rating: values.rating == null && initialValues.rating != null ? null : created.rating,
+  };
+
+  if (created.book) {
+    payload.book = buildMetadataUpdate(
+      category,
+      values.metadata,
+      initialValues.metadata,
+      created.book,
+    ) as UpdateItemInput['book'];
+  } else if (created.cd) {
+    payload.cd = buildMetadataUpdate(
+      category,
+      values.metadata,
+      initialValues.metadata,
+      created.cd,
+    ) as UpdateItemInput['cd'];
+  } else if (created.dvd) {
+    payload.dvd = buildMetadataUpdate(
+      category,
+      values.metadata,
+      initialValues.metadata,
+      created.dvd,
+    ) as UpdateItemInput['dvd'];
+  }
+
+  return payload;
 }
 
 /** Champs personnalisés requis (catégorie personnalisée) manquants ou vides. */

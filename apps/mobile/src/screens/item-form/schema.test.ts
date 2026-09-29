@@ -4,6 +4,7 @@ import { mockItem } from '../../test-utils/mockItem';
 
 import {
   buildItemPayload,
+  buildItemUpdatePayload,
   EMPTY_ITEM_FORM_VALUES,
   findMissingRequiredCustomFields,
   itemFormSchema,
@@ -306,5 +307,155 @@ describe('findMissingRequiredCustomFields', () => {
 
   it('returns an empty list for system categories (no dynamic schema)', () => {
     expect(findMissingRequiredCustomFields(BOOK_CATEGORY, {})).toEqual([]);
+  });
+});
+
+describe('buildItemUpdatePayload — effacement des champs facultatifs (Lot 2)', () => {
+  /** Valeurs initiales d'un livre dont TOUS les champs facultatifs sont renseignés. */
+  const FULL_BOOK: ItemFormValues = {
+    ...EMPTY_ITEM_FORM_VALUES,
+    title: 'Dune',
+    barcode: '9782070368228',
+    condition: 'GOOD',
+    rating: 4.5,
+    description: 'Un classique.',
+    notes: 'Dédicacé.',
+    coverImageUrl: 'https://cdn.test/dune.jpg',
+    ownerIds: ['user-1'],
+    metadata: {
+      author: 'Frank Herbert',
+      isbn: '9782070368228',
+      publisher: 'Gallimard',
+      publicationYear: '1970',
+      language: 'fr',
+      pageCount: '592',
+      format: 'Poche',
+    },
+  };
+
+  it('sends null for common fields that had a value and were emptied', () => {
+    const payload = buildItemUpdatePayload(
+      { ...FULL_BOOK, description: '', notes: '   ', coverImageUrl: '', rating: null },
+      BOOK_CATEGORY,
+      FULL_BOOK,
+    );
+
+    expect(payload.description).toBeNull();
+    expect(payload.notes).toBeNull();
+    expect(payload.coverImageUrl).toBeNull();
+    expect(payload.rating).toBeNull();
+  });
+
+  it('sends null for text and numeric metadata that had a value and were emptied, keeping the others', () => {
+    const payload = buildItemUpdatePayload(
+      {
+        ...FULL_BOOK,
+        metadata: { ...FULL_BOOK.metadata, author: '', publicationYear: '', pageCount: ' ' },
+      },
+      BOOK_CATEGORY,
+      FULL_BOOK,
+    );
+
+    expect(payload.book).toEqual({
+      author: null,
+      isbn: '9782070368228',
+      publisher: 'Gallimard',
+      publicationYear: null,
+      language: 'fr',
+      pageCount: null,
+      format: 'Poche',
+    });
+  });
+
+  it('cd and dvd metadata follow the same rule', () => {
+    const cdInitial: ItemFormValues = {
+      ...FULL_BOOK,
+      metadata: { artist: 'Daft Punk', label: 'Virgin', releaseYear: '2001', format: 'CD' },
+    };
+    expect(
+      buildItemUpdatePayload(
+        { ...cdInitial, metadata: { ...cdInitial.metadata, label: '', releaseYear: '' } },
+        CD_CATEGORY,
+        cdInitial,
+      ).cd,
+    ).toEqual({ artist: 'Daft Punk', label: null, releaseYear: null, format: 'CD' });
+
+    const dvdInitial: ItemFormValues = {
+      ...FULL_BOOK,
+      metadata: { director: 'Villeneuve', edition: 'Collector', durationMinutes: '155' },
+    };
+    expect(
+      buildItemUpdatePayload(
+        { ...dvdInitial, metadata: { ...dvdInitial.metadata, director: '', durationMinutes: '' } },
+        DVD_CATEGORY,
+        dvdInitial,
+      ).dvd,
+    ).toMatchObject({ director: null, edition: 'Collector', durationMinutes: null });
+  });
+
+  it('never sends null for a field that was already empty and stays empty (no pointless change)', () => {
+    const emptyInitial: ItemFormValues = {
+      ...EMPTY_ITEM_FORM_VALUES,
+      title: 'Dune',
+      ownerIds: ['user-1'],
+    };
+    const payload = buildItemUpdatePayload({ ...emptyInitial }, BOOK_CATEGORY, emptyInitial);
+
+    expect(payload.description).toBeUndefined();
+    expect(payload.notes).toBeUndefined();
+    expect(payload.coverImageUrl).toBeUndefined();
+    expect(payload.rating).toBeUndefined();
+    expect(Object.values(payload.book ?? {}).every((value) => value === undefined)).toBe(true);
+  });
+
+  it('sends the unchanged value for an untouched filled field — never a destructive null', () => {
+    const payload = buildItemUpdatePayload({ ...FULL_BOOK }, BOOK_CATEGORY, FULL_BOOK);
+
+    expect(payload.description).toBe('Un classique.');
+    expect(payload.rating).toBe(4.5);
+    expect(payload.coverImageUrl).toBe('https://cdn.test/dune.jpg');
+    expect(payload.book?.author).toBe('Frank Herbert');
+    expect(payload.book?.pageCount).toBe(592);
+  });
+
+  it('sends the new value for a modified field, and for a field that was empty and got filled', () => {
+    const initial: ItemFormValues = { ...FULL_BOOK, notes: '' };
+    const payload = buildItemUpdatePayload(
+      { ...initial, description: 'Nouvelle description', notes: 'Prêté à Sam' },
+      BOOK_CATEGORY,
+      initial,
+    );
+
+    expect(payload.description).toBe('Nouvelle description');
+    expect(payload.notes).toBe('Prêté à Sam');
+  });
+
+  it('never clears a numeric field on an invalid entry — only an emptied one', () => {
+    const payload = buildItemUpdatePayload(
+      { ...FULL_BOOK, metadata: { ...FULL_BOOK.metadata, publicationYear: 'abc' } },
+      BOOK_CATEGORY,
+      FULL_BOOK,
+    );
+
+    expect(payload.book?.publicationYear).toBeUndefined();
+  });
+
+  it('keeps the barcode contract unchanged: cleared → null, kept → value', () => {
+    expect(
+      buildItemUpdatePayload({ ...FULL_BOOK, barcode: '' }, BOOK_CATEGORY, FULL_BOOK).barcode,
+    ).toBeNull();
+    expect(buildItemUpdatePayload({ ...FULL_BOOK }, BOOK_CATEGORY, FULL_BOOK).barcode).toBe(
+      '9782070368228',
+    );
+  });
+
+  it('leaves the creation payload unchanged: an emptied field is simply omitted there', () => {
+    const payload = buildItemPayload(
+      { ...FULL_BOOK, description: '', rating: null },
+      BOOK_CATEGORY,
+    );
+
+    expect(payload.description).toBeUndefined();
+    expect(payload.rating).toBeUndefined();
   });
 });

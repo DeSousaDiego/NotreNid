@@ -22,6 +22,11 @@ import { DvdMetadataDto } from './dvd-metadata.dto';
 import { ISO_COUNTRY_CODES } from '../iso-country-codes.constant';
 import { ITEM_RATING_VALUES, type ItemRatingValue } from '../item-rating.constants';
 
+/** Rappel de contrat commun aux champs facultatifs effaçables. */
+const CLEARABLE_ON_UPDATE =
+  "`null` explicite (distinct d'une propriété absente) efface la valeur existante lors " +
+  "d'une modification — voir `ItemsService.update`.";
+
 export class CreateItemDto {
   @ApiProperty()
   @IsUUID()
@@ -52,34 +57,36 @@ export class CreateItemDto {
   @MaxLength(32)
   barcode?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true, description: CLEARABLE_ON_UPDATE })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  description?: string;
+  description?: string | null;
 
   @ApiProperty({ enum: ItemCondition })
   @IsEnum(ItemCondition)
   condition!: ItemCondition;
 
   @ApiPropertyOptional({
+    type: Number,
     enum: ITEM_RATING_VALUES,
-    description: 'Note sur 5, par pas de 0,5. Absente = pas de note.',
+    nullable: true,
+    description: 'Note sur 5, par pas de 0,5. Absente = pas de note. ' + CLEARABLE_ON_UPDATE,
   })
   @IsOptional()
   @IsIn(ITEM_RATING_VALUES)
-  rating?: ItemRatingValue;
+  rating?: ItemRatingValue | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true, description: CLEARABLE_ON_UPDATE })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  notes?: string;
+  notes?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true, description: CLEARABLE_ON_UPDATE })
   @IsOptional()
   @IsString()
-  coverImageUrl?: string;
+  coverImageUrl?: string | null;
 
   @ApiProperty({ type: [String], description: 'IDs des membres propriétaires (au moins un)' })
   @IsArray()

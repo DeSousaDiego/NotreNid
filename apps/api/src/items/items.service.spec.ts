@@ -770,3 +770,177 @@ describe('ItemsService', () => {
     });
   });
 });
+
+describe('ItemsService.update — effacement des champs facultatifs (Lot 2)', () => {
+  let prisma: {
+    category: { findUnique: jest.Mock };
+    householdMember: { findMany: jest.Mock };
+    item: { findUnique: jest.Mock; update: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let service: ItemsService;
+  let itemUpdate: jest.Mock;
+
+  const fakeUser = {
+    id: 'u1',
+    email: 'a@a.com',
+    displayName: 'A',
+    avatarUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    passwordHash: 'x',
+  };
+
+  /** Item existant avec TOUS les champs facultatifs renseignés. */
+  const EXISTING = {
+    id: 'item1',
+    householdId: 'h1',
+    categoryId: 'cat1',
+    title: 'Dune',
+    barcode: '3600029412578',
+    description: 'Un classique de la SF.',
+    condition: ItemCondition.GOOD,
+    rating: 4.5,
+    notes: 'Dédicacé.',
+    coverImageUrl: 'https://cdn.test/dune.jpg',
+    customMetadata: null,
+    archivedAt: null,
+    owners: [],
+  };
+
+  beforeEach(() => {
+    prisma = {
+      category: { findUnique: jest.fn() },
+      householdMember: { findMany: jest.fn() },
+      item: { findUnique: jest.fn(), update: jest.fn() },
+      $transaction: jest.fn(),
+    };
+    service = new ItemsService(
+      prisma as unknown as PrismaService,
+      { validateCustomMetadata: jest.fn() } as unknown as CategoriesService,
+    );
+    prisma.item.findUnique.mockResolvedValue(EXISTING);
+    prisma.category.findUnique.mockResolvedValue({
+      id: 'cat1',
+      householdId: null,
+      isSystem: true,
+      metadataSchema: null,
+    });
+    itemUpdate = jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
+      ...EXISTING,
+      ...data,
+      owners: [],
+      category: { id: 'cat1' },
+      countries: [],
+      bookMetadata: null,
+      cdMetadata: null,
+      dvdMetadata: null,
+      createdBy: fakeUser,
+      updatedBy: fakeUser,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+    const auditLogCreate = jest.fn().mockResolvedValue({});
+    prisma.$transaction.mockImplementation(
+      async (
+        fn: (tx: {
+          item: { update: typeof itemUpdate };
+          auditLog: { create: typeof auditLogCreate };
+        }) => unknown,
+      ) => fn({ item: { update: itemUpdate }, auditLog: { create: auditLogCreate } }),
+    );
+  });
+
+  function sentData(): Record<string, unknown> {
+    return (itemUpdate.mock.calls[0]![0] as { data: Record<string, unknown> }).data;
+  }
+
+  it.each(['description', 'notes', 'coverImageUrl', 'rating'] as const)(
+    '%s: explicit null clears the existing value',
+    async (field) => {
+      const result = await service.update('h1', 'item1', 'u1', { [field]: null });
+
+      expect(sentData()[field]).toBeNull();
+      expect(result[field]).toBeNull();
+    },
+  );
+
+  it.each(['description', 'notes', 'coverImageUrl', 'rating'] as const)(
+    '%s: absent (undefined) keeps the existing value — never cleared by omission',
+    async (field) => {
+      await service.update('h1', 'item1', 'u1', { title: 'Dune (poche)' });
+
+      expect(sentData()[field]).toBe(EXISTING[field]);
+    },
+  );
+
+  it('distinguishes { field: undefined } from { field: null } in the same patch', async () => {
+    await service.update('h1', 'item1', 'u1', { description: undefined, notes: null });
+
+    expect(sentData().description).toBe(EXISTING.description);
+    expect(sentData().notes).toBeNull();
+  });
+
+  it('replaces a value with a new non-null one', async () => {
+    await service.update('h1', 'item1', 'u1', { description: 'Nouvelle description', rating: 2 });
+
+    expect(sentData().description).toBe('Nouvelle description');
+    expect(sentData().rating).toBe(2);
+  });
+
+  it('barcode keeps its contract: undefined unchanged, null cleared, string replaced', async () => {
+    await service.update('h1', 'item1', 'u1', {});
+    expect(sentData().barcode).toBe(EXISTING.barcode);
+
+    itemUpdate.mockClear();
+    await service.update('h1', 'item1', 'u1', { barcode: null });
+    expect(sentData().barcode).toBeNull();
+
+    itemUpdate.mockClear();
+    await service.update('h1', 'item1', 'u1', { barcode: '0000000000000' });
+    expect(sentData().barcode).toBe('0000000000000');
+  });
+
+  describe('category metadata (upsert: null clears a column, an absent key is left untouched)', () => {
+    function sentUpsert(relation: 'bookMetadata' | 'cdMetadata' | 'dvdMetadata') {
+      return (sentData()[relation] as { upsert: { update: Record<string, unknown> } }).upsert
+        .update;
+    }
+
+    it('book: null author/publisher/year/pages reach Prisma as null, untouched keys stay absent', async () => {
+      await service.update('h1', 'item1', 'u1', {
+        book: { author: null, publisher: null, publicationYear: null, pageCount: null },
+      });
+
+      const update = sentUpsert('bookMetadata');
+      expect(update).toEqual({
+        author: null,
+        publisher: null,
+        publicationYear: null,
+        pageCount: null,
+      });
+      expect('isbn' in update).toBe(false);
+    });
+
+    it('cd: null artist/label/releaseYear reach Prisma as null', async () => {
+      await service.update('h1', 'item1', 'u1', {
+        cd: { artist: null, label: null, releaseYear: null },
+      });
+
+      expect(sentUpsert('cdMetadata')).toEqual({ artist: null, label: null, releaseYear: null });
+    });
+
+    it('dvd: null director/edition/durationMinutes reach Prisma as null, a new value replaces', async () => {
+      await service.update('h1', 'item1', 'u1', {
+        dvd: { director: null, edition: null, durationMinutes: null, region: 'Zone 2' },
+      });
+
+      expect(sentUpsert('dvdMetadata')).toEqual({
+        director: null,
+        edition: null,
+        durationMinutes: null,
+        region: 'Zone 2',
+      });
+    });
+  });
+});

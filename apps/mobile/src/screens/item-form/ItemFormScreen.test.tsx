@@ -1176,3 +1176,111 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
     });
   });
 });
+
+describe('ItemFormScreen — effacement des champs facultatifs en édition (Lot 2)', () => {
+  /** Livre existant dont tous les champs facultatifs sont renseignés. */
+  const FULL_ITEM = {
+    ...EXISTING_ITEM,
+    barcode: '9782070368228',
+    description: 'Un classique de la SF.',
+    notes: 'Dédicacé.',
+    rating: 4,
+    coverImageUrl: 'https://cdn.test/dune.jpg',
+    book: {
+      ...EXISTING_ITEM.book,
+      author: 'Frank Herbert',
+      publisher: 'Gallimard',
+      pageCount: 592,
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetPreventRemoveMock();
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER]);
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(FULL_ITEM);
+    (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...FULL_ITEM });
+  });
+
+  type View = Awaited<ReturnType<typeof renderScreen>>;
+
+  async function openEdit() {
+    const view = await renderScreen(
+      <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+    );
+    await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+    return view;
+  }
+
+  async function next(view: View) {
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+  }
+
+  async function save(view: View) {
+    await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => expect(mockApiClient.items.update).toHaveBeenCalledTimes(1));
+    return (mockApiClient.items.update as jest.Mock).mock.calls[0]![2] as Record<string, unknown>;
+  }
+
+  it('sends null for an emptied description and emptied text/numeric metadata', async () => {
+    const view = await openEdit();
+    await fireEvent.changeText(view.getByLabelText('Description'), '');
+    await fireEvent.changeText(view.getByLabelText('Auteur'), '');
+    await fireEvent.changeText(view.getByLabelText('Nombre de pages'), '');
+    await next(view);
+    await next(view);
+
+    const input = await save(view);
+
+    expect(input.description).toBeNull();
+    expect(input.book).toMatchObject({ author: null, pageCount: null, publisher: 'Gallimard' });
+    // Champs non touchés : jamais d'effacement destructeur.
+    expect(input.notes).toBe('Dédicacé.');
+    expect(input.rating).toBe(4);
+    expect(input.coverImageUrl).toBe('https://cdn.test/dune.jpg');
+    expect(input.barcode).toBe('9782070368228');
+  });
+
+  it('sends null for emptied notes and a removed rating', async () => {
+    const view = await openEdit();
+    await next(view);
+    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await fireEvent.changeText(view.getByLabelText('Notes'), '');
+    // Re-toucher la note actuelle la retire (voir StarRating).
+    await fireEvent.press(view.getByLabelText('4 sur 5'));
+    await next(view);
+
+    const input = await save(view);
+
+    expect(input.notes).toBeNull();
+    expect(input.rating).toBeNull();
+    expect(input.description).toBe('Un classique de la SF.');
+  });
+
+  it('sends coverImageUrl: null when the existing cover is removed', async () => {
+    const view = await openEdit();
+    await next(view);
+    await next(view);
+    await waitFor(() => expect(view.getByLabelText('Retirer la couverture')).toBeTruthy());
+    await fireEvent.press(view.getByLabelText('Retirer la couverture'));
+
+    const input = await save(view);
+
+    expect(input.coverImageUrl).toBeNull();
+    // Couverture d'origine (pas téléversée pendant cette session) : jamais supprimée
+    // côté stockage dans ce lot.
+    expect(mockApiClient.uploads.remove).not.toHaveBeenCalled();
+  });
+
+  it('keeps the barcode behaviour: an emptied barcode is still sent as null', async () => {
+    const view = await openEdit();
+    await fireEvent.changeText(view.getByLabelText('Code-barres'), '');
+    await next(view);
+    await next(view);
+
+    const input = await save(view);
+
+    expect(input.barcode).toBeNull();
+    expect(input.description).toBe('Un classique de la SF.');
+  });
+});
