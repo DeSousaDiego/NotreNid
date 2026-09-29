@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AppText } from '../../components';
-import { useTheme } from '../../theme';
+import { useTheme, type ColorToken } from '../../theme';
 
 export interface SelectionCardProps {
   title: string;
@@ -10,6 +10,8 @@ export interface SelectionCardProps {
   icon: ReactNode;
   onPress: () => void;
   accessibilityLabel?: string;
+  /** Surface teintée (tokens `tint*` de l'Accueil) — carte neutre si absent. */
+  tint?: ColorToken;
 }
 
 /**
@@ -24,6 +26,7 @@ export function SelectionCard({
   icon,
   onPress,
   accessibilityLabel,
+  tint,
 }: SelectionCardProps) {
   const theme = useTheme();
 
@@ -39,8 +42,9 @@ export function SelectionCard({
           gap: theme.spacing.lg,
           padding: theme.spacing.lg,
           borderRadius: theme.radii.lg,
-          backgroundColor: theme.colors.surface,
-          borderWidth: 1,
+          // Teintée : la couleur remplace la bordure (moins d'effet « rectangle neutre »).
+          backgroundColor: tint ? theme.colors[tint] : theme.colors.surface,
+          borderWidth: tint ? 0 : 1,
           borderColor: theme.colors.border,
           opacity: pressed ? 0.85 : 1,
         },
@@ -51,8 +55,8 @@ export function SelectionCard({
         style={{
           width: 64,
           height: 64,
-          borderRadius: theme.radii.md,
-          backgroundColor: theme.colors.background,
+          borderRadius: tint ? theme.radii.full : theme.radii.md,
+          backgroundColor: tint ? theme.colors.surface : theme.colors.background,
           alignItems: 'center',
           justifyContent: 'center',
         }}

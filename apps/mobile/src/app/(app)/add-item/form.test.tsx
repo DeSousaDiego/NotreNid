@@ -137,7 +137,9 @@ describe('AddItemFormScreen (create wrapper)', () => {
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Discovery');
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+    expect(view.getByRole('checkbox', { name: 'Alix' }).props.accessibilityState?.checked).toBe(
+      true,
+    );
     await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
 
     await waitFor(() =>

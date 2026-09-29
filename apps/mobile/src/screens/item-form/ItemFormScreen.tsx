@@ -21,6 +21,7 @@ import { useCreateItem, useUpdateItem } from '../../hooks/useItemMutations';
 import { useItem } from '../../hooks/useItem';
 import { useMembers } from '../../hooks/useMembers';
 import { getErrorMessage } from '../../lib/errorMessage';
+import { useAuth } from '../../providers/AuthProvider';
 import { useHousehold } from '../../providers/HouseholdProvider';
 import { useTheme } from '../../theme';
 
@@ -37,6 +38,7 @@ import {
 import { StepCopy } from './StepCopy';
 import { StepInformation } from './StepInformation';
 import { StepOwnersAndCover } from './StepOwnersAndCover';
+import { StepProgress } from './StepProgress';
 import { leaveAddFlowToCollection } from './successNavigation';
 
 export interface ItemFormScreenProps {
@@ -66,7 +68,9 @@ export interface ItemFormScreenProps {
   infoMessage?: string;
 }
 
-const STEP_TITLES = ['Informations', 'Votre exemplaire', 'Propriétaires et couverture'];
+// « L'objet » (l'œuvre) / « Votre exemplaire » (cette copie) / « Dans votre nid »
+// (propriétaires, couverture, récapitulatif : le moment où l'objet rejoint le foyer).
+const STEP_TITLES = ["L'objet", 'Votre exemplaire', 'Dans votre nid'] as const;
 
 // Utilisé pour les états sans footer (chargement/erreur) — la zone de sécurité basse
 // y est gérée par `SafeAreaView` seule.
@@ -104,6 +108,21 @@ function mergeWithEmpty(partial: Partial<ItemFormValues> | undefined): ItemFormV
   };
 }
 
+/**
+ * Création : l'utilisateur courant est propriétaire par défaut (cas le plus fréquent,
+ * et seul choix possible dans un foyer d'un membre) — sauf si le brouillon porte déjà
+ * une sélection (même vide : choix explicite de l'utilisateur, jamais réécrit). Le scan
+ * ne renseigne jamais `ownerIds` (voir `buildDraftValuesFromBarcodeResult`).
+ */
+function withCurrentOwnerByDefault(
+  values: ItemFormValues,
+  initialValues: Partial<ItemFormValues> | undefined,
+  currentUserId: string | undefined,
+): ItemFormValues {
+  if (initialValues?.ownerIds !== undefined || !currentUserId) return values;
+  return { ...values, ownerIds: [currentUserId] };
+}
+
 function ItemFormScreenComponent({
   mode,
   category,
@@ -117,6 +136,7 @@ function ItemFormScreenComponent({
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
   const { householdId } = useHousehold();
+  const currentUserId = useAuth().user?.id;
   const membersQuery = useMembers(householdId);
   const itemQuery = useItem(mode === 'edit' ? householdId : null, itemId ?? '');
   const createItem = useCreateItem(householdId);
@@ -158,8 +178,8 @@ function ItemFormScreenComponent({
     () =>
       mode === 'edit' && itemQuery.data
         ? itemToFormValues(itemQuery.data)
-        : mergeWithEmpty(initialValues),
-    [mode, itemQuery.data, initialValues],
+        : withCurrentOwnerByDefault(mergeWithEmpty(initialValues), initialValues, currentUserId),
+    [mode, itemQuery.data, initialValues, currentUserId],
   );
 
   const {
@@ -316,6 +336,11 @@ function ItemFormScreenComponent({
 
   const onSubmit = handleSubmit(async (formValues) => {
     setSubmitError(null);
+    const missing = findMissingRequiredCustomFields(category, formValues.customMetadata);
+    if (missing.length > 0) {
+      setSubmitError(`Champs requis manquants : ${missing.join(', ')}.`);
+      return;
+    }
 
     try {
       if (mode === 'create') {
@@ -415,50 +440,82 @@ function ItemFormScreenComponent({
               />
             ) : null}
             <View style={{ flex: 1 }} />
-            {isLastStep ? (
+            {mode === 'edit' ? (
+              // Édition : « Enregistrer » à chaque étape — retoucher une note ou une
+              // couverture ne demande plus de parcourir tout le formulaire.
+              <>
+                {!isLastStep ? (
+                  <Button
+                    label="Suivant"
+                    variant="ghost"
+                    onPress={() => void goNext()}
+                    disabled={isBusy || isUploadingCover}
+                  />
+                ) : null}
+                <Button
+                  label="Enregistrer"
+                  variant="primary"
+                  onPress={() => void submit()}
+                  loading={isBusy}
+                  disabled={isUploadingCover}
+                />
+              </>
+            ) : isLastStep ? (
+              // Création : terracotta, la couleur de l'ajout (même logique que l'Accueil).
               <Button
-                label={mode === 'create' ? 'Ajouter au nid' : 'Enregistrer'}
+                label="Ajouter au nid"
+                variant="secondary"
                 onPress={() => void submit()}
                 loading={isBusy}
                 disabled={isUploadingCover}
               />
             ) : (
-              <Button label="Suivant" onPress={() => void goNext()} disabled={isBusy} />
+              <Button
+                label="Suivant"
+                variant="primary"
+                onPress={() => void goNext()}
+                disabled={isBusy}
+              />
             )}
           </View>
         </View>
       }
     >
-      <View style={{ gap: theme.spacing.lg }}>
-        <View style={{ gap: theme.spacing.xs }}>
-          <AppText variant="title">
-            {mode === 'create' ? categoryAddTitle(category) : "Modifier l'objet"}
-          </AppText>
-          <AppText variant="label" color="textMuted">
-            Étape {step + 1} sur {STEP_TITLES.length} — {STEP_TITLES[step]}
-          </AppText>
+      <View style={{ gap: theme.spacing.xl }}>
+        <View style={{ gap: theme.spacing.md }}>
+          <View style={{ gap: 2 }}>
+            <AppText variant="title" accessibilityRole="header">
+              {mode === 'create' ? categoryAddTitle(category) : "Modifier l'objet"}
+            </AppText>
+            {mode === 'edit' && itemQuery.data ? (
+              // On retouche CET objet : son titre reste visible pendant toute l'édition.
+              <AppText variant="body" color="textMuted" numberOfLines={1}>
+                {itemQuery.data.title}
+              </AppText>
+            ) : null}
+          </View>
+          <StepProgress steps={STEP_TITLES} current={step} />
         </View>
 
         {infoMessage ? (
           <View
+            testID="item-form-info-banner"
             accessibilityRole="text"
             style={{
               flexDirection: 'row',
               alignItems: 'flex-start',
               gap: theme.spacing.sm,
-              padding: theme.spacing.sm,
-              borderRadius: theme.radii.md,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
+              padding: theme.spacing.md,
+              borderRadius: theme.radii.lg,
+              backgroundColor: theme.colors.tintHoney,
             }}
           >
             <Ionicons
               name="information-circle-outline"
               size={theme.iconSizes.md}
-              color={theme.colors.accent}
+              color={theme.colors.primary}
             />
-            <AppText variant="body" color="textMuted" style={{ flex: 1 }}>
+            <AppText variant="body" style={{ flex: 1 }}>
               {infoMessage}
             </AppText>
           </View>

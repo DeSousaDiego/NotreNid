@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
-import { ThemeProvider } from '../../../theme';
+import { StyleSheet, type ViewStyle } from 'react-native';
+
+import { colors, ThemeProvider } from '../../../theme';
 
 import AddItemCategoryScreen from './category';
 
@@ -83,6 +85,19 @@ describe('AddItemCategoryScreen', () => {
       pathname: '/(app)/add-item/mode',
       params: { categoryId: 'cat-cd' },
     });
+  });
+
+  it('tints each category card like its Home tile (book sage, cd peach, dvd honey)', async () => {
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK, CD, DVD]);
+    const view = await renderScreen(<AddItemCategoryScreen />);
+    await waitFor(() => expect(view.getByRole('button', { name: 'Livres' })).toBeTruthy());
+
+    const background = (name: string) =>
+      (StyleSheet.flatten(view.getByRole('button', { name }).props.style) as ViewStyle)
+        .backgroundColor;
+    expect(background('Livres')).toBe(colors.tintSage);
+    expect(background('CD')).toBe(colors.tintPeach);
+    expect(background('DVD')).toBe(colors.tintHoney);
   });
 
   // Le bouton retour de cet écran est désormais l'écran-retour natif automatique

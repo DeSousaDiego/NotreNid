@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { AppText, BottomSheet, Chip, ConditionBadge, ItemCover } from '../../components';
+import { AppText, Avatar, BottomSheet, ConditionBadge, ItemCover } from '../../components';
+import { getCategoryTint } from '../../constants/category-icons';
 import { useTheme } from '../../theme';
 
+import { FormSection } from './FormSection';
 import { countryLabelForSlug } from './metadataFields';
 import type { ItemFormValues } from './schema';
 import { useCoverPicker } from './useCoverPicker';
@@ -23,7 +25,7 @@ export interface StepOwnersAndCoverProps {
   onUploadingChange?: (isUploading: boolean) => void;
 }
 
-/** Étape 3 sur 3 — Propriétaires, couverture et récapitulatif (Bloc 2). */
+/** Étape 3 sur 3 — Dans votre nid : propriétaires, couverture et récapitulatif. */
 export function StepOwnersAndCover({
   control,
   errors,
@@ -36,22 +38,19 @@ export function StepOwnersAndCover({
   const theme = useTheme();
 
   return (
-    <View style={{ gap: theme.spacing.lg }}>
+    <View style={{ gap: theme.spacing.xl }}>
       <Controller
         control={control}
         name="ownerIds"
         render={({ field }) => (
-          <View>
-            <AppText variant="label" color="textMuted" style={{ marginBottom: 6 }}>
-              Propriétaires
-            </AppText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+          <FormSection icon="home-outline" title="À qui appartient-il ?">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
               {members.map((member) => {
                 const selected = field.value.includes(member.user.id);
                 return (
-                  <Chip
+                  <OwnerChip
                     key={member.user.id}
-                    label={member.user.displayName}
+                    member={member}
                     selected={selected}
                     onPress={() => {
                       field.onChange(
@@ -65,11 +64,11 @@ export function StepOwnersAndCover({
               })}
             </View>
             {errors.ownerIds ? (
-              <AppText variant="helper" color="danger" style={{ marginTop: 6 }}>
+              <AppText variant="helper" color="danger">
                 {errors.ownerIds.message}
               </AppText>
             ) : null}
-          </View>
+          </FormSection>
         )}
       />
 
@@ -87,17 +86,22 @@ export function StepOwnersAndCover({
         )}
       />
 
+      {/* Petite synthèse chaleureuse : fond sauge, pas de bordure. */}
       <View
+        testID="item-form-summary"
         style={{
-          borderRadius: theme.radii.md,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
-          padding: theme.spacing.md,
+          borderRadius: theme.radii.lg,
+          backgroundColor: theme.colors.tintSage,
+          padding: theme.spacing.lg,
           gap: theme.spacing.xs,
         }}
       >
-        <AppText variant="label" color="textMuted">
+        <AppText
+          variant="label"
+          color="primary"
+          accessibilityRole="header"
+          style={{ marginBottom: theme.spacing.xs }}
+        >
           Récapitulatif
         </AppText>
         <SummaryRow label="Titre" value={values.title || '—'} />
@@ -125,6 +129,52 @@ export function StepOwnersAndCover({
         ) : null}
       </View>
     </View>
+  );
+}
+
+/** Membre du foyer : avatar + prénom, case à cocher (plusieurs propriétaires possibles). */
+function OwnerChip({
+  member,
+  selected,
+  onPress,
+}: {
+  member: HouseholdMember;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={member.user.displayName}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        minHeight: 48,
+        paddingLeft: theme.spacing.xs,
+        paddingRight: theme.spacing.md,
+        borderRadius: theme.radii.full,
+        backgroundColor: selected ? theme.colors.primary : theme.colors.surface,
+        borderWidth: 1,
+        borderColor: selected ? theme.colors.primary : theme.colors.border,
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Avatar displayName={member.user.displayName} avatarUrl={member.user.avatarUrl} size={36} />
+      <AppText variant="label" color={selected ? 'onPrimary' : 'text'}>
+        {member.user.displayName}
+      </AppText>
+      <Ionicons
+        name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+        size={theme.iconSizes.md}
+        color={selected ? theme.colors.onPrimary : theme.colors.primaryMuted}
+        accessible={false}
+        importantForAccessibility="no"
+      />
+    </Pressable>
   );
 }
 
@@ -178,44 +228,78 @@ function CoverPickerField({
   useEffect(() => () => onUploadingChange?.(false), [onUploadingChange]);
 
   return (
-    <View>
-      <AppText variant="label" color="textMuted" style={{ marginBottom: 6 }}>
-        Couverture
-      </AppText>
+    <FormSection icon="image-outline" title="Couverture">
       <Pressable
+        testID="cover-picker"
         accessibilityRole="button"
         accessibilityLabel={previewUri ? 'Remplacer la couverture' : 'Ajouter une couverture'}
         onPress={() => setSourceSheetOpen(true)}
         disabled={isUploading}
-        style={{
+        style={({ pressed }) => ({
           width: 120,
           height: 160,
-          borderRadius: theme.radii.md,
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.background,
+          borderRadius: theme.radii.lg,
+          // Teinte de la catégorie (Livre sauge / CD pêche / DVD miel), comme sur l'Accueil.
+          backgroundColor: theme.colors[getCategoryTint(categorySlug)],
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
-        }}
+          opacity: pressed ? 0.85 : 1,
+        })}
       >
         {isUploading ? (
           <ActivityIndicator color={theme.colors.primary} />
         ) : previewUri ? (
-          <ItemCover
-            uri={previewUri}
-            categorySlug={categorySlug}
-            illustrationSize={56}
-            style={{ width: '100%', height: '100%' }}
-          />
+          <>
+            <ItemCover
+              uri={previewUri}
+              categorySlug={categorySlug}
+              illustrationSize={56}
+              style={{ width: '100%', height: '100%' }}
+            />
+            {/* Repère visuel « remplacer » : l'action est déjà portée par le libellé
+             * accessible de la zone entière. */}
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                position: 'absolute',
+                bottom: theme.spacing.xs,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: theme.spacing.sm,
+                paddingVertical: 2,
+                borderRadius: theme.radii.full,
+                backgroundColor: theme.colors.surface,
+              }}
+            >
+              <Ionicons
+                name="camera-outline"
+                size={theme.iconSizes.sm}
+                color={theme.colors.primary}
+              />
+              <AppText variant="caption" color="primary">
+                Remplacer
+              </AppText>
+            </View>
+          </>
         ) : (
-          <AppText variant="caption" color="textMuted" style={{ textAlign: 'center', padding: 8 }}>
-            Ajouter une image
-          </AppText>
+          <View style={{ alignItems: 'center', gap: theme.spacing.xs, padding: theme.spacing.sm }}>
+            <Ionicons
+              name="camera-outline"
+              size={theme.iconSizes.xl}
+              color={theme.colors.primary}
+              accessible={false}
+            />
+            <AppText variant="caption" color="primary" style={{ textAlign: 'center' }}>
+              Ajouter une image
+            </AppText>
+          </View>
         )}
       </Pressable>
       {isUploading ? (
-        <AppText variant="helper" color="textMuted" style={{ marginTop: 6 }}>
+        <AppText variant="helper" color="textMuted">
           Envoi de l’image en cours…
         </AppText>
       ) : null}
@@ -225,15 +309,24 @@ function CoverPickerField({
           accessibilityLabel="Retirer la couverture"
           onPress={() => void removeImage()}
           disabled={isRemoving}
-          style={{ marginTop: theme.spacing.xs }}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            alignSelf: 'flex-start',
+            gap: theme.spacing.xs,
+            minHeight: 44,
+            paddingRight: theme.spacing.sm,
+            opacity: pressed ? 0.6 : 1,
+          })}
         >
+          <Ionicons name="trash-outline" size={theme.iconSizes.md} color={theme.colors.danger} />
           <AppText variant="label" color="danger">
             {isRemoving ? 'Suppression…' : 'Retirer la couverture'}
           </AppText>
         </Pressable>
       ) : null}
       {error ? (
-        <AppText variant="helper" color="danger" style={{ marginTop: 6 }}>
+        <AppText variant="helper" color="danger">
           {error}
         </AppText>
       ) : null}
@@ -263,7 +356,7 @@ function CoverPickerField({
           />
         </View>
       </BottomSheet>
-    </View>
+    </FormSection>
   );
 }
 

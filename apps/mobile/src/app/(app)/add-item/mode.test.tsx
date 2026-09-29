@@ -7,7 +7,9 @@ import {
   useAddItemDraft,
 } from '../../../screens/add-item/AddItemDraftContext';
 import type { ItemFormValues } from '../../../screens/item-form/schema';
-import { ThemeProvider } from '../../../theme';
+import { StyleSheet, type ViewStyle } from 'react-native';
+
+import { colors, ThemeProvider } from '../../../theme';
 
 import AddItemModeScreen from './mode';
 
@@ -86,6 +88,22 @@ describe('AddItemModeScreen', () => {
     const view = await renderScreen();
     await waitFor(() => expect(view.getByText('Ajouter un CD')).toBeTruthy());
     expect(view.getAllByText('CD').length).toBeGreaterThan(0);
+  });
+
+  it('gives scan and manual entry two distinct soft tints of equal weight', async () => {
+    const view = await renderScreen();
+    await waitFor(() =>
+      expect(view.getByRole('button', { name: 'Scanner un code-barres' })).toBeTruthy(),
+    );
+
+    const style = (name: string) =>
+      StyleSheet.flatten(view.getByRole('button', { name }).props.style) as ViewStyle;
+    expect(style('Scanner un code-barres').backgroundColor).toBe(colors.tintSage);
+    expect(style('Saisir manuellement').backgroundColor).toBe(colors.tintPeach);
+    // Même importance : même rayon, même ombre, même padding — seule la teinte change.
+    const { backgroundColor: _scan, ...scanRest } = style('Scanner un code-barres');
+    const { backgroundColor: _manual, ...manualRest } = style('Saisir manuellement');
+    expect(scanRest).toEqual(manualRest);
   });
 
   it('navigates to the scan placeholder when "Scanner un code-barres" is pressed', async () => {

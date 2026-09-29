@@ -1,7 +1,8 @@
 import { Controller, type Control, type FieldErrors } from 'react-hook-form';
-import { View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, View } from 'react-native';
 
-import { AppText, Select, StarRating, TextField } from '../../components';
+import { AppText, formatRatingLabel, Select, StarRating, TextField } from '../../components';
 import { CONDITION_OPTIONS } from '../../constants/condition';
 import { useTheme } from '../../theme';
 
@@ -21,7 +22,7 @@ export function StepCopy({ control, errors }: StepCopyProps) {
   const theme = useTheme();
 
   return (
-    <View style={{ gap: theme.spacing.md }}>
+    <View style={{ gap: theme.spacing.lg }}>
       <Controller
         control={control}
         name="condition"
@@ -48,10 +49,44 @@ export function StepCopy({ control, errors }: StepCopyProps) {
         name="rating"
         render={({ field }) => (
           <View>
-            <AppText variant="label" color="textMuted" style={{ marginBottom: 4 }}>
-              Note (optionnelle)
-            </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm }}>
+              <AppText variant="label" color="textMuted">
+                Note (optionnelle)
+              </AppText>
+              {field.value ? (
+                <AppText variant="label" color="primary" testID="rating-value">
+                  {formatRatingLabel(field.value)} / 5
+                </AppText>
+              ) : null}
+            </View>
             <StarRating value={field.value} onChange={field.onChange} />
+            {field.value ? (
+              // Retirer la note était possible (re-toucher l'étoile courante) mais
+              // invisible : action explicite, cible tactile ≥ 44.
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retirer la note"
+                onPress={() => field.onChange(null)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
+                  gap: theme.spacing.xs,
+                  minHeight: 44,
+                  paddingRight: theme.spacing.sm,
+                  opacity: pressed ? 0.6 : 1,
+                })}
+              >
+                <Ionicons
+                  name="close-circle-outline"
+                  size={theme.iconSizes.md}
+                  color={theme.colors.textMuted}
+                />
+                <AppText variant="label" color="textMuted">
+                  Retirer la note
+                </AppText>
+              </Pressable>
+            ) : null}
           </View>
         )}
       />

@@ -8,6 +8,7 @@ import {
   LoadingSkeleton,
   ScreenContainer,
 } from '../../../components';
+import { getCategoryTint } from '../../../constants/category-icons';
 import { useCategories } from '../../../hooks/useCategories';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
@@ -65,6 +66,7 @@ export default function AddItemCategoryScreen() {
                 key={category.id}
                 title={category.name}
                 icon={<CategoryIllustration slug={category.slug} size={56} />}
+                tint={getCategoryTint(category.slug)}
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/add-item/mode',

@@ -2,7 +2,7 @@ import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useState, type ReactElement } from 'react';
-import { BackHandler, Pressable } from 'react-native';
+import { BackHandler, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 
 import { AppText, ToastProvider } from '../../components';
 import {
@@ -11,7 +11,7 @@ import {
   resetPreventRemoveMock,
   simulateBackAttempt,
 } from '../../test-utils/preventRemoveMock';
-import { ThemeProvider } from '../../theme';
+import { colors, ThemeProvider } from '../../theme';
 
 import { ItemFormScreen } from './ItemFormScreen';
 
@@ -269,12 +269,16 @@ describe('ItemFormScreen', () => {
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await waitFor(() =>
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+    );
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
+    await waitFor(() => expect(view.getByRole('checkbox', { name: 'Alix' })).toBeTruthy());
 
-    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+    expect(view.getByRole('checkbox', { name: 'Alix' }).props.accessibilityState?.checked).toBe(
+      true,
+    );
     await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
 
     await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
@@ -313,7 +317,9 @@ describe('ItemFormScreen', () => {
     await fireEvent.changeText(view.getByLabelText('Format'), 'Broché');
 
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await waitFor(() =>
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+    );
     await fireEvent.press(view.getByRole('button', { name: 'Précédent' }));
 
     await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
@@ -501,10 +507,14 @@ describe('ItemFormScreen', () => {
       await fireEvent.changeText(view.getByLabelText('Code-barres'), '012345678905');
 
       await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+      await waitFor(() =>
+        expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+      );
       await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-      await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
-      await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+      await waitFor(() => expect(view.getByRole('checkbox', { name: 'Alix' })).toBeTruthy());
+      expect(view.getByRole('checkbox', { name: 'Alix' }).props.accessibilityState?.checked).toBe(
+        true,
+      );
       await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
 
       await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
@@ -582,10 +592,14 @@ describe('ItemFormScreen', () => {
       expect(view.getByLabelText('Code-barres').props.value).toBe('3600029412578');
 
       await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+      await waitFor(() =>
+        expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+      );
       await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-      await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
-      await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+      await waitFor(() => expect(view.getByRole('checkbox', { name: 'Alix' })).toBeTruthy());
+      expect(view.getByRole('checkbox', { name: 'Alix' }).props.accessibilityState?.checked).toBe(
+        true,
+      );
       await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
 
       await waitFor(() => expect(mockApiClient.items.create).toHaveBeenCalledTimes(1));
@@ -633,20 +647,24 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
     await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await waitFor(() =>
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+    );
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByRole('button', { name: 'Alix' })).toBeTruthy());
-    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+    await waitFor(() => expect(view.getByRole('checkbox', { name: 'Alix' })).toBeTruthy());
+    expect(view.getByRole('checkbox', { name: 'Alix' }).props.accessibilityState?.checked).toBe(
+      true,
+    );
   }
 
   async function goToLastStepInEdit(view: View) {
     await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
-    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
     await waitFor(() =>
-      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy(),
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
     );
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByLabelText('Étape 3 sur 3, Dans votre nid')).toBeTruthy());
   }
 
   function isDisabled(view: View, name: string): boolean {
@@ -745,7 +763,7 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
         expect(simulateBackAttempt()).toBe(true);
       });
 
-      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy();
+      expect(view.getByLabelText('Étape 3 sur 3, Dans votre nid')).toBeTruthy();
     });
   });
 
@@ -867,12 +885,14 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
       await act(async () => {
         expect(simulateBackAttempt()).toBe(true);
       });
-      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+      await waitFor(() =>
+        expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+      );
 
       await act(async () => {
         expect(simulateBackAttempt()).toBe(true);
       });
-      await waitFor(() => expect(view.getByText('Étape 1 sur 3 — Informations')).toBeTruthy());
+      await waitFor(() => expect(view.getByLabelText("Étape 1 sur 3, L'objet")).toBeTruthy());
       // Les données saisies sont toujours là.
       expect(view.getByLabelText('Titre').props.value).toBe('Dune');
 
@@ -905,12 +925,14 @@ describe('ItemFormScreen — robustesse (Lot 1)', () => {
       await act(async () => {
         expect(simulateBackAttempt()).toBe(true);
       });
-      await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+      await waitFor(() =>
+        expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+      );
 
       await act(async () => {
         expect(simulateBackAttempt()).toBe(true);
       });
-      await waitFor(() => expect(view.getByText('Étape 1 sur 3 — Informations')).toBeTruthy());
+      await waitFor(() => expect(view.getByLabelText("Étape 1 sur 3, L'objet")).toBeTruthy());
     });
 
     it('leaves step 1 without any confirmation when nothing was changed', async () => {
@@ -997,21 +1019,25 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
     await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await waitFor(() =>
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+    );
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByRole('button', { name: 'Alix' })).toBeTruthy());
-    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+    await waitFor(() => expect(view.getByRole('checkbox', { name: 'Alix' })).toBeTruthy());
+    expect(view.getByRole('checkbox', { name: 'Alix' }).props.accessibilityState?.checked).toBe(
+      true,
+    );
   }
 
   async function reachLastStepInEditWithChange(view: View) {
     await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
     await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (collector)');
     await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
-    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
     await waitFor(() =>
-      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy(),
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
     );
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByLabelText('Étape 3 sur 3, Dans votre nid')).toBeTruthy());
   }
 
   function pending<T>() {
@@ -1116,7 +1142,7 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
       expect(
         hardwareBack.handlers[0]!({} as Parameters<(typeof hardwareBack.handlers)[number]>[0]),
       ).toBe(true);
-      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy();
+      expect(view.getByLabelText('Étape 3 sur 3, Dans votre nid')).toBeTruthy();
 
       await act(async () => {
         request.reject(new NetworkError());
@@ -1156,7 +1182,7 @@ describe('ItemFormScreen — régressions appareil (hotfix)', () => {
       });
 
       expect(mockApiClient.items.create).not.toHaveBeenCalled();
-      expect(view.getByText('Étape 3 sur 3 — Propriétaires et couverture')).toBeTruthy();
+      expect(view.getByLabelText('Étape 3 sur 3, Dans votre nid')).toBeTruthy();
       expect(
         view.getByRole('button', { name: 'Ajouter au nid' }).props.accessibilityState?.disabled,
       ).toBe(true);
@@ -1244,7 +1270,9 @@ describe('ItemFormScreen — effacement des champs facultatifs en édition (Lot 
   it('sends null for emptied notes and a removed rating', async () => {
     const view = await openEdit();
     await next(view);
-    await waitFor(() => expect(view.getByText('Étape 2 sur 3 — Votre exemplaire')).toBeTruthy());
+    await waitFor(() =>
+      expect(view.getByLabelText('Étape 2 sur 3, Votre exemplaire')).toBeTruthy(),
+    );
     await fireEvent.changeText(view.getByLabelText('Notes'), '');
     // Re-toucher la note actuelle la retire (voir StarRating).
     await fireEvent.press(view.getByLabelText('4 sur 5'));
@@ -1282,5 +1310,295 @@ describe('ItemFormScreen — effacement des champs facultatifs en édition (Lot 
 
     expect(input.barcode).toBeNull();
     expect(input.description).toBe('Un classique de la SF.');
+  });
+});
+
+describe('ItemFormScreen — hiérarchie et identité visuelle (Lot 3)', () => {
+  const SAM = {
+    id: 'member-2',
+    role: 'MEMBER' as const,
+    joinedAt: '2026-01-01T00:00:00.000Z',
+    user: { ...MEMBER.user, id: 'user-2', email: 'sam@example.com', displayName: 'Sam' },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetPreventRemoveMock();
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([MEMBER, SAM]);
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(EXISTING_ITEM);
+    (mockApiClient.items.update as jest.Mock).mockResolvedValue({ ...EXISTING_ITEM });
+    (mockApiClient.items.create as jest.Mock).mockResolvedValue({ id: 'item-1' });
+  });
+
+  type View = Awaited<ReturnType<typeof renderScreen>>;
+
+  function styleOf(element: { props: { style?: unknown } }): ViewStyle {
+    return StyleSheet.flatten(element.props.style as never) as ViewStyle;
+  }
+
+  function checked(view: View, name: string): boolean {
+    return Boolean(view.getByRole('checkbox', { name }).props.accessibilityState?.checked);
+  }
+
+  async function toStep(view: View, label: string) {
+    await fireEvent.press(view.getByRole('button', { name: 'Suivant' }));
+    await waitFor(() => expect(view.getByLabelText(label)).toBeTruthy());
+  }
+
+  describe('owners', () => {
+    it('create: preselects the current user as owner — no tap needed — and sends it', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+
+      expect(checked(view, 'Alix')).toBe(true);
+      expect(checked(view, 'Sam')).toBe(false);
+      expect(view.getByRole('header', { name: 'À qui appartient-il ?' })).toBeTruthy();
+
+      await fireEvent.press(view.getByRole('button', { name: 'Ajouter au nid' }));
+      await waitFor(() =>
+        expect(mockApiClient.items.create).toHaveBeenCalledWith(
+          'household-1',
+          expect.objectContaining({ ownerIds: ['user-1'] }),
+        ),
+      );
+    });
+
+    it('create: never overrides an owner selection already carried by the draft (even empty)', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen
+          mode="create"
+          category={BOOK_CATEGORY}
+          initialValues={{ title: 'Dune', ownerIds: [] }}
+        />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+
+      expect(checked(view, 'Alix')).toBe(false);
+    });
+
+    it('edit: keeps exactly the existing owners — the current user is never added', async () => {
+      (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+        ...EXISTING_ITEM,
+        owners: [SAM.user],
+      });
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+
+      expect(checked(view, 'Sam')).toBe(true);
+      expect(checked(view, 'Alix')).toBe(false);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+      await waitFor(() =>
+        expect(mockApiClient.items.update).toHaveBeenCalledWith(
+          'household-1',
+          'item-1',
+          expect.objectContaining({ ownerIds: ['user-2'] }),
+        ),
+      );
+    });
+
+    it('exposes each owner as a checkbox tall enough to tap', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+
+      const chip = view.getByRole('checkbox', { name: 'Sam' });
+      expect(styleOf(chip).minHeight).toBeGreaterThanOrEqual(44);
+      await fireEvent.press(chip);
+      expect(checked(view, 'Sam')).toBe(true);
+    });
+  });
+
+  describe('edit: save from any step', () => {
+    it('shows "Enregistrer" on every step, next to "Suivant" until the last one', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      // Le titre de l'objet retouché reste visible sous « Modifier l'objet ».
+      expect(view.getByText("Modifier l'objet")).toBeTruthy();
+      expect(view.getAllByText('Dune').length).toBeGreaterThan(0);
+
+      expect(view.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      expect(view.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+      expect(view.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
+      expect(view.queryByRole('button', { name: 'Suivant' })).toBeNull();
+    });
+
+    it('saves directly from step 1', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune (poche)');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() =>
+        expect(mockApiClient.items.update).toHaveBeenCalledWith(
+          'household-1',
+          'item-1',
+          expect.objectContaining({ title: 'Dune (poche)', ownerIds: ['user-1'] }),
+        ),
+      );
+      await waitFor(() => expect(mockRouterBack).toHaveBeenCalledTimes(1));
+    });
+
+    it('saves directly from step 2 (e.g. only the notes)', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      await fireEvent.changeText(view.getByLabelText('Notes'), 'Prêté à Sam');
+
+      await fireEvent.press(view.getByRole('button', { name: 'Enregistrer' }));
+
+      await waitFor(() =>
+        expect(mockApiClient.items.update).toHaveBeenCalledWith(
+          'household-1',
+          'item-1',
+          expect.objectContaining({ notes: 'Prêté à Sam' }),
+        ),
+      );
+    });
+
+    it('keeps "Enregistrer" in forest green and "Suivant" secondary (ghost) in edit mode', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="edit" itemId="item-1" category={BOOK_CATEGORY} />,
+      );
+      await waitFor(() => expect(view.getByLabelText('Titre').props.value).toBe('Dune'));
+
+      expect(styleOf(view.getByRole('button', { name: 'Enregistrer' })).backgroundColor).toBe(
+        colors.primary,
+      );
+      expect(styleOf(view.getByRole('button', { name: 'Suivant' })).backgroundColor).toBe(
+        'transparent',
+      );
+    });
+  });
+
+  describe('create CTA', () => {
+    it('shows "Ajouter au nid" (terracotta) only on the last step, "Suivant" (forest green) before', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+
+      expect(view.queryByRole('button', { name: 'Ajouter au nid' })).toBeNull();
+      expect(styleOf(view.getByRole('button', { name: 'Suivant' })).backgroundColor).toBe(
+        colors.primary,
+      );
+
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      expect(view.queryByRole('button', { name: 'Ajouter au nid' })).toBeNull();
+      expect(view.queryByRole('button', { name: 'Enregistrer' })).toBeNull();
+
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+      expect(styleOf(view.getByRole('button', { name: 'Ajouter au nid' })).backgroundColor).toBe(
+        colors.secondary,
+      );
+    });
+  });
+
+  describe('step 1 hierarchy', () => {
+    it('says clearly that only the title is required, and groups the work and its identifiers', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+
+      expect(view.getByText('Seul le titre est indispensable.')).toBeTruthy();
+      expect(view.getByRole('header', { name: 'L’œuvre' })).toBeTruthy();
+      expect(view.getByRole('header', { name: 'Identifiants' })).toBeTruthy();
+      expect(view.getByText('Souvent identique à l’ISBN, mais pas toujours.')).toBeTruthy();
+    });
+
+    it('shows the category as a pill tinted like the Home tiles, with a large enough "Changer" target', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="create" category={CD_CATEGORY} onChangeCategoryPress={jest.fn()} />,
+      );
+      await waitFor(() => expect(view.getByTestId('category-pill')).toBeTruthy());
+
+      expect(styleOf(view.getByTestId('category-pill')).backgroundColor).toBe(colors.tintPeach);
+      expect(styleOf(view.getByLabelText('Changer de catégorie')).minHeight).toBeGreaterThanOrEqual(
+        44,
+      );
+    });
+
+    it.each([
+      [BOOK_CATEGORY, 'Format', 'Poche, broché, relié…'],
+      [BOOK_CATEGORY, 'Langue', 'Français, anglais…'],
+      [CD_CATEGORY, 'Format', 'CD, vinyle…'],
+      [DVD_CATEGORY, 'Format', 'DVD, Blu-ray…'],
+      [DVD_CATEGORY, 'Région', 'Zone 2'],
+      [DVD_CATEGORY, 'Édition', 'Collector, Steelbook…'],
+    ])('%# shows a helpful placeholder for %s → %s', async (category, label, placeholder) => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={category} />);
+      await waitFor(() => expect(view.getByLabelText(label)).toBeTruthy());
+
+      expect(view.getByLabelText(label).props.placeholder).toBe(placeholder);
+    });
+  });
+
+  describe('progress', () => {
+    it('shows done / current / upcoming states and announces the current step', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+      expect(view.getByRole('header', { name: "Étape 1 sur 3, L'objet" })).toBeTruthy();
+
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+
+      expect(styleOf(view.getByTestId('step-marker-0')).backgroundColor).toBe(colors.primary);
+      expect(styleOf(view.getByTestId('step-marker-1')).backgroundColor).toBe(colors.secondary);
+      expect(styleOf(view.getByTestId('step-marker-2')).backgroundColor).toBe(colors.surface);
+      expect(styleOf(view.getByTestId('step-marker-2')).borderWidth).toBeGreaterThan(0);
+    });
+  });
+
+  describe('warm surfaces', () => {
+    it('renders the summary on a pale sage surface and the partial banner on honey', async () => {
+      const view = await renderScreen(
+        <ItemFormScreen mode="create" category={DVD_CATEGORY} infoMessage="À vérifier." />,
+      );
+      await waitFor(() => expect(view.getByTestId('item-form-info-banner')).toBeTruthy());
+      expect(styleOf(view.getByTestId('item-form-info-banner')).backgroundColor).toBe(
+        colors.tintHoney,
+      );
+
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Heat');
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+      await toStep(view, 'Étape 3 sur 3, Dans votre nid');
+
+      expect(styleOf(view.getByTestId('item-form-summary')).backgroundColor).toBe(colors.tintSage);
+      expect(styleOf(view.getByTestId('cover-picker')).backgroundColor).toBe(colors.tintHoney);
+    });
+  });
+
+  describe('rating', () => {
+    it('shows the selected rating as text and offers an explicit "Retirer la note"', async () => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+      await fireEvent.changeText(view.getByLabelText('Titre'), 'Dune');
+      await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
+
+      expect(view.queryByRole('button', { name: 'Retirer la note' })).toBeNull();
+      await fireEvent.press(view.getByLabelText('3,5 sur 5'));
+      expect(view.getByTestId('rating-value').props.children).toEqual(['3,5', ' / 5']);
+
+      await fireEvent.press(view.getByRole('button', { name: 'Retirer la note' }));
+      expect(view.queryByTestId('rating-value')).toBeNull();
+    });
   });
 });

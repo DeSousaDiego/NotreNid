@@ -81,7 +81,8 @@ export default function AddItemModeScreen() {
             accessibilityRole="button"
             accessibilityLabel="Changer de catégorie"
             onPress={requestChangeCategory}
-            hitSlop={8}
+            hitSlop={4}
+            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: theme.spacing.xs }}
           >
             <AppText variant="label" color="secondary">
               Changer
@@ -98,6 +99,7 @@ export default function AddItemModeScreen() {
         <SelectionCard
           title="Scanner un code-barres"
           subtitle="Rechercher automatiquement les informations"
+          tint="tintSage"
           icon={<Ionicons name="barcode-outline" size={36} color={theme.colors.primary} />}
           onPress={() =>
             router.push({ pathname: '/(app)/add-item/scan', params: { categoryId: category.id } })
@@ -106,6 +108,7 @@ export default function AddItemModeScreen() {
         <SelectionCard
           title="Saisir manuellement"
           subtitle="Remplir les informations vous-même"
+          tint="tintPeach"
           icon={<Ionicons name="create-outline" size={36} color={theme.colors.primary} />}
           onPress={() =>
             router.push({ pathname: '/(app)/add-item/form', params: { categoryId: category.id } })
