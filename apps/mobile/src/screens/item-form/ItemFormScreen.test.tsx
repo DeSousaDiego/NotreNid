@@ -1577,6 +1577,9 @@ describe('ItemFormScreen — hiérarchie et identité visuelle (Lot 3)', () => {
         colors.tintHoney,
       );
 
+      // Le bandeau s'affiche AVANT le chargement des membres (squelette à la place des
+      // champs) : attendre le champ lui-même, jamais un signal rendu plus tôt que lui.
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
       await fireEvent.changeText(view.getByLabelText('Titre'), 'Heat');
       await toStep(view, 'Étape 2 sur 3, Votre exemplaire');
       await toStep(view, 'Étape 3 sur 3, Dans votre nid');
