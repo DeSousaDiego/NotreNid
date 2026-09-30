@@ -31,8 +31,12 @@ export interface TextFieldProps extends TextInputProps {
    * au parent d'intercepter le geste dès le toucher (`requestDisallowInterceptTouchEvent`,
    * voir `ReactEditText.onTouchEvent`) et ne le rend que s'il ne peut défiler dans
    * AUCUNE direction — un texte qui déborde, ou quelques pixels d'écart entre la hauteur
-   * mesurée et celle réellement dessinée, suffisent à bloquer la page. Hors focus, le
-   * toucher arrive donc sur un `Pressable` englobant (tap court = focus) ; une fois
+   * mesurée et celle réellement dessinée, suffisent à bloquer la page (cas typique :
+   * champ vide SANS placeholder, mesuré par Fabric sur une chaîne vide). Hors focus,
+   * l'enveloppe `Pressable` passe en `pointerEvents="box-only"` : `ReactViewGroup`
+   * intercepte alors le toucher AVANT le `EditText`, qui ne le reçoit jamais (tap
+   * court = focus via `onPress`). Un `pointerEvents` posé sur le `TextInput` lui-même
+   * n'aurait aucun effet natif : `ReactEditText` ne l'implémente pas. Une fois
    * focalisé, le champ retrouve tout son comportement natif (curseur, sélection,
    * défilement interne). Opt-in : réservé aux formulaires longs (Ajout/Édition).
    */
@@ -83,7 +87,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
 
   // Structure stable : l'enveloppe existe toujours quand l'option est active (jamais
   // ajoutée/retirée au focus, ce qui remonterait le `TextInput` et lui ferait perdre le
-  // focus) — seuls `pointerEvents` et `disabled` basculent.
+  // focus) — seuls son `pointerEvents` et son `disabled` basculent.
   const touchShield = allowScrollFromField && Platform.OS === 'android';
   const shieldActive = touchShield && !focused && editable;
 
@@ -106,7 +110,6 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         <TextInput
           ref={setInputRef}
           editable={editable}
-          pointerEvents={shieldActive ? 'none' : 'auto'}
           accessibilityLabel={label}
           placeholderTextColor={theme.colors.textMuted}
           onFocus={(e) => {
@@ -168,6 +171,9 @@ function FieldTouchShield({
       accessible={false}
       importantForAccessibility="no"
       disabled={!active}
+      // Hors focus : le toucher s'arrête sur cette vue native (jamais transmis au
+      // `EditText`), le `ScrollView` parent peut donc l'intercepter.
+      pointerEvents={active ? 'box-only' : 'auto'}
       onPress={onPress}
     >
       {children}

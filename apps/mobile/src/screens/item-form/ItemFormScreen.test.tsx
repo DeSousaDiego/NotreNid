@@ -1,6 +1,6 @@
 import { NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { useState, type ReactElement } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 
@@ -1670,21 +1670,92 @@ describe('ItemFormScreen — glisser depuis un champ (Lot 3.2, Android)', () => 
     Object.defineProperty(Platform, 'OS', { configurable: true, get: () => originalOS });
   });
 
-  it('opts every step-1 text field in — single-line and the multiline Description alike', async () => {
+  /** Enveloppe tactile qui contient CE champ — `box-only` = le `EditText` natif ne
+   * reçoit jamais le toucher hors focus (voir `TextField.allowScrollFromField`). */
+  function shieldPointerEvents(view: Awaited<ReturnType<typeof renderScreen>>, label: string) {
+    const shield = view
+      .getAllByTestId('text-field-touch-shield')
+      .find((candidate) => within(candidate).queryByLabelText(label));
+    return shield?.props.pointerEvents as string | undefined;
+  }
+
+  // Champs sans placeholder (Titre, Auteur, Année, ISBN, Code-barres…) inclus : c'étaient
+  // eux qui restaient bloqués sur téléphone avec l'ancien `pointerEvents="none"` sur le
+  // TextInput, ignoré par `ReactEditText`.
+  it.each([
+    [
+      'Livre',
+      BOOK_CATEGORY,
+      [
+        'Titre',
+        'Auteur',
+        'Éditeur',
+        'Année de publication',
+        'Langue',
+        'Nombre de pages',
+        'Format',
+        'Description',
+        'ISBN',
+        'Code-barres',
+      ],
+    ],
+    [
+      'CD',
+      CD_CATEGORY,
+      ['Titre', 'Artiste', 'Année de sortie', 'Label', 'Format', 'Description', 'Code-barres'],
+    ],
+    [
+      'DVD',
+      DVD_CATEGORY,
+      [
+        'Titre',
+        'Réalisateur',
+        'Année de sortie',
+        'Édition',
+        'Région',
+        'Format',
+        'Durée (minutes)',
+        'Description',
+        'Code-barres',
+      ],
+    ],
+  ])(
+    '%s: every step-1 text field (standard, numeric, generated metadata, Description) is shielded',
+    async (_name, category, labels) => {
+      const view = await renderScreen(<ItemFormScreen mode="create" category={category} />);
+      await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+
+      for (const label of labels) {
+        expect([label, shieldPointerEvents(view, label)]).toEqual([label, 'box-only']);
+      }
+      // Aucun champ texte de l'étape oublié (un par enveloppe, aucun en trop).
+      expect(view.getAllByTestId('text-field-touch-shield')).toHaveLength(labels.length);
+    },
+  );
+
+  it('custom category: generated custom-metadata text fields are shielded too', async () => {
+    const view = await renderScreen(<ItemFormScreen mode="create" category={CUSTOM_CATEGORY} />);
+    await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
+
+    for (const label of ['Titre', 'Édition', 'Description']) {
+      expect([label, shieldPointerEvents(view, label)]).toEqual([label, 'box-only']);
+    }
+  });
+
+  it('CountrySelect is left untouched: plain Pressable, no EditText, picker still opens', async () => {
     const view = await renderScreen(<ItemFormScreen mode="create" category={BOOK_CATEGORY} />);
     await waitFor(() => expect(view.getByLabelText('Titre')).toBeTruthy());
 
-    for (const label of [
-      'Titre',
-      'Auteur',
-      'Nombre de pages',
-      'ISBN',
-      'Code-barres',
-      'Description',
-    ]) {
-      expect(view.getByLabelText(label).props.pointerEvents).toBe('none');
-    }
-    // Livre : titre, 6 champs de l'œuvre, description, ISBN, code-barres.
-    expect(view.getAllByTestId('text-field-touch-shield')).toHaveLength(10);
+    const trigger = view.getByRole('button', { name: /^Pays d'origine/ });
+    expect(
+      view
+        .getAllByTestId('text-field-touch-shield')
+        .some((shield) => within(shield).queryByRole('button', { name: /^Pays d'origine/ })),
+    ).toBe(false);
+    expect(trigger.props.pointerEvents).toBeUndefined();
+
+    expect(view.queryByLabelText('Rechercher un pays')).toBeNull();
+    await fireEvent.press(trigger);
+    expect(view.getByLabelText('Rechercher un pays')).toBeTruthy();
   });
 });
