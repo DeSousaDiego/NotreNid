@@ -12,6 +12,12 @@ import type { ItemsQueryParams } from '@notre-nid/shared';
  */
 export const queryKeys = {
   households: (userId: string) => ['users', userId, 'households'] as const,
+  /**
+   * Préfixe commun à toutes les données d'un foyer (membres, catégories, items, stats,
+   * invitations) — ne correspond pas à la liste `households` elle-même, plus courte.
+   */
+  householdScope: (userId: string, householdId: string) =>
+    ['users', userId, 'households', householdId] as const,
   members: (userId: string, householdId: string) =>
     ['users', userId, 'households', householdId, 'members'] as const,
   categories: (userId: string, householdId: string) =>

@@ -1,16 +1,21 @@
+import type { HouseholdInvitation } from '@notre-nid/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '../lib/queryKeys';
 import { useApiClient, useAuth } from '../providers/AuthProvider';
 
-export function useInvitations(householdId: string | null) {
+/**
+ * `enabled` : l'API réserve la liste aux OWNER/ADMIN — l'appelant passe `false` pour un
+ * simple membre plutôt que d'envoyer une requête vouée au 403.
+ */
+export function useInvitations(householdId: string | null, enabled = true) {
   const apiClient = useApiClient();
   const { user } = useAuth();
 
   return useQuery({
     queryKey: queryKeys.invitations(user?.id ?? '__none__', householdId ?? '__none__'),
     queryFn: () => apiClient.invitations.list(householdId as string),
-    enabled: Boolean(householdId),
+    enabled: enabled && Boolean(householdId),
     staleTime: 30_000,
   });
 }
@@ -38,10 +43,15 @@ export function useRevokeInvitation(householdId: string | null) {
 
   return useMutation({
     mutationFn: (invitationId: string) => apiClient.invitations.revoke(invitationId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.invitations(user?.id ?? '__none__', householdId as string),
-      });
+    onSuccess: (_result, invitationId) => {
+      const invitationsKey = queryKeys.invitations(user?.id ?? '__none__', householdId as string);
+      // Retrait immédiat du cache (révocation confirmée par l'API) : l'écran affiche la
+      // liste en cache même si le refetch ci-dessous échoue — elle ne doit pas continuer à
+      // présenter ce code comme actif.
+      queryClient.setQueryData<HouseholdInvitation[]>(invitationsKey, (invitations) =>
+        invitations?.filter((invitation) => invitation.id !== invitationId),
+      );
+      void queryClient.invalidateQueries({ queryKey: invitationsKey });
     },
   });
 }

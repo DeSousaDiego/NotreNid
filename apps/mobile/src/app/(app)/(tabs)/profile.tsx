@@ -2,14 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 
-import {
-  AppText,
-  Avatar,
-  Button,
-  LoadingSkeleton,
-  ScreenContainer,
-  useToast,
-} from '../../../components';
+import { AppText, Avatar, Button, ScreenContainer, useToast } from '../../../components';
+import { useCurrentHouseholdRole } from '../../../hooks/useCurrentHouseholdRole';
 import { useExportCollection } from '../../../hooks/useExports';
 import { useHouseholds } from '../../../hooks/useHouseholds';
 import { getErrorMessage } from '../../../lib/errorMessage';
@@ -54,6 +48,7 @@ export default function ProfileScreen() {
   const { user, logout, logoutAllDevices } = useAuth();
   const { householdId, households, clearSelection } = useHousehold();
   const householdsQuery = useHouseholds(true);
+  const { isAdmin } = useCurrentHouseholdRole();
 
   const currentHousehold = households.find((h) => h.id === householdId);
   const exportCollection = useExportCollection(householdId, currentHousehold?.name ?? 'Notre Nid');
@@ -112,11 +107,14 @@ export default function ProfileScreen() {
             label="Membres"
             onPress={() => router.push('/(app)/profile/members')}
           />
-          <NavRow
-            icon="mail-outline"
-            label="Invitations"
-            onPress={() => router.push('/(app)/profile/invitations')}
-          />
+          {/* Réservées aux OWNER/ADMIN (l'API refuse les autres) : pas d'entrée vers une impasse. */}
+          {isAdmin ? (
+            <NavRow
+              icon="mail-outline"
+              label="Invitations"
+              onPress={() => router.push('/(app)/profile/invitations')}
+            />
+          ) : null}
           <NavRow
             icon="pricetag-outline"
             label="Catégories"
@@ -133,8 +131,6 @@ export default function ProfileScreen() {
             onPress={() => router.push('/(app)/profile/join')}
           />
         </View>
-
-        {householdsQuery.isLoading ? <LoadingSkeleton height={40} /> : null}
 
         <View style={{ gap: theme.spacing.sm }}>
           <AppText variant="section">Exporter la collection</AppText>

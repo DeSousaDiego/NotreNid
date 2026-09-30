@@ -1,4 +1,5 @@
 import type { HouseholdMember, HouseholdRole } from '@notre-nid/shared';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 
@@ -8,13 +9,13 @@ import {
   Button,
   Chip,
   ConfirmDialog,
-  EmptyState,
   ErrorState,
   IconButton,
   LoadingSkeleton,
   ScreenContainer,
   useToast,
 } from '../../../components';
+import { useCurrentHouseholdRole } from '../../../hooks/useCurrentHouseholdRole';
 import { useMembers } from '../../../hooks/useMembers';
 import {
   useLeaveHousehold,
@@ -40,7 +41,8 @@ export default function MembersScreen() {
   const theme = useTheme();
   const { showToast } = useToast();
   const { user } = useAuth();
-  const { householdId, households, clearSelection } = useHousehold();
+  const { householdId, clearSelection } = useHousehold();
+  const { isAdmin } = useCurrentHouseholdRole();
   const membersQuery = useMembers(householdId);
   const updateRole = useUpdateMemberRole(householdId);
   const removeMember = useRemoveMember(householdId);
@@ -48,20 +50,34 @@ export default function MembersScreen() {
 
   const [managedMember, setManagedMember] = useState<HouseholdMember | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<HouseholdMember | null>(null);
+  const [confirmPromote, setConfirmPromote] = useState<HouseholdMember | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Foyer en cours de départ : dès que le contexte bascule sur un autre foyer (sélection
+  // automatique de `HouseholdProvider` une fois le foyer quitté retiré de la liste), cet
+  // écran ne doit plus rien afficher — il n'appartient qu'au foyer quitté, et la
+  // navigation vers l'Accueil suit immédiatement.
+  const [leavingHouseholdId, setLeavingHouseholdId] = useState<string | null>(null);
 
-  const currentRole = households.find((h) => h.id === householdId)?.role;
-  const isAdmin = currentRole === 'OWNER' || currentRole === 'ADMIN';
-
-  const handleChangeRole = async (role: HouseholdRole) => {
-    if (!managedMember) return;
+  const applyRole = async (member: HouseholdMember, role: HouseholdRole) => {
     try {
-      await updateRole.mutateAsync({ userId: managedMember.user.id, role });
+      await updateRole.mutateAsync({ userId: member.user.id, role });
       showToast('Rôle mis à jour.', 'success');
+      setConfirmPromote(null);
       setManagedMember(null);
     } catch (error) {
+      setConfirmPromote(null);
       showToast(getErrorMessage(error), 'error');
     }
+  };
+
+  const handleSelectRole = (role: HouseholdRole) => {
+    if (!managedMember || role === managedMember.role) return;
+    // Confier la responsabilité du foyer n'est pas un simple réglage : confirmation d'abord.
+    if (role === 'OWNER') {
+      setConfirmPromote(managedMember);
+      return;
+    }
+    void applyRole(managedMember, role);
   };
 
   const handleRemove = async () => {
@@ -77,86 +93,101 @@ export default function MembersScreen() {
     }
   };
 
+  // Séquence : départ confirmé par l'API → cache des foyers cohérent (foyer quitté retiré,
+  // liste rechargée, données du foyer purgées — voir `useLeaveHousehold`) → sélection
+  // remise à zéro → Accueil. Jamais l'inverse : vider la sélection tant que la liste
+  // contient encore le foyer quitté permettait de le re-sélectionner.
   const handleLeave = async () => {
+    setLeavingHouseholdId(householdId);
     try {
       await leaveHousehold.mutateAsync();
-      setConfirmLeave(false);
-      clearSelection();
-      showToast('Vous avez quitté ce foyer.', 'success');
     } catch (error) {
+      setLeavingHouseholdId(null);
       setConfirmLeave(false);
       showToast(getErrorMessage(error), 'error');
+      return;
     }
+    setConfirmLeave(false);
+    clearSelection();
+    router.replace('/');
+    showToast('Vous avez quitté ce foyer.', 'success');
   };
 
-  if (membersQuery.isLoading) {
+  if (leavingHouseholdId !== null && householdId !== leavingHouseholdId) {
+    return <ScreenContainer edges={['left', 'right', 'bottom']}>{null}</ScreenContainer>;
+  }
+
+  // `data` d'abord : un refetch en échec garde la dernière liste valide (TanStack Query v5)
+  // et ne doit pas la remplacer par un écran d'erreur.
+  const members = membersQuery.data;
+
+  if (!members) {
     return (
       <ScreenContainer edges={['left', 'right', 'bottom']}>
-        <LoadingSkeleton height={220} />
+        {membersQuery.isError ? (
+          <ErrorState
+            message={getErrorMessage(membersQuery.error)}
+            onRetry={() => void membersQuery.refetch()}
+          />
+        ) : (
+          <LoadingSkeleton height={220} />
+        )}
       </ScreenContainer>
     );
   }
 
-  if (membersQuery.isError) {
-    return (
-      <ScreenContainer edges={['left', 'right', 'bottom']}>
-        <ErrorState
-          message={getErrorMessage(membersQuery.error)}
-          onRetry={() => void membersQuery.refetch()}
-        />
-      </ScreenContainer>
-    );
-  }
-
-  const members = membersQuery.data ?? [];
+  // L'API interdit au dernier propriétaire de partir (LAST_OWNER_CANNOT_LEAVE) : ne pas
+  // proposer une action vouée à l'échec. La liste contient toujours l'utilisateur
+  // courant (seuls les membres peuvent la lire).
+  const currentMember = members.find((member) => member.user.id === user?.id);
+  const ownerCount = members.filter((member) => member.role === 'OWNER').length;
+  const isLastOwner = currentMember?.role === 'OWNER' && ownerCount <= 1;
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      {members.length === 0 ? (
-        <EmptyState
-          icon="people-outline"
-          title="Aucun membre"
-          message="Ce foyer n’a pas de membre."
-        />
-      ) : (
-        <FlatList
-          data={members}
-          keyExtractor={(member) => member.id}
-          contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.xs }}
-          renderItem={({ item: member }) => (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: theme.spacing.sm,
-                borderBottomWidth: 1,
-                borderBottomColor: theme.colors.border,
-              }}
-            >
-              <View>
-                <AppText variant="body">
-                  {member.user.displayName}
-                  {member.user.id === user?.id ? ' (vous)' : ''}
-                </AppText>
-                <AppText variant="caption" color="textMuted">
-                  {roleLabel(member.role)}
-                </AppText>
-              </View>
-              {isAdmin && member.user.id !== user?.id ? (
-                <IconButton
-                  name="ellipsis-horizontal"
-                  accessibilityLabel={`Gérer ${member.user.displayName}`}
-                  onPress={() => setManagedMember(member)}
-                />
-              ) : null}
+      <FlatList
+        data={members}
+        keyExtractor={(member) => member.id}
+        contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.xs }}
+        renderItem={({ item: member }) => (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: theme.spacing.sm,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border,
+            }}
+          >
+            <View>
+              <AppText variant="body">
+                {member.user.displayName}
+                {member.user.id === user?.id ? ' (vous)' : ''}
+              </AppText>
+              <AppText variant="caption" color="textMuted">
+                {roleLabel(member.role)}
+              </AppText>
             </View>
-          )}
-        />
-      )}
+            {isAdmin && member.user.id !== user?.id ? (
+              <IconButton
+                name="ellipsis-horizontal"
+                accessibilityLabel={`Gérer ${member.user.displayName}`}
+                onPress={() => setManagedMember(member)}
+              />
+            ) : null}
+          </View>
+        )}
+      />
 
       <View style={{ padding: theme.spacing.lg }}>
-        <Button label="Quitter ce foyer" variant="ghost" onPress={() => setConfirmLeave(true)} />
+        {isLastOwner ? (
+          <AppText variant="helper" color="textMuted" style={{ textAlign: 'center' }}>
+            Pour quitter ce foyer, confiez-le d’abord à quelqu’un d’autre.
+          </AppText>
+        ) : (
+          <Button label="Quitter ce foyer" variant="ghost" onPress={() => setConfirmLeave(true)} />
+        )}
       </View>
 
       <BottomSheet
@@ -176,7 +207,7 @@ export default function MembersScreen() {
                   label={option.label}
                   selected={managedMember?.role === option.value}
                   disabled={updateRole.isPending}
-                  onPress={() => void handleChangeRole(option.value)}
+                  onPress={() => handleSelectRole(option.value)}
                 />
               ))}
             </View>
@@ -191,6 +222,18 @@ export default function MembersScreen() {
           />
         </View>
       </BottomSheet>
+
+      <ConfirmDialog
+        visible={confirmPromote !== null}
+        title={`Donner à ${confirmPromote?.user.displayName ?? ''} la responsabilité du foyer ?`}
+        message="Cette personne pourra gérer les membres et les invitations."
+        confirmLabel="Confirmer"
+        loading={updateRole.isPending}
+        onConfirm={() => {
+          if (confirmPromote) void applyRole(confirmPromote, 'OWNER');
+        }}
+        onCancel={() => setConfirmPromote(null)}
+      />
 
       <ConfirmDialog
         visible={confirmRemove !== null}

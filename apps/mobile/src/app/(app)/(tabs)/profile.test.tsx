@@ -135,6 +135,23 @@ describe('ProfileScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/profile/join');
   });
 
+  it('hides the invitations entry from a plain member, who could only reach a dead end', async () => {
+    mockHouseholds = [{ ...LE_NID, role: 'MEMBER' }];
+    const view = await renderScreen(<ProfileScreen />);
+    await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    expect(view.queryByRole('button', { name: 'Invitations' })).toBeNull();
+    expect(view.getByRole('button', { name: 'Membres' })).toBeTruthy();
+  });
+
+  it('shows the invitations entry to an admin', async () => {
+    mockHouseholds = [{ ...LE_NID, role: 'ADMIN' }];
+    const view = await renderScreen(<ProfileScreen />);
+    await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    expect(view.getByRole('button', { name: 'Invitations' })).toBeTruthy();
+  });
+
   it('only offers to switch households when the user belongs to more than one', async () => {
     mockHouseholds = [LE_NID];
     const single = await renderScreen(<ProfileScreen />);

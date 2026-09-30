@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 import type { ReactElement } from 'react';
 import { Share } from 'react-native';
@@ -69,15 +69,20 @@ const ACTIVE_INVITATION = {
   status: 'pending' as const,
 };
 
-function renderScreen(ui: ReactElement) {
+const CREATED_INVITATION = { ...ACTIVE_INVITATION, code: '7K4P2Q9D', emailDelivered: null };
+
+const listInvitations = () => mockApiClient.invitations.list as jest.Mock;
+
+async function renderScreen(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const view = await render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider fontsLoaded={false}>
         <ToastProvider>{ui}</ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
+  return { view, queryClient };
 }
 
 describe('InvitationsScreen', () => {
@@ -94,42 +99,57 @@ describe('InvitationsScreen', () => {
     await new Promise((resolve) => setTimeout(resolve, 3200));
   });
 
-  it('blocks access for a plain member', async () => {
+  it('blocks access for a plain member without ever requesting the invitations', async () => {
     mockCurrentRole = 'MEMBER';
-    (mockApiClient.invitations.list as jest.Mock).mockResolvedValue([]);
-    const view = await renderScreen(<InvitationsScreen />);
+    listInvitations().mockResolvedValue([]);
+    const { view } = await renderScreen(<InvitationsScreen />);
 
     await waitFor(() => expect(view.getByText('Accès réservé')).toBeTruthy());
+    expect(listInvitations()).not.toHaveBeenCalled();
   });
 
-  // Un seul rendu couvrant toute la séquence OWNER (état vide → génération → copier →
-  // partager → révoquer) plutôt qu'un test par scénario : un troisième rendu complet de cet
-  // écran dans ce même fichier se corrompt de façon reproductible, indépendamment de son
-  // contenu (voir la note équivalente dans join.test.tsx) — vraisemblablement une limite de
-  // cet environnement react-test-renderer/React 19 plutôt qu'un bug de l'écran. La branche
-  // « invitation déjà active sans code visible, revenue d'une session précédente » n'est de
-  // ce fait pas couverte par un rendu dédié ici ; elle a été vérifiée par relecture (trois
-  // lignes de JSX conditionnelles, voir invitations.tsx) plutôt que sacrifier la fiabilité de
-  // cette suite pour un rendu supplémentaire.
-  it('generates a code, allows copying and sharing it, and revoking it back to the empty state', async () => {
+  it('shows a full error state only when no invitation data was ever loaded', async () => {
+    listInvitations().mockRejectedValue(new Error('boom'));
+    const { view } = await renderScreen(<InvitationsScreen />);
+
+    await waitFor(() =>
+      expect(view.getByText("Une erreur inattendue s'est produite.")).toBeTruthy(),
+    );
+    expect(listInvitations()).toHaveBeenCalledWith('household-1');
+    expect(view.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
+  });
+
+  it('keeps an already known active invitation visible when a refetch fails', async () => {
+    listInvitations().mockResolvedValueOnce([ACTIVE_INVITATION]);
+    const { view, queryClient } = await renderScreen(<InvitationsScreen />);
+    await waitFor(() => expect(view.getByText('Un code est déjà actif')).toBeTruthy());
+
+    listInvitations().mockRejectedValue(new Error('offline'));
+    await act(() => queryClient.refetchQueries());
+
+    expect(listInvitations()).toHaveBeenCalledTimes(2);
+    expect(view.getByText('Un code est déjà actif')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
+  });
+
+  it('keeps the freshly created code visible even when the refetch that follows fails, then copies, shares and revokes it', async () => {
     const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
-    (mockApiClient.invitations.list as jest.Mock).mockResolvedValue([]);
-    const view = await renderScreen(<InvitationsScreen />);
+    listInvitations().mockResolvedValueOnce([]);
+    const { view } = await renderScreen(<InvitationsScreen />);
 
     await waitFor(() => expect(view.getByText('Aucune invitation active')).toBeTruthy());
-    expect(view.getByRole('button', { name: 'Inviter quelqu’un' })).toBeTruthy();
 
-    (mockApiClient.invitations.create as jest.Mock).mockResolvedValue({
-      ...ACTIVE_INVITATION,
-      code: '7K4P2Q9D',
-      emailDelivered: null,
-    });
+    // Le refetch déclenché par l'invalidation post-création échoue (réseau instable).
+    listInvitations().mockRejectedValue(new Error('offline'));
+    (mockApiClient.invitations.create as jest.Mock).mockResolvedValue(CREATED_INVITATION);
     await fireEvent.press(view.getByRole('button', { name: 'Inviter quelqu’un' }));
 
     await waitFor(() =>
       expect(mockApiClient.invitations.create).toHaveBeenCalledWith('household-1', undefined),
     );
+    await waitFor(() => expect(listInvitations()).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(view.getByText('7K4P-2Q9D')).toBeTruthy());
+    expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
 
     await fireEvent.press(view.getByRole('button', { name: 'Copier' }));
     await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith('7K4P-2Q9D'));
@@ -149,5 +169,43 @@ describe('InvitationsScreen', () => {
 
     await waitFor(() => expect(mockApiClient.invitations.revoke).toHaveBeenCalledWith('inv-1'));
     await waitFor(() => expect(view.getByText('Aucune invitation active')).toBeTruthy());
+  });
+
+  it('reports copy and share failures, but stays silent when the share sheet is simply dismissed', async () => {
+    listInvitations().mockResolvedValue([]);
+    (mockApiClient.invitations.create as jest.Mock).mockResolvedValue(CREATED_INVITATION);
+    const { view } = await renderScreen(<InvitationsScreen />);
+
+    await waitFor(() => expect(view.getByText('Aucune invitation active')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Inviter quelqu’un' }));
+    await waitFor(() => expect(view.getByText('7K4P-2Q9D')).toBeTruthy());
+
+    (Clipboard.setStringAsync as jest.Mock).mockRejectedValueOnce(new Error('clipboard'));
+    await fireEvent.press(view.getByRole('button', { name: 'Copier' }));
+    await waitFor(() =>
+      expect(
+        view.getByText('Impossible de copier le code. Vous pouvez le sélectionner à la main.'),
+      ).toBeTruthy(),
+    );
+    expect(view.queryByText('Code copié')).toBeNull();
+
+    const shareSpy = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValueOnce({ action: 'dismissedAction' });
+    await fireEvent.press(view.getByRole('button', { name: 'Partager' }));
+    await waitFor(() => expect(shareSpy).toHaveBeenCalledTimes(1));
+    expect(
+      view.queryByText('Impossible d’ouvrir le partage. Copiez le code à la place.'),
+    ).toBeNull();
+
+    shareSpy.mockRejectedValueOnce(new Error('share'));
+    await fireEvent.press(view.getByRole('button', { name: 'Partager' }));
+    await waitFor(() =>
+      expect(
+        view.getByText('Impossible d’ouvrir le partage. Copiez le code à la place.'),
+      ).toBeTruthy(),
+    );
+    // Le code reste affiché : l'échec du partage ne le fait jamais disparaître.
+    expect(view.getByText('7K4P-2Q9D')).toBeTruthy();
   });
 });

@@ -13,16 +13,34 @@ import JoinHouseholdScreen from './join';
 jest.mock('expo-image', () => ({ Image: () => null }));
 
 const mockApiClient = createMockApiClient();
-const mockSelectHousehold = jest.fn();
 
 jest.mock('../../../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
   useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
-jest.mock('../../../providers/HouseholdProvider', () => ({
-  useHousehold: () => ({ selectHousehold: mockSelectHousehold }),
-}));
+// Foyer courant observable, comme le vrai `HouseholdProvider` : `selectHousehold` ne
+// prend effet qu'au rendu suivant, ce que l'écran doit attendre avant de naviguer.
+let mockHouseholdId = 'household-1';
+const mockHouseholdListeners = new Set<() => void>();
+function mockSubscribeHousehold(listener: () => void) {
+  mockHouseholdListeners.add(listener);
+  return () => mockHouseholdListeners.delete(listener);
+}
+const mockSelectHousehold = jest.fn((id: string) => {
+  mockHouseholdId = id;
+  mockHouseholdListeners.forEach((listener) => listener());
+});
+
+jest.mock('../../../providers/HouseholdProvider', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  return {
+    useHousehold: () => ({
+      householdId: React.useSyncExternalStore(mockSubscribeHousehold, () => mockHouseholdId),
+      selectHousehold: mockSelectHousehold,
+    }),
+  };
+});
 
 const mockRouterReplace = jest.fn();
 jest.mock('expo-router', () => ({
@@ -34,10 +52,17 @@ jest.mock('expo-router', () => ({
 function createMockApiClient() {
   return {
     invitations: { accept: jest.fn() },
+    households: { list: jest.fn() },
   } as unknown as import('@notre-nid/api-client').ApiClient;
 }
 
-function renderScreen(ui: ReactElement) {
+const LE_NID = { id: 'household-1', name: 'Le Nid', role: 'OWNER' };
+const CHEZ_SAM = { id: 'household-2', name: 'Chez Sam', role: 'MEMBER' };
+
+const accept = () => mockApiClient.invitations.accept as jest.Mock;
+const listHouseholds = () => mockApiClient.households.list as jest.Mock;
+
+async function renderScreen(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -51,6 +76,7 @@ function renderScreen(ui: ReactElement) {
 describe('JoinHouseholdScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHouseholdId = 'household-1';
   });
 
   // `ToastProvider` schedules a real 3s hide timeout per `showToast()` call (see
@@ -67,24 +93,19 @@ describe('JoinHouseholdScreen', () => {
     await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
 
     await waitFor(() => expect(view.getByText("Le code d'invitation est requis.")).toBeTruthy());
-    expect(mockApiClient.invitations.accept).not.toHaveBeenCalled();
+    expect(accept()).not.toHaveBeenCalled();
   });
 
-  // Un seul rendu couvrant à la fois le rejet et le succès (plutôt que deux tests distincts
-  // avec chacun leur propre `render()`) : un troisième rendu complet de cet écran dans ce
-  // même fichier se corrompt de façon reproductible (l'élément recherché juste après le
-  // rendu est introuvable dès la première requête, y compris pour un `render()` par ailleurs
-  // strictement identique à celui des deux tests précédents) — reproduit indépendamment du
-  // contenu du test, de l'ordre, et de purges de timers ajoutées entre les tests ; il s'agit
-  // vraisemblablement d'une limite de cet environnement react-test-renderer/React 19 plutôt
-  // que d'un bug de l'écran lui-même (chaque scénario, isolé dans son propre fichier, passe
-  // sans problème). Regrouper les scénarios restants dans le second rendu contourne le souci
-  // sans rien perdre en couverture.
-  it('shows a human error on rejection, then normalizes the code and joins successfully on retry', async () => {
-    (mockApiClient.invitations.accept as jest.Mock).mockRejectedValueOnce(new Error('boom'));
+  // Tous les `fireEvent` sont attendus, `changeText` compris : dans cette version de RNTL ils
+  // retournent une promesse enveloppée dans `act()`. Un `changeText` non attendu suivi d'un
+  // `press` produisait des `act()` qui se chevauchent ; l'environnement `act` restait alors
+  // cassé pour la suite du fichier (« troisième rendu corrompu », élément introuvable juste
+  // après `render`), cause réelle de l'instabilité autrefois attribuée à l'environnement.
+  it('shows a human error on rejection, then refreshes the list before selecting the joined household and going home', async () => {
+    accept().mockRejectedValueOnce(new Error('boom'));
     const view = await renderScreen(<JoinHouseholdScreen />);
 
-    fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'ZZZZZZZZ');
+    await fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'ZZZZZZZZ');
     await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
 
     await waitFor(() =>
@@ -92,19 +113,54 @@ describe('JoinHouseholdScreen', () => {
     );
     expect(mockRouterReplace).not.toHaveBeenCalled();
     expect(mockSelectHousehold).not.toHaveBeenCalled();
+    expect(listHouseholds()).not.toHaveBeenCalled();
 
-    (mockApiClient.invitations.accept as jest.Mock).mockResolvedValueOnce({
+    accept().mockResolvedValueOnce({
       householdId: 'household-2',
       householdName: 'Chez Sam',
       role: 'MEMBER',
     });
+    listHouseholds().mockResolvedValue([LE_NID, CHEZ_SAM]);
 
-    fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'nid-7k4p-2q9d');
+    await fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'nid-7k4p-2q9d');
     await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
 
-    await waitFor(() => expect(mockApiClient.invitations.accept).toHaveBeenCalledWith('7K4P2Q9D'));
-    await waitFor(() => expect(mockSelectHousehold).toHaveBeenCalledWith('household-2'));
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/'));
+    expect(accept()).toHaveBeenCalledWith('7K4P2Q9D');
+    expect(mockSelectHousehold).toHaveBeenCalledWith('household-2');
+    // Liste rechargée → sélection → navigation, dans cet ordre.
+    const listOrder = listHouseholds().mock.invocationCallOrder[0] as number;
+    const selectOrder = mockSelectHousehold.mock.invocationCallOrder[0] as number;
+    expect(accept().mock.invocationCallOrder[1]).toBeLessThan(listOrder);
+    expect(listOrder).toBeLessThan(selectOrder);
+    expect(selectOrder).toBeLessThan(mockRouterReplace.mock.invocationCallOrder[0] as number);
     await waitFor(() => expect(view.getByText('Bienvenue dans Chez Sam 🌿')).toBeTruthy());
+  });
+
+  it('never announces success nor navigates when the list cannot be refreshed, and lets the user retry', async () => {
+    accept().mockResolvedValue({
+      householdId: 'household-2',
+      householdName: 'Chez Sam',
+      role: 'MEMBER',
+    });
+    listHouseholds().mockRejectedValueOnce(new Error('offline'));
+    const view = await renderScreen(<JoinHouseholdScreen />);
+
+    await fireEvent.changeText(view.getByLabelText("Code d'invitation"), '7K4P2Q9D');
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+
+    await waitFor(() => expect(view.getByText('Encore un instant')).toBeTruthy());
+    expect(view.getByText(/Vous avez bien rejoint « Chez Sam »/)).toBeTruthy();
+    expect(mockSelectHousehold).not.toHaveBeenCalled();
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+    expect(view.queryByText('Bienvenue dans Chez Sam 🌿')).toBeNull();
+
+    listHouseholds().mockResolvedValueOnce([LE_NID, CHEZ_SAM]);
+    await fireEvent.press(view.getByRole('button', { name: 'Réessayer' }));
+
+    await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/'));
+    expect(mockSelectHousehold).toHaveBeenCalledWith('household-2');
+    // Le code, déjà consommé, n'est jamais renvoyé une seconde fois.
+    expect(accept()).toHaveBeenCalledTimes(1);
   });
 });

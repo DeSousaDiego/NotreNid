@@ -18,6 +18,7 @@ import {
   useInvitations,
   useRevokeInvitation,
 } from '../../../hooks/useInvitations';
+import { useCurrentHouseholdRole } from '../../../hooks/useCurrentHouseholdRole';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useTheme } from '../../../theme';
@@ -34,7 +35,8 @@ export default function InvitationsScreen() {
   const theme = useTheme();
   const { showToast } = useToast();
   const { householdId, households } = useHousehold();
-  const invitationsQuery = useInvitations(householdId);
+  const { isAdmin } = useCurrentHouseholdRole();
+  const invitationsQuery = useInvitations(householdId, isAdmin);
   const createInvitation = useCreateInvitation(householdId);
   const revokeInvitation = useRevokeInvitation(householdId);
 
@@ -42,16 +44,15 @@ export default function InvitationsScreen() {
   // voir InvitationsService côté API) : on garde donc la réponse complète de `create()` en
   // mémoire plutôt que de dépendre du délai de rafraîchissement de la liste (`invalidateQueries`
   // déclenche un refetch asynchrone qui n'a pas forcément abouti au moment où ce composant
-  // se re-rend juste après la création).
+  // se re-rend juste après la création). Il prime sur tout état de la liste, y compris une
+  // erreur de ce refetch : une fois perdu, ce code ne peut plus jamais être réaffiché.
   const [justCreated, setJustCreated] = useState<HouseholdInvitationWithCode | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   const currentHousehold = households.find((h) => h.id === householdId);
-  const currentRole = currentHousehold?.role;
-  const isAdmin = currentRole === 'OWNER' || currentRole === 'ADMIN';
+  const invitations = invitationsQuery.data;
 
-  const activeInvitation =
-    justCreated ?? (invitationsQuery.data ?? []).find((i) => i.status === 'pending');
+  const activeInvitation = justCreated ?? (invitations ?? []).find((i) => i.status === 'pending');
 
   const handleCreate = async () => {
     try {
@@ -77,10 +78,16 @@ export default function InvitationsScreen() {
   };
 
   const handleCopy = async (formattedCode: string) => {
-    await Clipboard.setStringAsync(formattedCode);
-    showToast('Code copié', 'success');
+    try {
+      await Clipboard.setStringAsync(formattedCode);
+      showToast('Code copié', 'success');
+    } catch {
+      showToast('Impossible de copier le code. Vous pouvez le sélectionner à la main.', 'error');
+    }
   };
 
+  // `Share.share` ne rejette pas quand le panneau est simplement fermé (il résout avec
+  // `dismissedAction`) : une exception est donc toujours un vrai échec, à signaler.
   const handleShare = async (formattedCode: string) => {
     const householdName = currentHousehold?.name ?? 'Notre Nid';
     try {
@@ -94,7 +101,7 @@ export default function InvitationsScreen() {
         ].join('\n'),
       });
     } catch {
-      // L'utilisateur a simplement fermé le panneau de partage : rien à signaler.
+      showToast('Impossible d’ouvrir le partage. Copiez le code à la place.', 'error');
     }
   };
 
@@ -110,7 +117,12 @@ export default function InvitationsScreen() {
     );
   }
 
-  if (invitationsQuery.isLoading) {
+  // Squelette/erreur pleine page uniquement sans rien d'exploitable à afficher : un refetch
+  // en échec (TanStack Query v5 passe alors `isError` à true en gardant `data`) ne doit
+  // jamais remplacer une liste déjà connue ni, surtout, le code tout juste créé.
+  const hasContent = justCreated !== null || invitations !== undefined;
+
+  if (!hasContent && invitationsQuery.isLoading) {
     return (
       <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <LoadingSkeleton height={160} />
@@ -118,7 +130,7 @@ export default function InvitationsScreen() {
     );
   }
 
-  if (invitationsQuery.isError) {
+  if (!hasContent && invitationsQuery.isError) {
     return (
       <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
         <ErrorState

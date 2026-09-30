@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import { ToastProvider } from '../../../components';
@@ -73,8 +73,10 @@ const VINYL_CATEGORY = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+let queryClient: QueryClient;
+
 function renderScreen(ui: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider fontsLoaded={false}>
@@ -109,6 +111,19 @@ describe('CategoriesScreen', () => {
 
     await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
     expect(mockApiClient.categories.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the known categories visible when a refetch fails', async () => {
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValueOnce([BOOK_CATEGORY]);
+    const view = await renderScreen(<CategoriesScreen />);
+    await waitFor(() => expect(view.getByText('Livre')).toBeTruthy());
+
+    (mockApiClient.categories.list as jest.Mock).mockRejectedValue(new Error('offline'));
+    await act(() => queryClient.refetchQueries());
+
+    expect(mockApiClient.categories.list).toHaveBeenCalledTimes(2);
+    expect(view.getByText('Livre')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
   });
 
   it('lists categories in read-only, distinguishing system from custom ones (Bloc 4 — V1 = 3 catégories système)', async () => {

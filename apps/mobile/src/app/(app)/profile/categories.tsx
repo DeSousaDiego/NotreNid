@@ -22,8 +22,10 @@ export default function CategoriesScreen() {
   const theme = useTheme();
   const { householdId } = useHousehold();
   const categoriesQuery = useCategories(householdId);
+  // `data` d'abord : un refetch en échec garde la dernière liste valide (TanStack Query v5).
+  const categories = categoriesQuery.data;
 
-  if (categoriesQuery.isLoading) {
+  if (!categories && categoriesQuery.isLoading) {
     return (
       <ScreenContainer edges={['left', 'right', 'bottom']}>
         <LoadingSkeleton height={220} />
@@ -31,18 +33,18 @@ export default function CategoriesScreen() {
     );
   }
 
-  if (categoriesQuery.isError) {
+  if (!categories) {
     return (
       <ScreenContainer edges={['left', 'right', 'bottom']}>
-        <ErrorState
-          message={getErrorMessage(categoriesQuery.error)}
-          onRetry={() => void categoriesQuery.refetch()}
-        />
+        {categoriesQuery.isError ? (
+          <ErrorState
+            message={getErrorMessage(categoriesQuery.error)}
+            onRetry={() => void categoriesQuery.refetch()}
+          />
+        ) : null}
       </ScreenContainer>
     );
   }
-
-  const categories = categoriesQuery.data ?? [];
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>

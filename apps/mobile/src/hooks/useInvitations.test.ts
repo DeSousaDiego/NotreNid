@@ -41,6 +41,29 @@ describe('useInvitations', () => {
     expect(mockApiClient.invitations.list).not.toHaveBeenCalled();
   });
 
+  it('never requests the list when disabled (plain member)', async () => {
+    const { wrapper } = createQueryWrapper();
+    await renderHook(() => useInvitations(HOUSEHOLD_ID, false), { wrapper });
+    expect(mockApiClient.invitations.list).not.toHaveBeenCalled();
+  });
+
+  it('useRevokeInvitation drops the revoked invitation from the cache right away', async () => {
+    (mockApiClient.invitations.revoke as jest.Mock).mockResolvedValue(undefined);
+    // Le refetch qui suit échoue : le cache ne doit pas pour autant conserver le code révoqué.
+    (mockApiClient.invitations.list as jest.Mock).mockRejectedValue(new Error('offline'));
+    const { queryClient, wrapper } = createQueryWrapper();
+    const invitationsKey = ['users', 'user-1', 'households', HOUSEHOLD_ID, 'invitations'];
+    queryClient.setQueryData(invitationsKey, [{ id: 'inv-1' }, { id: 'inv-2' }]);
+
+    const { result } = await renderHook(() => useRevokeInvitation(HOUSEHOLD_ID), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync('inv-1');
+    });
+
+    expect(queryClient.getQueryData(invitationsKey)).toEqual([{ id: 'inv-2' }]);
+  });
+
   it('useCreateInvitation forwards the email and invalidates the invitations list', async () => {
     (mockApiClient.invitations.create as jest.Mock).mockResolvedValue({
       id: 'inv-1',
