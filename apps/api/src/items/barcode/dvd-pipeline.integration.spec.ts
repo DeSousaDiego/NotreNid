@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import { BarcodeCacheService } from './barcode-cache.service';
 import { DvdBarcodeResolverService } from './dvd-barcode-resolver.service';
 import { DvdEnrichmentService } from './dvd-enrichment.service';
+import type { ProductImageValidator } from './product-image-validator.service';
 import type { TmdbProvider } from './providers/tmdb.provider';
 import type { UpcItemDbRateLimiterService } from './providers/upcitemdb-rate-limiter.service';
 import { UpcItemDbProvider } from './providers/upcitemdb.provider';
@@ -28,6 +29,12 @@ import {
   PIRATES_BARCODE,
   PIRATES_FIXTURE,
 } from './test-fixtures/upcitemdb';
+
+/** Validateur d'image neutre : toute URL fournie est jugée exploitable (la
+ * politique d'image a ses propres tests, voir product-image-validator.service.spec.ts). */
+const ACCEPT_ALL_IMAGES = {
+  isUsable: (url: string | null) => Promise.resolve(url !== null),
+} as unknown as ProductImageValidator;
 
 /**
  * Test d'intégration du pipeline `dvd` complet — VRAI `DvdBarcodeResolverService`,
@@ -58,6 +65,7 @@ function buildResolver(upcLookup: jest.Mock, tmdbSearch: jest.Mock, tmdbGetDetai
     fakeUpcItemDb(upcLookup),
     enrichment,
     new BarcodeCacheService(),
+    ACCEPT_ALL_IMAGES,
   );
 }
 
@@ -252,6 +260,7 @@ describe('dvd pipeline (integration, no network)', () => {
         upcItemDb,
         new DvdEnrichmentService(fakeTmdb(tmdbSearch, tmdbGetDetails)),
         new BarcodeCacheService(),
+        ACCEPT_ALL_IMAGES,
       );
     }
 

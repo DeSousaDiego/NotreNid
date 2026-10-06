@@ -6,7 +6,7 @@ import {
   extractYearHint,
   selectBestMovieMatch,
 } from './providers/tmdb.provider';
-import type { TmdbMovieResult, UpcItemDbPocResult } from './types/dvd-poc.types';
+import type { TmdbMovieResult, DvdProductResult } from './types/dvd-poc.types';
 
 export type DvdEnrichmentOutcome =
   | { kind: 'resolved'; movie: TmdbMovieResult }
@@ -19,22 +19,22 @@ export type DvdEnrichmentOutcome =
   | { kind: 'unresolved' }
   /** Panne technique TMDB (réseau, timeout, 429/5xx, JSON illisible) — voir
    * `DvdBarcodeResolverService` : ne devient JAMAIS un `provider_error`
-   * global, le produit physique UPCitemdb reste exploitable. */
+   * global, le produit physique identifié reste exploitable. */
   | { kind: 'provider_error'; error: unknown };
 
 /**
- * Orchestration UPCitemdb → TMDB — jamais l'inverse des responsabilités (voir
- * docs/DECISIONS.md : UPCitemdb reste la seule source pour l'édition
- * physique, TMDB la seule pour l'œuvre). Prend un résultat UPCitemdb DÉJÀ
- * validé comme vidéo (`mediaType !== 'unknown'`) — n'est jamais appelé pour un
- * produit non-vidéo, cette décision reste entièrement du ressort de
- * `UpcItemDbProvider`.
+ * Orchestration fournisseur produit (Digit-Eyes ou UPCitemdb) → TMDB — jamais
+ * l'inverse des responsabilités (voir docs/DECISIONS.md : le fournisseur
+ * produit reste la seule source pour l'édition physique, TMDB la seule pour
+ * l'œuvre). Prend un résultat DÉJÀ validé comme vidéo (`mediaType !==
+ * 'unknown'`) — n'est jamais appelé pour un produit non-vidéo, cette décision
+ * reste entièrement du ressort du `DvdProductProvider`.
  */
 @Injectable()
 export class DvdEnrichmentService {
   constructor(private readonly tmdb: TmdbProvider) {}
 
-  async enrich(upcResult: UpcItemDbPocResult): Promise<DvdEnrichmentOutcome> {
+  async enrich(upcResult: DvdProductResult): Promise<DvdEnrichmentOutcome> {
     const cleanedTitle = cleanTitleForSearch(upcResult.rawTitle ?? '');
     if (!cleanedTitle) return { kind: 'unresolved' };
 

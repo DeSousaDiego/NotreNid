@@ -28,10 +28,11 @@ export type BookProviderSource = 'google-books' | 'open-library';
 export type CdProviderSource = 'musicbrainz';
 
 /** TMDB n'est, de la même façon que Cover Art Archive pour `cd`, jamais une
- * `source` à lui seul : il n'enrichit qu'un produit déjà identifié par
- * UPCitemdb (voir `DvdEnrichmentService`) — `source` reste `'upcitemdb'` que
- * TMDB ait résolu le film (`status: 'matched'`) ou non (`status: 'partial'`). */
-export type DvdProviderSource = 'upcitemdb';
+ * `source` à lui seul : il n'enrichit qu'un produit déjà identifié par le
+ * provider produit configuré (`DVD_PRODUCT_PROVIDER`, voir
+ * `DvdEnrichmentService`) — `source` reste ce provider que TMDB ait résolu le
+ * film (`status: 'matched'`) ou non (`status: 'partial'`). */
+export type DvdProviderSource = 'upcitemdb' | 'digiteyes';
 
 export type BarcodeProviderSource = BookProviderSource | CdProviderSource | DvdProviderSource;
 

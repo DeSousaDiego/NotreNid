@@ -34,8 +34,9 @@ export class BarcodeController {
   @ApiOperation({
     summary:
       'Résout un code-barres via un fournisseur externe (livre : Google Books puis Open ' +
-      'Library ; CD : MusicBrainz, avec couverture Cover Art Archive ; DVD : UPCitemdb pour ' +
-      "l'édition physique, enrichi par TMDB pour le film — voir `status: 'partial'` quand " +
+      'Library ; CD : MusicBrainz, avec couverture Cover Art Archive ; DVD : fournisseur ' +
+      "produit configuré (Digit-Eyes ou UPCitemdb) pour l'édition physique, enrichi par " +
+      "TMDB pour le film — voir `status: 'partial'` quand " +
       "seule l'édition physique a pu être identifiée). Ne crée ni ne modifie jamais un item.",
   })
   @ApiResponse({

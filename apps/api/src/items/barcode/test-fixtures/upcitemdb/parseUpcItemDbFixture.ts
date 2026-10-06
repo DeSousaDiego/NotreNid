@@ -7,7 +7,7 @@ import {
   selectMatchingItem,
   type UpcItemDbLookupOutcome,
 } from '../../providers/upcitemdb.provider';
-import type { UpcItemDbPocResult } from '../../types/dvd-poc.types';
+import type { DvdProductResult } from '../../types/dvd-poc.types';
 
 /**
  * Traduit une fixture brute (même enveloppe qu'une vraie réponse UPCitemdb)
@@ -36,7 +36,7 @@ export function parseUpcItemDbFixture(
     .filter((v): v is string => Boolean(v))
     .join(' \n ');
 
-  const result: UpcItemDbPocResult = {
+  const result: DvdProductResult = {
     barcode,
     rawTitle: item.title?.trim() || null,
     description: item.description?.trim() || null,

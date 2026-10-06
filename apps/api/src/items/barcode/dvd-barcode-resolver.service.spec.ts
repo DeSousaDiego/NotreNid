@@ -1,10 +1,17 @@
 import { BarcodeCacheService } from './barcode-cache.service';
 import { DvdBarcodeResolverService } from './dvd-barcode-resolver.service';
 import type { DvdEnrichmentOutcome } from './dvd-enrichment.service';
+import type { ProductImageValidator } from './product-image-validator.service';
 import type { UpcItemDbLookupOutcome, UpcItemDbProvider } from './providers/upcitemdb.provider';
-import type { TmdbMovieResult, UpcItemDbPocResult } from './types/dvd-poc.types';
+import type { TmdbMovieResult, DvdProductResult } from './types/dvd-poc.types';
 
-const UPC_RESULT: UpcItemDbPocResult = {
+/** Validateur d'image neutre : toute URL fournie est jugée exploitable (la
+ * politique d'image a ses propres tests, voir product-image-validator.service.spec.ts). */
+const ACCEPT_ALL_IMAGES = {
+  isUsable: (url: string | null) => Promise.resolve(url !== null),
+} as unknown as ProductImageValidator;
+
+const UPC_RESULT: DvdProductResult = {
   barcode: '786936815481',
   rawTitle: "Pirates of the Caribbean: At World's End (DVD + 2-Disc Blu-ray)",
   description: 'Bloopers of the Caribbean',
@@ -48,6 +55,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -84,6 +92,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -101,6 +110,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -115,6 +125,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -141,7 +152,7 @@ describe('DvdBarcodeResolverService', () => {
   });
 
   it('returns "partial" — a real boxset scenario (Dark Knight Trilogy) never forced into a fabricated film match', async () => {
-    const boxsetResult: UpcItemDbPocResult = {
+    const boxsetResult: DvdProductResult = {
       ...UPC_RESULT,
       barcode: '883929308002',
       rawTitle: 'The Dark Knight Trilogy [Blu-ray]',
@@ -157,6 +168,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('883929308002');
@@ -175,6 +187,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -191,6 +204,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -209,13 +223,14 @@ describe('DvdBarcodeResolverService', () => {
   });
 
   it('flattens a "not_video" UPC outcome into no_match, never calling TMDB', async () => {
-    const nonVideoResult: UpcItemDbPocResult = { ...UPC_RESULT, mediaType: 'unknown' };
+    const nonVideoResult: DvdProductResult = { ...UPC_RESULT, mediaType: 'unknown' };
     const upcLookup = jest.fn().mockResolvedValue({ status: 'not_video', result: nonVideoResult });
     const enrich = jest.fn();
     const service = new DvdBarcodeResolverService(
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('016000487727');
@@ -231,6 +246,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');
@@ -254,6 +270,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     await service.resolve('786936815481');
@@ -270,6 +287,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     await service.resolve('786936815481');
@@ -288,6 +306,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     await service.resolve('786936815481');
@@ -303,6 +322,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(jest.fn()) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     await service.resolve('786936815481');
@@ -317,6 +337,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(jest.fn()) as never,
       new BarcodeCacheService(),
+      ACCEPT_ALL_IMAGES,
     );
 
     await service.resolve('786936815481');
@@ -347,6 +368,7 @@ describe('DvdBarcodeResolverService', () => {
       fakeUpcItemDb(upcLookup),
       fakeEnrichment(enrich) as never,
       cache,
+      ACCEPT_ALL_IMAGES,
     );
 
     const response = await service.resolve('786936815481');

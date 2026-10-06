@@ -46,6 +46,15 @@ Toujours précédé d'une sauvegarde (`docs/BACKUP_AND_RESTORE.md`) pour toute m
 4. **Effet de bord attendu pour `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET`** : tous les tokens émis avec l'ancien secret deviennent invalides — tous les utilisateurs sont déconnectés et doivent se reconnecter. Communiquer ce point avant une rotation planifiée (voir aussi « Révoquer des sessions » ci-dessous, qui a le même effet mais de façon ciblée).
 5. **Effet de bord supplémentaire pour `JWT_ACCESS_SECRET` spécifiquement** : le hash des codes d'invitation actifs (`HouseholdInvitation.codeHash`) est un HMAC dont la clé est dérivée de ce secret (voir `docs/DECISIONS.md`). Une rotation invalide donc silencieusement tout code d'invitation actif au moment du changement — la personne invitée doit demander un nouveau code après la rotation. Sans conséquence si aucune invitation n'est en attente à ce moment-là.
 
+## Fournisseur produit DVD/Blu-ray (Digit-Eyes / UPCitemdb)
+
+Le scan `dvd` identifie l'édition physique via **un seul** fournisseur, choisi au démarrage par `DVD_PRODUCT_PROVIDER` (`upcitemdb` par défaut, `digiteyes` visé). TMDB enrichit ensuite le film, quel que soit le fournisseur. Aucun fallback automatique : la bascule et le rollback sont manuels.
+
+- **Basculer sur Digit-Eyes** : renseigner `DIGITEYES_APP_KEY` et `DIGITEYES_AUTH_KEY` dans l'hébergeur (secrets), puis `DVD_PRODUCT_PROVIDER=digiteyes`, redémarrer. Le log de démarrage indique `Provider produit DVD : digiteyes`. Si une clé manque ou si la valeur est inconnue, **l'API refuse de démarrer** avec un message `Configuration invalide : …` — sur Render, modifier une variable déclenche un nouveau déploiement ; s'il ne démarre pas, la version précédente devrait rester en service (déploiement sans interruption), mais **vérifier l'état du service dans le tableau de bord après chaque bascule**.
+- **Rollback** : `DVD_PRODUCT_PROVIDER=upcitemdb`, redémarrer. Aucun redéploiement de code nécessaire ; le cache des résultats `dvd` est en mémoire et repart à vide.
+- **Solde Digit-Eyes (prépayé)** : chaque lecture consomme du solde (0,01 $). Digit-Eyes envoie un e-mail d'alerte quand il reste 100 puis 10 lectures — **surveiller ces alertes** et réapprovisionner (PayPal, page « My Account »). Solde épuisé → les scans DVD renvoient `provider_error`.
+- **Lire les logs d'un scan DVD en échec** : la ligne `DvdBarcodeResolverService` indique le fournisseur et la nature de l'échec, ex. `Provider digiteyes en échec (quota) …`. Natures possibles : `quota` (solde/quota épuisé), `auth` (clé invalide ou absente), `rate_limit` (UPCitemdb `TOO_FAST`), `timeout`, `unavailable` (5xx/réseau), `invalid_response`. Les clés et la signature ne sont jamais journalisées.
+
 ## Restaurer une base de données
 
 Voir la procédure complète dans `docs/BACKUP_AND_RESTORE.md#restauration-sur-une-base-de-test`. Ne restaurer directement sur la base de production qu'en dernier recours (perte de données confirmée), jamais sans confirmation explicite du propriétaire du dépôt.

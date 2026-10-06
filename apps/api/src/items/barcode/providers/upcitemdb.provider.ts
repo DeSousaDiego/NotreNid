@@ -1,9 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { BarcodeProviderError } from './barcode-provider.error';
+import { BarcodeProviderError, type BarcodeProviderErrorKind } from './barcode-provider.error';
+import type { DvdProductLookupOutcome, DvdProductProvider } from './dvd-product-provider.interface';
 import { UpcItemDbRateLimiterService } from './upcitemdb-rate-limiter.service';
-import type { UpcItemDbMediaType, UpcItemDbPocResult } from '../types/dvd-poc.types';
+import {
+  detectEditionHint,
+  detectMediaType,
+  detectPackagingHint,
+  detectRegionHint,
+} from '../dvd-product-classification';
+import type { DvdProductResult } from '../types/dvd-poc.types';
 
 interface UpcItemDbOffer {
   title?: string;
@@ -61,67 +68,15 @@ const MIN_ATTEMPT_TIMEOUT_MS = 1000;
 // nature) sont retentés, même principe que les autres providers.
 const RETRYABLE_HTTP_STATUSES = new Set([500, 502, 503, 504]);
 
-const DVD_KEYWORD = /\bdvd\b/i;
-const BLURAY_KEYWORD = /\bblu[-\s]?ray\b/i;
-
-/**
- * Détermine `mediaType` uniquement à partir d'un mot-clé explicite
- * ("DVD"/"Blu-ray") dans le texte fourni — jamais depuis `category` (voir
- * `UpcItemDbItem`). Un item contenant les deux mots-clés (ex. combo pack
- * "DVD + 2-Disc Blu-ray", observé réellement) est classé `'dvd'` : il
- * contient bien un disque DVD, cohérent avec la catégorie `dvd` de Notre Nid
- * (qui ne distingue pas encore Blu-ray — hors périmètre de ce POC).
- */
-export function detectMediaType(text: string): UpcItemDbMediaType {
-  if (DVD_KEYWORD.test(text)) return 'dvd';
-  if (BLURAY_KEYWORD.test(text)) return 'bluray';
-  return 'unknown';
-}
-
-// Motifs les plus spécifiques en premier : "Ultimate Collector's Edition"
-// doit être capturé en entier, jamais tronqué à "Collector's Edition" parce
-// que ce dernier motif aurait matché avant.
-const EDITION_PATTERNS: RegExp[] = [
-  /Ultimate Collector'?s Edition/i,
-  /Extended Collector'?s Edition/i,
-  /Collector'?s Edition/i,
-  /Director'?s Cut/i,
-  /Extended Edition/i,
-  /Special Edition/i,
-  /Anniversary Edition/i,
-  /Unrated Edition/i,
-  /Theatrical Edition/i,
-];
-
-export function detectEditionHint(text: string): string | null {
-  for (const pattern of EDITION_PATTERNS) {
-    const match = pattern.exec(text);
-    if (match) return match[0];
-  }
-  return null;
-}
-
-// Aucun des DVD/Blu-ray réels testés pendant ce POC n'exposait de région
-// explicite (voir docs/DECISIONS.md) — motif conservé car le vocabulaire
-// (Region 1-6, A/B/C, Free) est standard et sans risque de faux positif,
-// mais son taux de présence réel dans les données UPCitemdb reste à
-// confirmer sur un échantillon plus large avant de s'y fier pour le mobile.
-const REGION_PATTERN = /\bRegion[-\s]?(?:Free|[ABC]|[0-6])\b/i;
-
-export function detectRegionHint(text: string): string | null {
-  const match = REGION_PATTERN.exec(text);
-  return match ? match[0] : null;
-}
-
-const DISC_COUNT_PATTERN = /\b(?:\d+|One|Two|Three|Four|Five|Six|Seven|Eight)[-\s]Discs?\b/i;
-const BOX_SET_PATTERN = /\bbox\s?set\b/i;
-
-export function detectPackagingHint(text: string): string | null {
-  const discMatch = DISC_COUNT_PATTERN.exec(text);
-  if (discMatch) return discMatch[0];
-  const boxMatch = BOX_SET_PATTERN.exec(text);
-  return boxMatch ? boxMatch[0] : null;
-}
+// Déplacées dans un module neutre partagé avec Digit-Eyes (voir
+// `dvd-product-classification.ts`) — ré-exportées ici pour ne rien casser chez
+// les appelants historiques (tests, fixtures UPCitemdb).
+export {
+  detectEditionHint,
+  detectMediaType,
+  detectPackagingHint,
+  detectRegionHint,
+} from '../dvd-product-classification';
 
 /** `item.upc`/`item.ean` doivent correspondre au barcode demandé QUAND
  * UPCitemdb les fournit (voir consigne explicite) — un item sans aucun des
@@ -164,7 +119,7 @@ export function selectMatchingItem(items: UpcItemDbItem[], barcode: string): Upc
   return only ? { kind: 'found', item: only } : { kind: 'none' };
 }
 
-function normalizeItem(item: UpcItemDbItem, barcode: string): UpcItemDbPocResult {
+function normalizeItem(item: UpcItemDbItem, barcode: string): DvdProductResult {
   // Texte de classification volontairement restreint à `title`/`description`
   // (jamais `offers[].title`, ni `category`) : la précision de `mediaType`
   // dépend de ce périmètre étroit — voir consigne "pas d'heuristique agressive
@@ -193,22 +148,28 @@ function normalizeItem(item: UpcItemDbItem, barcode: string): UpcItemDbPocResult
   };
 }
 
-export type UpcItemDbLookupOutcome =
-  | { status: 'matched'; result: UpcItemDbPocResult }
-  | { status: 'no_match' }
-  /** Barcode connu, item trouvé et validé, mais aucun mot-clé DVD/Blu-ray
-   * explicite — `result` conservé pour inspection/logs uniquement, jamais
-   * exposé comme `matched` par `DvdBarcodeResolverService`. */
-  | { status: 'not_video'; result: UpcItemDbPocResult };
+/** Alias historique — voir `DvdProductLookupOutcome`. */
+export type UpcItemDbLookupOutcome = DvdProductLookupOutcome;
+
+/** Code métier UPCitemdb → nature d'échec interne (voir
+ * `BarcodeProviderErrorKind`), à partir des codes documentés ci-dessus. */
+function errorKindFor(status: number, code: string | undefined): BarcodeProviderErrorKind {
+  if (code === 'EXCEED_LIMIT') return 'quota';
+  if (code === 'TOO_FAST' || code === 'HTTP_TOO_MANY_REQUESTS' || status === 429) {
+    return 'rate_limit';
+  }
+  if (status === 401 || code === 'AUTH_ERR') return 'auth';
+  return 'unavailable';
+}
 
 /**
- * Provider POC `dvd` — UPCitemdb (plan FREE/trial), en attente de validation
- * de la qualité des données avant d'ajouter TMDB (voir docs/DECISIONS.md).
- * Volontairement pas encore enregistré dans `barcode.module.ts`/exposé via
- * `BarcodeResolverService` : voir `DvdBarcodeResolverService`.
+ * Provider produit `dvd` — UPCitemdb (plan FREE/trial, quota de 100
+ * requêtes/jour compté PAR IP : fragile depuis l'IP de sortie partagée de
+ * Render, voir docs/DECISIONS.md). Conservé comme rollback manuel de
+ * `DigitEyesProvider` via `DVD_PRODUCT_PROVIDER=upcitemdb`.
  */
 @Injectable()
-export class UpcItemDbProvider {
+export class UpcItemDbProvider implements DvdProductProvider {
   readonly id = 'upcitemdb' as const;
   private readonly logger = new Logger(UpcItemDbProvider.name);
 
@@ -217,7 +178,7 @@ export class UpcItemDbProvider {
     private readonly rateLimiter: UpcItemDbRateLimiterService,
   ) {}
 
-  async lookup(barcode: string): Promise<UpcItemDbLookupOutcome> {
+  async lookup(barcode: string): Promise<DvdProductLookupOutcome> {
     const budgetMs =
       this.configService.get<number>('UPCITEMDB_TIMEOUT_BUDGET_MS') ?? DEFAULT_TIMEOUT_BUDGET_MS;
     const userAgent = this.configService.get<string>('UPCITEMDB_USER_AGENT') ?? DEFAULT_USER_AGENT;
@@ -243,6 +204,8 @@ export class UpcItemDbProvider {
       throw new BarcodeProviderError(
         this.id,
         `UPCitemdb a répondu ${response.status}${code ? ` (${code})` : ''}.`,
+        undefined,
+        errorKindFor(response.status, code),
       );
     }
 
@@ -250,7 +213,12 @@ export class UpcItemDbProvider {
     try {
       body = (await response.json()) as UpcItemDbLookupResponse;
     } catch (error) {
-      throw new BarcodeProviderError(this.id, 'Réponse UPCitemdb illisible.', error);
+      throw new BarcodeProviderError(
+        this.id,
+        'Réponse UPCitemdb illisible.',
+        error,
+        'invalid_response',
+      );
     }
 
     // Défensif : un 200 avec un `code` métier non-`OK` n'a jamais été observé
@@ -331,10 +299,12 @@ export class UpcItemDbProvider {
     }
 
     if (lastResponse) return lastResponse;
+    const timedOut = lastError instanceof Error && lastError.name === 'AbortError';
     throw new BarcodeProviderError(
       this.id,
       'UPCitemdb injoignable, timeout ou limite de débit dépassée.',
       lastError,
+      timedOut || lastError === undefined ? 'timeout' : 'unavailable',
     );
   }
 }

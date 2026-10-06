@@ -1,8 +1,8 @@
 import { DvdEnrichmentService } from './dvd-enrichment.service';
 import type { TmdbProvider, TmdbSearchResult } from './providers/tmdb.provider';
-import type { TmdbMovieResult, UpcItemDbPocResult } from './types/dvd-poc.types';
+import type { TmdbMovieResult, DvdProductResult } from './types/dvd-poc.types';
 
-function makeUpcResult(overrides: Partial<UpcItemDbPocResult> = {}): UpcItemDbPocResult {
+function makeUpcResult(overrides: Partial<DvdProductResult> = {}): DvdProductResult {
   return {
     barcode: '786936815481',
     rawTitle: "Pirates of the Caribbean: At World's End (DVD + 2-Disc Blu-ray)",

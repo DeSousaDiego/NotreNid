@@ -3,13 +3,13 @@ import { ConfigService } from '@nestjs/config';
 
 import { BarcodeProviderError } from './barcode-provider.error';
 import { TmdbRateLimiterService } from './tmdb-rate-limiter.service';
+import { ISO_COUNTRY_CODES } from '../../iso-country-codes.constant';
 import {
   detectEditionHint,
   detectMediaType,
   detectPackagingHint,
   detectRegionHint,
-} from './upcitemdb.provider';
-import { ISO_COUNTRY_CODES } from '../../iso-country-codes.constant';
+} from '../dvd-product-classification';
 import type { TmdbMovieResult } from '../types/dvd-poc.types';
 
 // ---------------------------------------------------------------------------
@@ -85,9 +85,28 @@ const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w500';
  * jamais un groupe conservant un doute (ex. `(B01GWD9VG2)`, un code produit
  * réel observé dans le titre Avatar, ne matche aucun de ces motifs et reste
  * en place à ce stade — voir `stripTrailingByClause` pour ce cas précis).
+ *
+ * Également du bruit : un groupe VIDE (`[]`) ou contenant UNIQUEMENT une année
+ * (`[2009]`), observés réellement chez Digit-Eyes ("9 [blu-ray] [2009]
+ * [region 1] []", voir docs/DECISIONS.md). L'année n'est pas perdue :
+ * `extractYearHint` la lit sur le titre BRUT, avant tout nettoyage. Un groupe
+ * "année seule" n'est retiré QUE s'il porte l'année retenue par
+ * `extractYearHint` : avec deux années différentes ("Dune [1984] [2021]"),
+ * l'indice est `null` et retirer les groupes rendrait le titre ambigu
+ * ("Dune" → deux films exacts départagés par la seule popularité) — ils
+ * restent donc en place, faux négatif plutôt que mauvais film.
  */
-function isNoiseBracketContent(content: string): boolean {
+const YEAR_ONLY_CONTENT = /^\s*(1[89]\d{2}|20\d{2})\s*$/;
+
+function isYearOnlyNoise(content: string, yearHint: number | null): boolean {
+  const match = YEAR_ONLY_CONTENT.exec(content);
+  return match !== null && yearHint !== null && Number(match[1]) === yearHint;
+}
+
+function isNoiseBracketContent(content: string, yearHint: number | null): boolean {
   return (
+    content.trim() === '' ||
+    isYearOnlyNoise(content, yearHint) ||
     detectMediaType(content) !== 'unknown' ||
     detectEditionHint(content) !== null ||
     detectPackagingHint(content) !== null ||
@@ -95,10 +114,10 @@ function isNoiseBracketContent(content: string): boolean {
   );
 }
 
-function stripNoiseBrackets(text: string): string {
+function stripNoiseBrackets(text: string, yearHint: number | null): string {
   return text.replace(/[([][^)\]]*[)\]]/g, (group) => {
     const inner = group.slice(1, -1);
-    return isNoiseBracketContent(inner) ? ' ' : group;
+    return isNoiseBracketContent(inner, yearHint) ? ' ' : group;
   });
 }
 
@@ -139,7 +158,7 @@ function collapseWhitespaceAndPunctuation(text: string): string {
 }
 
 /**
- * Titre de recherche nettoyé à partir de `UpcItemDbPocResult.rawTitle` — voir
+ * Titre de recherche nettoyé à partir de `DvdProductResult.rawTitle` — voir
  * docs/DECISIONS.md pour la justification détaillée de chaque étape et sa
  * vérification sur les 4 titres réels DVD/Blu-ray de ce POC. **Garde-fou
  * final** : si le nettoyage détruit ENTIÈREMENT le titre (résultat vide), le
@@ -153,7 +172,7 @@ export function cleanTitleForSearch(rawTitle: string): string {
   const original = rawTitle.trim();
   if (!original) return '';
 
-  let cleaned = stripNoiseBrackets(original);
+  let cleaned = stripNoiseBrackets(original, extractYearHint(original));
   cleaned = stripTrailingByClause(cleaned);
   cleaned = stripLooseFormatWords(cleaned);
   cleaned = collapseWhitespaceAndPunctuation(cleaned);
@@ -197,10 +216,17 @@ export function extractYearHint(rawTitle: string): number | null {
 // Sélection déterministe du film — fonctions pures.
 // =============================================================================
 
-function normalizeTitle(text: string): string {
+/** Les apostrophes sont SUPPRIMÉES (pas remplacées par un espace) avant le
+ * reste de la ponctuation : "World's" et "Worlds" (graphie réelle de
+ * Digit-Eyes pour Pirates, voir docs/DECISIONS.md) donnent tous deux
+ * "worlds". Ne touche que la comparaison des titres, jamais le scoring. */
+const APOSTROPHES = /['‘’`´]/g;
+
+export function normalizeTitle(text: string): string {
   return text
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
+    .replace(APOSTROPHES, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()

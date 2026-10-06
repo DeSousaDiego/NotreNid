@@ -38,11 +38,17 @@ est exercée par les tests, jamais une réimplémentation indépendante.
 
 ```ts
 import { UpcItemDbProvider } from '../../providers/upcitemdb.provider';
-import { NINE_BLURAY_BARCODE, NINE_BLURAY_FIXTURE, parseUpcItemDbFixture } from '../test-fixtures/upcitemdb';
+import {
+  NINE_BLURAY_BARCODE,
+  NINE_BLURAY_FIXTURE,
+  parseUpcItemDbFixture,
+} from '../test-fixtures/upcitemdb';
 
 const fakeUpcItemDb = {
   id: 'upcitemdb',
-  lookup: jest.fn().mockResolvedValue(parseUpcItemDbFixture(NINE_BLURAY_FIXTURE, NINE_BLURAY_BARCODE)),
+  lookup: jest
+    .fn()
+    .mockResolvedValue(parseUpcItemDbFixture(NINE_BLURAY_FIXTURE, NINE_BLURAY_BARCODE)),
 } as unknown as UpcItemDbProvider;
 ```
 

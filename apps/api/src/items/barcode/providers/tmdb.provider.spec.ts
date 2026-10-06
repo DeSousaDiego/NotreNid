@@ -534,3 +534,73 @@ describe('TmdbProvider (HTTP)', () => {
     expect(schedule).toHaveBeenCalledTimes(2);
   });
 });
+
+/**
+ * Titres RÉELS renvoyés par Digit-Eyes (POC du 2026-10-06, voir
+ * `test-fixtures/digiteyes/`) — non-régression des deux corrections ciblées :
+ * crochets vides/année seule traités comme du bruit, apostrophes ignorées à la
+ * comparaison. Le scoring et le seuil restent strictement inchangés.
+ */
+describe('Digit-Eyes titles (cleaning + matching non-regression)', () => {
+  const NINE_DIGITEYES = '9 [blu-ray] [2009] [region 1] []';
+  const PIRATES_DIGITEYES = 'Pirates of the Caribbean: At Worlds End (DVD + 2-disc Blu-ray)';
+  const DARK_KNIGHT_DIGITEYES =
+    'The Dark Knight Trilogy: Ultimate Collectors Edition (batman Begins / the Dark Knight / the Dark Knight Rises)';
+
+  it('"9 [blu-ray] [2009] [region 1] []" → search title "9", year hint 2009 kept', () => {
+    expect(cleanTitleForSearch(NINE_DIGITEYES)).toBe('9');
+    expect(extractYearHint(NINE_DIGITEYES)).toBe(2009);
+  });
+
+  it('strips an empty group and a year-only group, but never a group with real words', () => {
+    expect(cleanTitleForSearch('Some Movie [] (1999)')).toBe('Some Movie');
+    expect(cleanTitleForSearch('Some Movie (Part 2)')).toBe('Some Movie (Part 2)');
+  });
+
+  it('keeps ambiguous year-only groups (two different years → no hint): never a confident wrong film', () => {
+    const raw = 'Dune [1984] [2021]';
+    expect(extractYearHint(raw)).toBeNull();
+    const query = cleanTitleForSearch(raw);
+    expect(query).toBe(raw);
+    const dune1984: TmdbSearchResult = { id: 841, title: 'Dune', release_date: '1984-12-14' };
+    const dune2021: TmdbSearchResult = { id: 438631, title: 'Dune', release_date: '2021-09-15' };
+    expect(selectBestMovieMatch([dune1984, dune2021], query, null)).toBeNull();
+  });
+
+  it('"9" from Digit-Eyes selects the real film 9 (2009), never "District 9"', () => {
+    const query = cleanTitleForSearch(NINE_DIGITEYES);
+    const selection = selectBestMovieMatch(
+      [NINE_2009_MAIN, NINE_2009_OBSCURE, DISTRICT_NINE],
+      query,
+      extractYearHint(NINE_DIGITEYES),
+    );
+    expect(selection?.id).toBe(12244);
+  });
+
+  it('treats "Worlds" and "World\'s" as the same title', () => {
+    expect(titleMatchTier('At Worlds End', ["At World's End"])).toBe('exact');
+    expect(titleMatchTier('At Worlds End', ['At World’s End'])).toBe('exact');
+  });
+
+  it('Pirates from Digit-Eyes ("Worlds", no apostrophe) selects the real film #285', () => {
+    const query = cleanTitleForSearch(PIRATES_DIGITEYES);
+    expect(query).toBe('Pirates of the Caribbean: At Worlds End');
+    expect(selectBestMovieMatch([PIRATES_TMDB], query, null)?.id).toBe(285);
+  });
+
+  it('apostrophe removal never makes a different title exact (scoring not loosened)', () => {
+    expect(titleMatchTier('The Worlds End', ["The World's End Part 2"])).not.toBe('exact');
+    expect(titleMatchTier('Its', ['It'])).not.toBe('exact');
+  });
+
+  it('Dark Knight Trilogy from Digit-Eyes never selects one of the individual films', () => {
+    const query = cleanTitleForSearch(DARK_KNIGHT_DIGITEYES);
+    const decoys: TmdbSearchResult[] = [
+      { id: 155, title: 'The Dark Knight', release_date: '2008-07-16', popularity: 120 },
+      { id: 49026, title: 'The Dark Knight Rises', release_date: '2012-07-16', popularity: 90 },
+      { id: 272, title: 'Batman Begins', release_date: '2005-06-10', popularity: 80 },
+      DARK_KNIGHT_DOCUMENTARY,
+    ];
+    expect(selectBestMovieMatch(decoys, query, extractYearHint(DARK_KNIGHT_DIGITEYES))).toBeNull();
+  });
+});

@@ -118,10 +118,20 @@ Chaque étape indique : l'objectif, les valeurs nécessaires, où les renseigner
 - **Optionnel** : `SENTRY_DSN` (créer un projet sur [sentry.io](https://sentry.io), plan gratuit suffisant pour ce volume) pour la remontée d'erreurs applicatives détaillées — non configuré dans le code de cette V1 au-delà de la variable d'environnement déjà prévue.
 - **Vérifier** : couper temporairement l'API (redémarrage manuel) et confirmer la réception d'une alerte.
 
+### 13 bis. Activer Digit-Eyes pour le scan DVD/Blu-ray
+
+- **Objectif** : remplacer UPCitemdb (quota gratuit compté par IP, épuisé depuis l'IP partagée de Render) par Digit-Eyes comme fournisseur produit DVD. Le code le supporte ; **la production reste sur `upcitemdb` tant que cette étape n'est pas faite**.
+- **Valeurs nécessaires** : « app key » et « authorization key » Digit-Eyes (page « My Account »), activation de production (99 $, paiement unique) et un premier dépôt prépayé (0,01 $ par lecture, aucun abonnement).
+- **Où les renseigner** : variables d'environnement de l'hébergeur — `DIGITEYES_APP_KEY`, `DIGITEYES_AUTH_KEY` (secrets), puis `DVD_PRODUCT_PROVIDER=digiteyes`. Jamais dans un fichier commité.
+- **Ordre** : déployer le code avec `DVD_PRODUCT_PROVIDER=upcitemdb` (aucun changement visible) → ajouter les deux clés → passer `DVD_PRODUCT_PROVIDER=digiteyes` → redémarrer.
+- **Vérifier** : log de démarrage `Provider produit DVD : digiteyes`, puis scanner sur téléphone les codes de référence (9, Dark Knight Trilogy, Pirates, Avatar ; Cheerios doit donner « aucun résultat »).
+- **Erreurs fréquentes** : clé absente → démarrage refusé (`Configuration invalide`) ; solde vide → scans DVD en « service indisponible » et log `(quota)` ; signature refusée → log `(auth)`, vérifier qu'aucune espace n'a été copiée avec les clés.
+- **Rollback** : `DVD_PRODUCT_PROVIDER=upcitemdb`, redémarrer (voir `docs/OPERATIONS.md`).
+
 ### 14. Accepter les coûts des services choisis
 
 - **Objectif** : confirmation explicite avant tout engagement financier récurrent.
-- **Postes de coût typiques pour ce projet** (ordres de grandeur, à vérifier au moment de la souscription) : hébergement API (gratuit à ~5-10 $/mois selon le fournisseur et l'usage), base de données managée (souvent gratuite au volume d'une collection personnelle), stockage d'images (quelques centimes/mois à ce volume), nom de domaine optionnel (~10-15 $/an), compte Apple Developer (99 $/an, uniquement si publication iOS), compte Google Play Console (25 $, paiement unique, uniquement si publication Android).
+- **Postes de coût typiques pour ce projet** (ordres de grandeur, à vérifier au moment de la souscription) : hébergement API (gratuit à ~5-10 $/mois selon le fournisseur et l'usage), base de données managée (souvent gratuite au volume d'une collection personnelle), stockage d'images (quelques centimes/mois à ce volume), nom de domaine optionnel (~10-15 $/an), compte Apple Developer (99 $/an, uniquement si publication iOS), compte Google Play Console (25 $, paiement unique, uniquement si publication Android), Digit-Eyes pour le scan DVD (99 $ d'activation unique, puis ~1 $ pour 100 scans, prépayé, sans abonnement — voir étape 13 bis).
 - Aucun de ces services n'a été souscrit par Claude Code.
 
 ### (Optionnel) Nom de domaine personnalisé
