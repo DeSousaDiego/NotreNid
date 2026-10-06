@@ -17,6 +17,22 @@ interface CoverArtResponse {
 
 const DEFAULT_TIMEOUT_MS = 4000;
 
+const INSECURE_CAA_PREFIX = 'http://coverartarchive.org/';
+
+/**
+ * Les `index.json` anciens de Cover Art Archive exposent encore des URLs en
+ * `http://` (observé réellement le 2026-10-06, ex. release
+ * e69e2f55-a2c0-472e-b30b-f43b565b3fbe : `image`/`thumbnails.large` en
+ * `http://`, sans clé `500`), alors que les plus récents sont en `https://`.
+ * Android bloque le trafic en clair dans un build release : l'image ne
+ * s'affiche alors jamais côté mobile. Le même chemin en `https://` est servi
+ * à l'identique (vérifié : 200 après redirection archive.org) — seul l'hôte
+ * `coverartarchive.org` est réécrit, jamais une URL tierce.
+ */
+export function toSecureCoverUrl(url: string): string {
+  return url.startsWith(INSECURE_CAA_PREFIX) ? `https://${url.slice('http://'.length)}` : url;
+}
+
 /**
  * Enrichissement non bloquant : une couverture absente ou une panne de ce
  * service ne doit **jamais** faire échouer une résolution CD par ailleurs
@@ -59,7 +75,9 @@ export class CoverArtArchiveProvider {
 
       const body = (await response.json()) as CoverArtResponse;
       const front = body.images?.find((image) => image.front === true) ?? body.images?.[0];
-      return front?.thumbnails?.['500'] ?? front?.thumbnails?.large ?? front?.image ?? null;
+      const coverUrl =
+        front?.thumbnails?.['500'] ?? front?.thumbnails?.large ?? front?.image ?? null;
+      return coverUrl ? toSecureCoverUrl(coverUrl) : null;
     } catch (error) {
       this.logger.warn(
         `Échec réseau ou timeout — couverture ignorée (${

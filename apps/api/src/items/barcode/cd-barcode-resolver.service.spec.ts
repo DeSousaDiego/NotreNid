@@ -214,6 +214,65 @@ describe('CdBarcodeResolverService', () => {
           cd: { artist: 'Daft Punk', releaseYear: 2001, label: 'Daft Life', format: 'Jewel Case' },
         },
       });
+      // Cover Art Archive 404 : CD valide sans couverture, jamais une erreur.
+      expect(response.cover).toBeNull();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('exposes an https:// cover end-to-end when Cover Art Archive returns a legacy http:// URL', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn((url: string, _init?: RequestInit) => {
+      if (url.includes('musicbrainz.org/ws/2/release')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              releases: [{ id: 'release-mbid-1', title: 'Discovery', barcode: '5099969236424' }],
+            }),
+        } as unknown as Response);
+      }
+      if (url.includes('coverartarchive.org')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              images: [
+                {
+                  front: true,
+                  image: 'http://coverartarchive.org/release/release-mbid-1/1.jpg',
+                  thumbnails: {
+                    large: 'http://coverartarchive.org/release/release-mbid-1/1-500.jpg',
+                  },
+                },
+              ],
+            }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+    }) as unknown as typeof fetch;
+
+    try {
+      const configService = { get: () => undefined } as unknown as ConfigService;
+      const service = new CdBarcodeResolverService(
+        new MusicBrainzProvider(
+          configService,
+          { schedule: (task: () => unknown) => task() } as unknown as MusicBrainzRateLimiterService,
+          new CoverArtArchiveProvider(configService),
+          new MusicBrainzArtistCacheService(),
+        ),
+        new BarcodeCacheService(),
+      );
+
+      const response = await service.resolve('5099969236424');
+
+      expect(response.status).toBe('matched');
+      expect(response.cover).toEqual({
+        url: 'https://coverartarchive.org/release/release-mbid-1/1-500.jpg',
+      });
     } finally {
       global.fetch = originalFetch;
     }

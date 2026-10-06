@@ -1,8 +1,11 @@
+import type { ConfigService } from '@nestjs/config';
+
 import { BarcodeCacheService } from './barcode-cache.service';
 import { DvdBarcodeResolverService } from './dvd-barcode-resolver.service';
 import { DvdEnrichmentService } from './dvd-enrichment.service';
 import type { TmdbProvider } from './providers/tmdb.provider';
-import type { UpcItemDbProvider } from './providers/upcitemdb.provider';
+import type { UpcItemDbRateLimiterService } from './providers/upcitemdb-rate-limiter.service';
+import { UpcItemDbProvider } from './providers/upcitemdb.provider';
 import {
   AVATAR_TMDB_DETAILS,
   AVATAR_TMDB_SEARCH_RESULTS,
@@ -216,5 +219,86 @@ describe('dvd pipeline (integration, no network)', () => {
     expect(response.cover).toBeNull();
     expect(tmdbSearch).not.toHaveBeenCalled();
     expect(tmdbGetDetails).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Classification de bout en bout avec le VRAI `UpcItemDbProvider` (seul
+   * `fetch` est simulé) : le statut HTTP réel d'UPCitemdb doit aboutir au bon
+   * statut public — `provider_error` (quota/rate limit), `no_match` (404
+   * NOT_FOUND) ou `partial` (UPC OK mais TMDB en panne) — jamais l'un masqué
+   * derrière l'autre.
+   */
+  describe('with the real UpcItemDbProvider (fetch mocked)', () => {
+    const originalFetch = global.fetch;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    function upcResponse(status: number, body: unknown): Response {
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: () => Promise.resolve(body),
+      } as unknown as Response;
+    }
+
+    function buildRealUpcResolver(tmdbSearch: jest.Mock, tmdbGetDetails: jest.Mock) {
+      const upcItemDb = new UpcItemDbProvider(
+        { get: () => undefined } as unknown as ConfigService,
+        { schedule: (task: () => unknown) => task() } as unknown as UpcItemDbRateLimiterService,
+      );
+      return new DvdBarcodeResolverService(
+        upcItemDb,
+        new DvdEnrichmentService(fakeTmdb(tmdbSearch, tmdbGetDetails)),
+        new BarcodeCacheService(),
+      );
+    }
+
+    it.each(['EXCEED_LIMIT', 'TOO_FAST'])(
+      'HTTP 429 %s from UPCitemdb → provider_error, never retried, TMDB never called',
+      async (code) => {
+        const fetchMock = jest.fn().mockResolvedValue(upcResponse(429, { code }));
+        global.fetch = fetchMock as unknown as typeof fetch;
+        const tmdbSearch = jest.fn();
+        const resolver = buildRealUpcResolver(tmdbSearch, jest.fn());
+
+        const response = await resolver.resolve(NINE_BLURAY_BARCODE);
+
+        expect(response.status).toBe('provider_error');
+        expect(response.data).toBeNull();
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(tmdbSearch).not.toHaveBeenCalled();
+      },
+    );
+
+    it('HTTP 404 NOT_FOUND from UPCitemdb → no_match, never provider_error', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(upcResponse(404, { code: 'NOT_FOUND' })) as unknown as typeof fetch;
+      const resolver = buildRealUpcResolver(jest.fn(), jest.fn());
+
+      const response = await resolver.resolve(NINE_BLURAY_BARCODE);
+
+      expect(response.status).toBe('no_match');
+    });
+
+    it('UPCitemdb OK but TMDB failing technically → partial with UPC data, never provider_error', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue(upcResponse(200, NINE_BLURAY_FIXTURE)) as unknown as typeof fetch;
+      const tmdbSearch = jest.fn().mockRejectedValue(new Error('TMDB a répondu 503.'));
+      const resolver = buildRealUpcResolver(tmdbSearch, jest.fn());
+
+      const response = await resolver.resolve(NINE_BLURAY_BARCODE);
+
+      expect(response.status).toBe('partial');
+      expect(response.source).toBe('upcitemdb');
+      expect(response.data?.title).toBe('9');
+      expect(response.data?.dvd?.director).toBeNull();
+      expect(response.cover?.url).toBe(
+        'https://example-fixture.test/upcitemdb/nine-bluray-cover.jpg',
+      );
+    });
   });
 });
