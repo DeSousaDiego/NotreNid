@@ -1,12 +1,15 @@
-import { FlatList, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import {
   AppText,
+  CategoryIllustration,
   EmptyState,
   ErrorState,
   LoadingSkeleton,
+  RowGroup,
   ScreenContainer,
 } from '../../../components';
+import { getCategoryTint } from '../../../constants/category-icons';
 import { useCategories } from '../../../hooks/useCategories';
 import { getErrorMessage } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
@@ -51,25 +54,49 @@ export default function CategoriesScreen() {
       {categories.length === 0 ? (
         <EmptyState icon="pricetag-outline" title="Aucune catégorie" />
       ) : (
-        <FlatList
-          data={categories}
-          keyExtractor={(category) => category.id}
-          contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.xs }}
-          renderItem={({ item: category }) => (
-            <View
-              style={{
-                paddingVertical: theme.spacing.sm,
-                borderBottomWidth: 1,
-                borderBottomColor: theme.colors.border,
-              }}
-            >
-              <AppText variant="body">{category.name}</AppText>
-              <AppText variant="caption" color="textMuted">
-                {category.isSystem ? 'Catégorie système' : 'Catégorie personnalisée'}
-              </AppText>
-            </View>
-          )}
-        />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}
+        >
+          <AppText variant="body" color="textMuted">
+            Les familles d’objets de votre nid.
+          </AppText>
+          <RowGroup>
+            {categories.map((category) => (
+              <View
+                key={category.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                  minHeight: 64,
+                  paddingVertical: theme.spacing.sm,
+                }}
+              >
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: theme.radii.full,
+                    backgroundColor: theme.colors[getCategoryTint(category.slug)],
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CategoryIllustration slug={category.slug} size={28} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="body">{category.name}</AppText>
+                  <AppText variant="caption" color="textMuted">
+                    {category.isSystem ? 'Catégorie système' : 'Catégorie personnalisée'}
+                  </AppText>
+                </View>
+              </View>
+            ))}
+          </RowGroup>
+        </ScrollView>
       )}
     </ScreenContainer>
   );

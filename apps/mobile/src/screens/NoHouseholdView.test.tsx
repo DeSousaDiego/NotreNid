@@ -69,6 +69,13 @@ describe('NoHouseholdView', () => {
     });
     const view = await renderScreen(<NoHouseholdView />);
 
+    // Accueil chaleureux d'abord : deux choix clairs, aucun formulaire affiché d'emblée.
+    expect(view.getByText('Créez votre nid')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Rejoindre un foyer' })).toBeTruthy();
+    expect(view.queryByLabelText('Nom du foyer')).toBeNull();
+    expect(view.queryByLabelText("Code d'invitation")).toBeNull();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Créer un foyer' }));
     await fireEvent.changeText(view.getByLabelText('Nom du foyer'), 'Notre nid');
     await fireEvent.press(view.getByRole('button', { name: 'Créer mon nid' }));
 
@@ -85,8 +92,9 @@ describe('NoHouseholdView', () => {
     (mockApiClient.invitations.accept as jest.Mock).mockRejectedValueOnce(new Error('boom'));
     const view = await renderScreen(<NoHouseholdView />);
 
-    fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'ZZZZZZZZ');
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre un foyer' }));
+    await fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'ZZZZZZZZ');
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre ce foyer' }));
 
     await waitFor(() =>
       expect(view.getByText("Une erreur inattendue s'est produite.")).toBeTruthy(),
@@ -99,8 +107,8 @@ describe('NoHouseholdView', () => {
       role: 'MEMBER',
     });
 
-    fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'nid-7k4p-2q9d');
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+    await fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'nid-7k4p-2q9d');
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre ce foyer' }));
 
     await waitFor(() => expect(mockApiClient.invitations.accept).toHaveBeenCalledWith('7K4P2Q9D'));
     await waitFor(() => expect(mockSelectHousehold).toHaveBeenCalledWith('household-1'));

@@ -149,6 +149,7 @@ describe('InvitationsScreen', () => {
     );
     await waitFor(() => expect(listInvitations()).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(view.getByText('7K4P-2Q9D')).toBeTruthy());
+    expect(view.getByText('Nouvelle invitation')).toBeTruthy();
     expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
 
     await fireEvent.press(view.getByRole('button', { name: 'Copier' }));
@@ -163,9 +164,9 @@ describe('InvitationsScreen', () => {
     );
 
     (mockApiClient.invitations.revoke as jest.Mock).mockResolvedValue(undefined);
-    await fireEvent.press(view.getByRole('button', { name: 'Révoquer ce code' }));
-    await waitFor(() => expect(view.getByText('Révoquer ce code ?')).toBeTruthy());
-    await fireEvent.press(view.getByRole('button', { name: 'Révoquer' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Désactiver ce code' }));
+    await waitFor(() => expect(view.getByText('Désactiver ce code ?')).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Désactiver' }));
 
     await waitFor(() => expect(mockApiClient.invitations.revoke).toHaveBeenCalledWith('inv-1'));
     await waitFor(() => expect(view.getByText('Aucune invitation active')).toBeTruthy());

@@ -29,7 +29,9 @@ export default function ArchivesScreen() {
             <ItemCardSkeleton key={key} />
           ))}
         </View>
-      ) : itemsQuery.isError ? (
+      ) : itemsQuery.isError && !itemsQuery.data ? (
+        // Données d'abord : un refetch en échec (TanStack Query v5 garde `data`) ne
+        // remplace jamais une liste déjà affichée par un écran d'erreur.
         <ErrorState
           message={getErrorMessage(itemsQuery.error)}
           onRetry={() => void itemsQuery.refetch()}

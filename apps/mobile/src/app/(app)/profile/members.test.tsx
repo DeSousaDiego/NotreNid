@@ -121,7 +121,9 @@ async function renderScreen(ui: ReactElement) {
 async function openManagementSheetForSam(view: Awaited<ReturnType<typeof render>>) {
   await waitFor(() => expect(view.getByText('Sam')).toBeTruthy());
   await fireEvent.press(view.getByLabelText('Gérer Sam'));
-  await waitFor(() => expect(view.getByRole('button', { name: 'Administrateur' })).toBeTruthy());
+  await waitFor(() =>
+    expect(view.getByRole('radio', { name: 'Peut gérer le foyer' })).toBeTruthy(),
+  );
 }
 
 describe('MembersScreen', () => {
@@ -143,10 +145,11 @@ describe('MembersScreen', () => {
     listMembers().mockResolvedValue([ALIX_OWNER, SAM_MEMBER]);
     const { view } = await renderScreen(<MembersScreen />);
 
-    await waitFor(() => expect(view.getByText('Alix (vous)')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
     expect(view.getByText('Sam')).toBeTruthy();
-    expect(view.getByText('Propriétaire')).toBeTruthy();
-    expect(view.getByText('Membre')).toBeTruthy();
+    expect(view.getByText('Responsable du foyer')).toBeTruthy();
+    expect(view.getByText('Membre du foyer')).toBeTruthy();
+    expect(view.getByText('Vous')).toBeTruthy();
   });
 
   it('shows an error state without any data and retries on demand', async () => {
@@ -160,7 +163,7 @@ describe('MembersScreen', () => {
     listMembers().mockResolvedValue([ALIX_OWNER]);
     await fireEvent.press(view.getByRole('button', { name: 'Réessayer' }));
 
-    await waitFor(() => expect(view.getByText('Alix (vous)')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
     expect(listMembers()).toHaveBeenCalledTimes(2);
   });
 
@@ -174,7 +177,7 @@ describe('MembersScreen', () => {
 
     expect(listMembers()).toHaveBeenCalledTimes(2);
     expect(view.getByText('Sam')).toBeTruthy();
-    expect(view.getByText('Alix (vous)')).toBeTruthy();
+    expect(view.getByText('Alix')).toBeTruthy();
     expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
   });
 
@@ -184,7 +187,7 @@ describe('MembersScreen', () => {
     const { view } = await renderScreen(<MembersScreen />);
 
     await openManagementSheetForSam(view);
-    await fireEvent.press(view.getByRole('button', { name: 'Administrateur' }));
+    await fireEvent.press(view.getByRole('radio', { name: 'Peut gérer le foyer' }));
 
     await waitFor(() =>
       expect(updateMemberRole()).toHaveBeenCalledWith('household-1', 'user-2', 'ADMIN'),
@@ -197,7 +200,7 @@ describe('MembersScreen', () => {
     const { view } = await renderScreen(<MembersScreen />);
 
     await openManagementSheetForSam(view);
-    await fireEvent.press(view.getByRole('button', { name: 'Membre' }));
+    await fireEvent.press(view.getByRole('radio', { name: 'Membre du foyer' }));
 
     expect(updateMemberRole()).not.toHaveBeenCalled();
     expect(view.queryByText('Rôle mis à jour.')).toBeNull();
@@ -209,7 +212,7 @@ describe('MembersScreen', () => {
     const { view } = await renderScreen(<MembersScreen />);
 
     await openManagementSheetForSam(view);
-    await fireEvent.press(view.getByRole('button', { name: 'Propriétaire' }));
+    await fireEvent.press(view.getByRole('radio', { name: 'Responsable du foyer' }));
     await waitFor(() =>
       expect(view.getByText('Donner à Sam la responsabilité du foyer ?')).toBeTruthy(),
     );
@@ -224,7 +227,7 @@ describe('MembersScreen', () => {
     );
     expect(updateMemberRole()).not.toHaveBeenCalled();
 
-    await fireEvent.press(view.getByRole('button', { name: 'Propriétaire' }));
+    await fireEvent.press(view.getByRole('radio', { name: 'Responsable du foyer' }));
     await waitFor(() => expect(view.getByRole('button', { name: 'Confirmer' })).toBeTruthy());
     await fireEvent.press(view.getByRole('button', { name: 'Confirmer' }));
 
@@ -260,7 +263,7 @@ describe('MembersScreen', () => {
 
     await waitFor(() =>
       expect(
-        view.getByText('Pour quitter ce foyer, confiez-le d’abord à quelqu’un d’autre.'),
+        view.getByText('Vous devez nommer un autre responsable avant de pouvoir quitter le foyer.'),
       ).toBeTruthy(),
     );
     expect(view.queryByRole('button', { name: 'Quitter ce foyer' })).toBeNull();
@@ -274,7 +277,7 @@ describe('MembersScreen', () => {
       expect(view.getByRole('button', { name: 'Quitter ce foyer' })).toBeTruthy(),
     );
     expect(
-      view.queryByText('Pour quitter ce foyer, confiez-le d’abord à quelqu’un d’autre.'),
+      view.queryByText('Vous devez nommer un autre responsable avant de pouvoir quitter le foyer.'),
     ).toBeNull();
   });
 
@@ -304,7 +307,7 @@ describe('MembersScreen', () => {
     });
     const { view } = await renderScreen(<MembersScreen />);
 
-    await waitFor(() => expect(view.getByText('Alix (vous)')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Alix')).toBeTruthy());
     await fireEvent.press(view.getByRole('button', { name: 'Quitter ce foyer' }));
     await waitFor(() => expect(view.getByText('Quitter ce foyer ?')).toBeTruthy());
     await fireEvent.press(view.getByRole('button', { name: 'Quitter' }));
@@ -318,7 +321,7 @@ describe('MembersScreen', () => {
       mockClearSelection.mock.invocationCallOrder[0] as number,
     );
     expect(view.queryByText('Charlie')).toBeNull();
-    expect(view.queryByText('Alix (vous)')).toBeNull();
+    expect(view.queryByText('Alix')).toBeNull();
   });
 
   it('shows a clear message and stays put when the API refuses the departure', async () => {
@@ -349,6 +352,6 @@ describe('MembersScreen', () => {
     );
     expect(mockClearSelection).not.toHaveBeenCalled();
     expect(mockRouterReplace).not.toHaveBeenCalled();
-    expect(view.getByText('Alix (vous)')).toBeTruthy();
+    expect(view.getByText('Alix')).toBeTruthy();
   });
 });

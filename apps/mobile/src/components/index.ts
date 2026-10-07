@@ -20,6 +20,7 @@ export { ItemCover } from './ItemCover';
 export { OwnerAvatarGroup } from './OwnerAvatarGroup';
 export { PasswordField } from './PasswordField';
 export { RecentItemRow, RecentItemRowSkeleton } from './RecentItemRow';
+export { NavigationRow, RowGroup } from './RowGroup';
 export { ScreenContainer } from './ScreenContainer';
 export { SearchField } from './SearchField';
 export { Select } from './Select';

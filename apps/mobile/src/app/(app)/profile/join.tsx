@@ -1,4 +1,5 @@
 import { normalizeInvitationCode } from '@notre-nid/shared';
+import { Ionicons } from '@expo/vector-icons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -33,7 +34,8 @@ interface JoinedHousehold {
 export default function JoinHouseholdScreen() {
   const theme = useTheme();
   const { showToast } = useToast();
-  const { householdId, selectHousehold } = useHousehold();
+  const { householdId, households, selectHousehold } = useHousehold();
+  const currentHouseholdName = households.find((h) => h.id === householdId)?.name;
   const acceptInvitation = useAcceptInvitation();
   const fetchHouseholds = useFetchHouseholds();
 
@@ -112,10 +114,26 @@ export default function JoinHouseholdScreen() {
   return (
     <ScreenContainer scroll edges={['top', 'left', 'right', 'bottom']}>
       <View style={{ gap: theme.spacing.lg }}>
-        <View style={{ gap: theme.spacing.xs }}>
-          <AppText variant="title">Rejoindre un foyer</AppText>
+        <View style={{ gap: theme.spacing.sm }}>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: theme.radii.full,
+              backgroundColor: theme.colors.tintSage,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="enter-outline" size={theme.iconSizes.lg} color={theme.colors.primary} />
+          </View>
+          <AppText variant="title" color="primary" accessibilityRole="header">
+            Rejoindre un autre foyer
+          </AppText>
           <AppText variant="body" color="textMuted">
-            Entrez le code d’invitation que la personne vous a partagé.
+            Entrez le code d’invitation du foyer que vous souhaitez rejoindre.
           </AppText>
         </View>
 
@@ -133,10 +151,34 @@ export default function JoinHouseholdScreen() {
         />
 
         <Button
-          label="Rejoindre"
+          label="Rejoindre ce foyer"
           onPress={() => void onSubmit()}
           loading={isSubmitting || selectedJoin !== null}
         />
+
+        {currentHouseholdName ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: theme.spacing.sm,
+              padding: theme.spacing.md,
+              borderRadius: theme.radii.lg,
+              backgroundColor: theme.colors.tintLinen,
+            }}
+          >
+            <Ionicons
+              name="home-outline"
+              size={theme.iconSizes.md}
+              color={theme.colors.primary}
+              accessible={false}
+              importantForAccessibility="no"
+            />
+            <AppText variant="caption" color="text" style={{ flex: 1 }}>
+              Vous passerez sur ce nouveau foyer. « {currentHouseholdName} » reste accessible à tout
+              moment depuis votre profil.
+            </AppText>
+          </View>
+        ) : null}
       </View>
     </ScreenContainer>
   );

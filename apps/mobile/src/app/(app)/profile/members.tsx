@@ -1,17 +1,19 @@
 import type { HouseholdMember, HouseholdRole } from '@notre-nid/shared';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import {
   AppText,
+  Avatar,
   BottomSheet,
-  Button,
-  Chip,
   ConfirmDialog,
   ErrorState,
   IconButton,
   LoadingSkeleton,
+  NavigationRow,
+  RowGroup,
   ScreenContainer,
   useToast,
 } from '../../../components';
@@ -23,19 +25,14 @@ import {
   useUpdateMemberRole,
 } from '../../../hooks/useMemberMutations';
 import { getErrorMessage } from '../../../lib/errorMessage';
+import {
+  HOUSEHOLD_ROLE_OPTIONS,
+  householdHeadcountLabel,
+  householdRoleLabel,
+} from '../../../lib/householdRoles';
 import { useAuth } from '../../../providers/AuthProvider';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useTheme } from '../../../theme';
-
-const ROLE_OPTIONS: { value: HouseholdRole; label: string }[] = [
-  { value: 'OWNER', label: 'Propriétaire' },
-  { value: 'ADMIN', label: 'Administrateur' },
-  { value: 'MEMBER', label: 'Membre' },
-];
-
-function roleLabel(role: HouseholdRole): string {
-  return ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
-}
 
 export default function MembersScreen() {
   const theme = useTheme();
@@ -145,76 +142,145 @@ export default function MembersScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
-      <FlatList
-        data={members}
-        keyExtractor={(member) => member.id}
-        contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.xs }}
-        renderItem={({ item: member }) => (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingVertical: theme.spacing.sm,
-              borderBottomWidth: 1,
-              borderBottomColor: theme.colors.border,
-            }}
-          >
-            <View>
-              <AppText variant="body">
-                {member.user.displayName}
-                {member.user.id === user?.id ? ' (vous)' : ''}
-              </AppText>
-              <AppText variant="caption" color="textMuted">
-                {roleLabel(member.role)}
-              </AppText>
-            </View>
-            {isAdmin && member.user.id !== user?.id ? (
-              <IconButton
-                name="ellipsis-horizontal"
-                accessibilityLabel={`Gérer ${member.user.displayName}`}
-                onPress={() => setManagedMember(member)}
-              />
-            ) : null}
-          </View>
-        )}
-      />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: theme.spacing.lg, gap: theme.spacing.lg }}
+      >
+        <AppText variant="body" color="textMuted">
+          {householdHeadcountLabel(members.length)}.
+        </AppText>
 
-      <View style={{ padding: theme.spacing.lg }}>
-        {isLastOwner ? (
-          <AppText variant="helper" color="textMuted" style={{ textAlign: 'center' }}>
-            Pour quitter ce foyer, confiez-le d’abord à quelqu’un d’autre.
-          </AppText>
-        ) : (
-          <Button label="Quitter ce foyer" variant="ghost" onPress={() => setConfirmLeave(true)} />
-        )}
-      </View>
+        <RowGroup>
+          {members.map((member) => {
+            const isCurrentUser = member.user.id === user?.id;
+            return (
+              <View
+                key={member.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                  minHeight: 64,
+                  paddingVertical: theme.spacing.sm,
+                }}
+              >
+                <Avatar
+                  displayName={member.user.displayName}
+                  avatarUrl={member.user.avatarUrl}
+                  size={44}
+                />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}
+                  >
+                    <AppText variant="body" numberOfLines={1} style={{ flexShrink: 1 }}>
+                      {member.user.displayName}
+                    </AppText>
+                    {isCurrentUser ? (
+                      <View
+                        style={{
+                          paddingHorizontal: theme.spacing.sm,
+                          borderRadius: theme.radii.full,
+                          backgroundColor: theme.colors.tintSage,
+                        }}
+                      >
+                        <AppText variant="caption" color="primary">
+                          Vous
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
+                  <AppText variant="caption" color="textMuted">
+                    {householdRoleLabel(member.role)}
+                  </AppText>
+                </View>
+                {isAdmin && !isCurrentUser ? (
+                  <IconButton
+                    name="ellipsis-horizontal"
+                    color="textMuted"
+                    accessibilityLabel={`Gérer ${member.user.displayName}`}
+                    onPress={() => setManagedMember(member)}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
+        </RowGroup>
+
+        <View style={{ marginTop: theme.spacing.lg, paddingHorizontal: theme.spacing.md }}>
+          {isLastOwner ? (
+            <AppText variant="helper" color="textMuted">
+              Vous devez nommer un autre responsable avant de pouvoir quitter le foyer.
+            </AppText>
+          ) : (
+            <NavigationRow
+              icon="exit-outline"
+              label="Quitter ce foyer"
+              tone="danger"
+              showChevron={false}
+              onPress={() => setConfirmLeave(true)}
+            />
+          )}
+        </View>
+      </ScrollView>
 
       <BottomSheet
         visible={managedMember !== null}
         onClose={() => setManagedMember(null)}
         title={managedMember?.user.displayName}
       >
-        <View style={{ gap: theme.spacing.md }}>
-          <View>
-            <AppText variant="label" color="textMuted" style={{ marginBottom: 6 }}>
-              Rôle
+        <View style={{ gap: theme.spacing.lg }}>
+          <View accessibilityRole="radiogroup" style={{ gap: theme.spacing.xs }}>
+            <AppText variant="label" color="textMuted">
+              Place dans le foyer
             </AppText>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
-              {ROLE_OPTIONS.map((option) => (
-                <Chip
+            {HOUSEHOLD_ROLE_OPTIONS.map((option) => {
+              const selected = managedMember?.role === option.value;
+              return (
+                <Pressable
                   key={option.value}
-                  label={option.label}
-                  selected={managedMember?.role === option.value}
+                  accessibilityRole="radio"
+                  accessibilityLabel={option.label}
+                  accessibilityHint={option.description}
+                  accessibilityState={{ checked: selected, disabled: updateRole.isPending }}
                   disabled={updateRole.isPending}
                   onPress={() => handleSelectRole(option.value)}
-                />
-              ))}
-            </View>
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                    minHeight: 56,
+                    paddingVertical: theme.spacing.sm,
+                    paddingHorizontal: theme.spacing.md,
+                    borderRadius: theme.radii.md,
+                    borderWidth: 1,
+                    borderColor: selected ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: selected ? theme.colors.tintSage : theme.colors.surface,
+                    opacity: updateRole.isPending ? 0.5 : pressed ? 0.75 : 1,
+                  })}
+                >
+                  <Ionicons
+                    name={selected ? 'radio-button-on' : 'radio-button-off'}
+                    size={theme.iconSizes.md}
+                    color={selected ? theme.colors.primary : theme.colors.textMuted}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="body" color={selected ? 'primary' : 'text'}>
+                      {option.label}
+                    </AppText>
+                    <AppText variant="caption" color="textMuted">
+                      {option.description}
+                    </AppText>
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
-          <Button
+          <NavigationRow
+            icon="person-remove-outline"
             label="Retirer du foyer"
-            variant="danger"
+            tone="danger"
+            showChevron={false}
             disabled={updateRole.isPending}
             onPress={() => {
               if (managedMember) setConfirmRemove(managedMember);

@@ -12,6 +12,13 @@ import ProfileScreen from './profile';
 // though this screen never renders one (see docs/PHASE_STATUS.md Phase 3B).
 jest.mock('expo-image', () => ({ Image: () => null }));
 
+// `useTabBarClearance` a besoin d'un `useSafeAreaInsets` réel ; ce test ne rend pas de
+// `SafeAreaProvider` — seul ce hook est mocké, le reste du module reste réel.
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 const mockApiClient = createMockApiClient();
 const mockUser = {
   id: 'user-1',
@@ -65,7 +72,7 @@ jest.mock('../../../lib/exportFile', () => ({
 
 function createMockApiClient() {
   return {
-    households: { list: jest.fn() },
+    households: { list: jest.fn(), listMembers: jest.fn() },
     exports: { json: jest.fn(), csv: jest.fn() },
   } as unknown as import('@notre-nid/api-client').ApiClient;
 }
@@ -78,6 +85,17 @@ const LE_NID = {
   updatedAt: '2026-01-01T00:00:00.000Z',
   role: 'OWNER' as const,
 };
+
+function member(id: string, displayName: string, role: 'OWNER' | 'ADMIN' | 'MEMBER') {
+  return {
+    id: `membership-${id}`,
+    role,
+    joinedAt: '2026-01-01T00:00:00.000Z',
+    user: { ...mockUser, id, displayName, email: `${id}@example.com` },
+  };
+}
+
+const TWO_MEMBERS = [member('user-1', 'Alix', 'OWNER'), member('user-2', 'Sam', 'MEMBER')];
 
 function renderScreen(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -95,6 +113,7 @@ describe('ProfileScreen', () => {
     jest.clearAllMocks();
     mockHouseholds = [LE_NID];
     (mockApiClient.households.list as jest.Mock).mockResolvedValue([LE_NID]);
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue(TWO_MEMBERS);
   });
 
   it('renders the current user and household', async () => {
@@ -109,7 +128,7 @@ describe('ProfileScreen', () => {
     const view = await renderScreen(<ProfileScreen />);
     await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
 
-    expect(view.getByText('A')).toBeTruthy();
+    expect(view.getAllByText('A').length).toBeGreaterThan(0);
   });
 
   it('navigates to each management screen', async () => {
@@ -131,7 +150,7 @@ describe('ProfileScreen', () => {
     await fireEvent.press(view.getByRole('button', { name: 'Archives' }));
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/profile/archives');
 
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre un foyer' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre un autre foyer' }));
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/profile/join');
   });
 
@@ -172,7 +191,7 @@ describe('ProfileScreen', () => {
     const view = await renderScreen(<ProfileScreen />);
     await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
 
-    await fireEvent.press(view.getByRole('button', { name: 'Exporter en JSON' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Sauvegarder la collection en JSON' }));
     await waitFor(() => expect(mockApiClient.exports.json).toHaveBeenCalledWith('household-1'));
     await waitFor(() =>
       expect(mockShareExportFile).toHaveBeenCalledWith(
@@ -182,7 +201,9 @@ describe('ProfileScreen', () => {
       ),
     );
 
-    await fireEvent.press(view.getByRole('button', { name: 'Exporter en CSV' }));
+    await fireEvent.press(
+      view.getByRole('button', { name: 'Sauvegarder la collection en tableur CSV' }),
+    );
     await waitFor(() => expect(mockApiClient.exports.csv).toHaveBeenCalledWith('household-1'));
     await waitFor(() =>
       expect(mockShareExportFile).toHaveBeenCalledWith('Le Nid', 'csv', 'id\nitem-1\n'),
@@ -200,6 +221,50 @@ describe('ProfileScreen', () => {
       view.getByRole('button', { name: 'Se déconnecter de tous les appareils' }),
     );
     expect(mockLogoutAllDevices).toHaveBeenCalledTimes(1);
+  });
+
+  it('presents the household as the heart of the screen: headcount and a human role label', async () => {
+    const view = await renderScreen(<ProfileScreen />);
+
+    await waitFor(() => expect(view.getByText('Vous êtes 2 dans ce nid')).toBeTruthy());
+    expect(view.getByLabelText('Membres : Alix, Sam')).toBeTruthy();
+    expect(view.getByText('Responsable du foyer')).toBeTruthy();
+    expect(view.queryByText('OWNER')).toBeNull();
+  });
+
+  it('words a single-member household without a number', async () => {
+    (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([TWO_MEMBERS[0]]);
+    const view = await renderScreen(<ProfileScreen />);
+
+    await waitFor(() =>
+      expect(view.getByText('Pour l’instant, ce nid n’accueille que vous')).toBeTruthy(),
+    );
+  });
+
+  it.each([
+    ['ADMIN', 'Peut gérer le foyer'],
+    ['MEMBER', 'Membre du foyer'],
+  ] as const)('labels the %s role humanly', async (role, label) => {
+    mockHouseholds = [{ ...LE_NID, role }];
+    const view = await renderScreen(<ProfileScreen />);
+
+    await waitFor(() => expect(view.getByText(label)).toBeTruthy());
+  });
+
+  it('offers « Inviter quelqu’un » inside the household card to an owner, and opens the invitations', async () => {
+    const view = await renderScreen(<ProfileScreen />);
+    await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    await fireEvent.press(view.getByRole('button', { name: 'Inviter quelqu’un' }));
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/profile/invitations');
+  });
+
+  it('never offers to invite to a plain member', async () => {
+    mockHouseholds = [{ ...LE_NID, role: 'MEMBER' }];
+    const view = await renderScreen(<ProfileScreen />);
+    await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    expect(view.queryByRole('button', { name: 'Inviter quelqu’un' })).toBeNull();
   });
 
   it('shows an error message when the households list fails to load', async () => {

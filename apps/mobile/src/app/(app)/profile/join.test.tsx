@@ -37,6 +37,7 @@ jest.mock('../../../providers/HouseholdProvider', () => {
   return {
     useHousehold: () => ({
       householdId: React.useSyncExternalStore(mockSubscribeHousehold, () => mockHouseholdId),
+      households: [{ id: 'household-1', name: 'Le Nid', role: 'OWNER' }],
       selectHousehold: mockSelectHousehold,
     }),
   };
@@ -90,7 +91,12 @@ describe('JoinHouseholdScreen', () => {
   it('requires a code before calling the API', async () => {
     const view = await renderScreen(<JoinHouseholdScreen />);
 
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+    // Changer de foyer n'est ni anodin ni alarmant : le foyer actuel reste accessible.
+    expect(
+      view.getByText(/« Le Nid » reste accessible à tout moment depuis votre profil/),
+    ).toBeTruthy();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre ce foyer' }));
 
     await waitFor(() => expect(view.getByText("Le code d'invitation est requis.")).toBeTruthy());
     expect(accept()).not.toHaveBeenCalled();
@@ -106,7 +112,7 @@ describe('JoinHouseholdScreen', () => {
     const view = await renderScreen(<JoinHouseholdScreen />);
 
     await fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'ZZZZZZZZ');
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre ce foyer' }));
 
     await waitFor(() =>
       expect(view.getByText("Une erreur inattendue s'est produite.")).toBeTruthy(),
@@ -123,7 +129,7 @@ describe('JoinHouseholdScreen', () => {
     listHouseholds().mockResolvedValue([LE_NID, CHEZ_SAM]);
 
     await fireEvent.changeText(view.getByLabelText("Code d'invitation"), 'nid-7k4p-2q9d');
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre ce foyer' }));
 
     await waitFor(() => expect(mockRouterReplace).toHaveBeenCalledWith('/'));
     expect(accept()).toHaveBeenCalledWith('7K4P2Q9D');
@@ -147,7 +153,7 @@ describe('JoinHouseholdScreen', () => {
     const view = await renderScreen(<JoinHouseholdScreen />);
 
     await fireEvent.changeText(view.getByLabelText("Code d'invitation"), '7K4P2Q9D');
-    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Rejoindre ce foyer' }));
 
     await waitFor(() => expect(view.getByText('Encore un instant')).toBeTruthy());
     expect(view.getByText(/Vous avez bien rejoint « Chez Sam »/)).toBeTruthy();

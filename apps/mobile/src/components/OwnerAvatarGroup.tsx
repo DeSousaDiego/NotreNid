@@ -1,7 +1,7 @@
 import type { PublicUser } from '@notre-nid/shared';
 import { View } from 'react-native';
 
-import { useTheme } from '../theme';
+import { useTheme, type ColorToken } from '../theme';
 
 import { AppText } from './AppText';
 import { Avatar } from './Avatar';
@@ -9,44 +9,58 @@ import { Avatar } from './Avatar';
 export interface OwnerAvatarGroupProps {
   owners: PublicUser[];
   max?: number;
+  /** Diamètre de chaque avatar (28 par défaut, cartes d'objets). */
+  size?: number;
+  /** Couleur du liseré qui sépare les avatars superposés — celle du fond porteur. */
+  ringColor?: ColorToken;
+  /** Libellé accessible du groupe (« Propriétaires : … » par défaut). */
+  accessibilityLabel?: string;
 }
 
-const AVATAR_SIZE = 28;
+const DEFAULT_AVATAR_SIZE = 28;
 
 /** Avatars des propriétaires : jamais uniquement la position/couleur, toujours un libellé accessible. */
-export function OwnerAvatarGroup({ owners, max = 3 }: OwnerAvatarGroupProps) {
+export function OwnerAvatarGroup({
+  owners,
+  max = 3,
+  size = DEFAULT_AVATAR_SIZE,
+  ringColor = 'surface',
+  accessibilityLabel,
+}: OwnerAvatarGroupProps) {
   const theme = useTheme();
   const visible = owners.slice(0, max);
   const overflow = owners.length - visible.length;
-  const accessibilityLabel = `Propriétaires : ${owners.map((o) => o.displayName).join(', ')}`;
+  const label =
+    accessibilityLabel ?? `Propriétaires : ${owners.map((o) => o.displayName).join(', ')}`;
+  const overlap = -Math.round(size * 0.28);
 
   return (
-    <View accessibilityLabel={accessibilityLabel} style={{ flexDirection: 'row' }}>
+    <View accessibilityLabel={label} style={{ flexDirection: 'row' }}>
       {visible.map((owner, index) => (
         <View
           key={owner.id}
           style={{
             borderRadius: theme.radii.full,
             borderWidth: 2,
-            borderColor: theme.colors.surface,
-            marginLeft: index === 0 ? 0 : -8,
+            borderColor: theme.colors[ringColor],
+            marginLeft: index === 0 ? 0 : overlap,
           }}
         >
-          <Avatar displayName={owner.displayName} avatarUrl={owner.avatarUrl} size={AVATAR_SIZE} />
+          <Avatar displayName={owner.displayName} avatarUrl={owner.avatarUrl} size={size} />
         </View>
       ))}
       {overflow > 0 ? (
         <View
           style={{
-            width: AVATAR_SIZE,
-            height: AVATAR_SIZE,
+            width: size,
+            height: size,
             borderRadius: theme.radii.full,
             backgroundColor: theme.colors.border,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 2,
-            borderColor: theme.colors.surface,
-            marginLeft: -8,
+            borderColor: theme.colors[ringColor],
+            marginLeft: overlap,
           }}
         >
           <AppText variant="caption" color="text" style={{ fontSize: 11, lineHeight: 13 }}>
