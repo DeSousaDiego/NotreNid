@@ -191,7 +191,7 @@ describe('ProfileScreen', () => {
     const view = await renderScreen(<ProfileScreen />);
     await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
 
-    await fireEvent.press(view.getByRole('button', { name: 'Sauvegarder la collection en JSON' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Sauvegarde complète, fichier JSON' }));
     await waitFor(() => expect(mockApiClient.exports.json).toHaveBeenCalledWith('household-1'));
     await waitFor(() =>
       expect(mockShareExportFile).toHaveBeenCalledWith(
@@ -201,9 +201,7 @@ describe('ProfileScreen', () => {
       ),
     );
 
-    await fireEvent.press(
-      view.getByRole('button', { name: 'Sauvegarder la collection en tableur CSV' }),
-    );
+    await fireEvent.press(view.getByRole('button', { name: 'Exporter en tableur, fichier CSV' }));
     await waitFor(() => expect(mockApiClient.exports.csv).toHaveBeenCalledWith('household-1'));
     await waitFor(() =>
       expect(mockShareExportFile).toHaveBeenCalledWith('Le Nid', 'csv', 'id\nitem-1\n'),
@@ -213,6 +211,14 @@ describe('ProfileScreen', () => {
   it('logs out and logs out of all devices', async () => {
     const view = await renderScreen(<ProfileScreen />);
     await waitFor(() => expect(view.getByText('Le Nid')).toBeTruthy());
+
+    // Un vrai bloc de session : en-tête discret, deux actions, la seconde expliquée.
+    expect(view.getByRole('header', { name: 'Session' })).toBeTruthy();
+    expect(view.getByText('Ferme aussi les autres sessions actives')).toBeTruthy();
+    expect(
+      view.getByRole('button', { name: 'Se déconnecter de tous les appareils' }).props
+        .accessibilityHint,
+    ).toBe('Ferme aussi les autres sessions actives');
 
     await fireEvent.press(view.getByRole('button', { name: 'Se déconnecter' }));
     expect(mockLogout).toHaveBeenCalledTimes(1);

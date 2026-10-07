@@ -209,9 +209,28 @@ export default function MembersScreen() {
 
         <View style={{ marginTop: theme.spacing.lg, paddingHorizontal: theme.spacing.md }}>
           {isLastOwner ? (
-            <AppText variant="helper" color="textMuted">
-              Vous devez nommer un autre responsable avant de pouvoir quitter le foyer.
-            </AppText>
+            // Information secondaire, jamais une alerte : surface lin douce, pas de rouge.
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: theme.spacing.sm,
+                padding: theme.spacing.md,
+                borderRadius: theme.radii.md,
+                backgroundColor: theme.colors.tintLinen,
+              }}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={theme.iconSizes.md}
+                color={theme.colors.primary}
+                accessible={false}
+                importantForAccessibility="no"
+              />
+              <AppText variant="caption" color="text" style={{ flex: 1 }}>
+                Vous devez nommer un autre responsable avant de pouvoir quitter le foyer.
+              </AppText>
+            </View>
           ) : (
             <NavigationRow
               icon="exit-outline"

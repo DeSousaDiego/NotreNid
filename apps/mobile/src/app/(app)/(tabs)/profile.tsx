@@ -55,7 +55,14 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ gap: theme.spacing.xl, paddingBottom: tabBarClearance }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.md,
+            marginBottom: theme.spacing.xs,
+          }}
+        >
           <Avatar displayName={user?.displayName ?? ''} avatarUrl={user?.avatarUrl} size={48} />
           <View style={{ flex: 1 }}>
             <AppText variant="section" numberOfLines={1}>
@@ -69,25 +76,29 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Modifier mon profil"
             onPress={() => router.push('/(app)/profile/edit')}
-            hitSlop={4}
+            // Pastille visuellement légère (32 pt) : le `hitSlop` porte la zone tactile à 44 pt
+            // sans lui donner le poids visuel d'un bouton concurrent de la carte foyer.
+            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
             style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',
-              gap: theme.spacing.xs,
-              minHeight: 44,
-              paddingHorizontal: theme.spacing.md,
+              gap: 4,
+              minHeight: 32,
+              paddingHorizontal: theme.spacing.sm,
               borderRadius: theme.radii.full,
               borderWidth: 1,
               borderColor: theme.colors.border,
-              opacity: pressed ? 0.6 : 1,
+              backgroundColor: pressed ? theme.colors.tintSage : 'transparent',
             })}
           >
             <Ionicons
               name="create-outline"
               size={theme.iconSizes.sm}
               color={theme.colors.primary}
+              accessible={false}
+              importantForAccessibility="no"
             />
-            <AppText variant="label" color="primary">
+            <AppText variant="caption" color="primary">
               Modifier
             </AppText>
           </Pressable>
@@ -139,40 +150,46 @@ export default function ProfileScreen() {
             onPress={() => router.push('/(app)/profile/join')}
           />
           <NavigationRow
-            icon="download-outline"
-            label="Sauvegarder la collection"
-            description="Tableur (CSV)"
-            accessibilityLabel="Sauvegarder la collection en tableur CSV"
+            icon="grid-outline"
+            label="Exporter en tableur"
+            description="Fichier CSV"
+            accessibilityLabel="Exporter en tableur, fichier CSV"
             showChevron={false}
             loading={exportCollection.isPending}
             onPress={() => void handleExport('csv')}
           />
           <NavigationRow
-            icon="document-text-outline"
-            label="Sauvegarder la collection"
-            description="Fichier complet (JSON)"
-            accessibilityLabel="Sauvegarder la collection en JSON"
+            icon="cloud-download-outline"
+            label="Sauvegarde complète"
+            description="Fichier JSON, toutes les données"
+            accessibilityLabel="Sauvegarde complète, fichier JSON"
             showChevron={false}
             loading={exportCollection.isPending}
             onPress={() => void handleExport('json')}
           />
         </RowGroup>
 
-        {/* Hors de tout groupe, après un large espace : présente mais jamais dominante. */}
-        <View style={{ marginTop: theme.spacing.lg, paddingHorizontal: theme.spacing.md }}>
-          <NavigationRow
-            label="Se déconnecter"
-            icon="log-out-outline"
-            tone="danger"
-            showChevron={false}
-            onPress={() => void logout()}
-          />
-          <NavigationRow
-            label="Se déconnecter de tous les appareils"
-            tone="muted"
-            showChevron={false}
-            onPress={() => void logoutAllDevices()}
-          />
+        {/* Bloc de session, séparé par un espace plus généreux : présent mais jamais dominant.
+            Couleur `danger` réservée à l'icône et au texte ; le libellé reste le vrai signal. */}
+        <View style={{ marginTop: theme.spacing.md }}>
+          <RowGroup title="Session">
+            <NavigationRow
+              icon="log-out-outline"
+              label="Se déconnecter"
+              tone="danger"
+              showChevron={false}
+              onPress={() => void logout()}
+            />
+            <NavigationRow
+              icon="phone-portrait-outline"
+              label="Se déconnecter de tous les appareils"
+              description="Ferme aussi les autres sessions actives"
+              accessibilityHint="Ferme aussi les autres sessions actives"
+              tone="danger"
+              showChevron={false}
+              onPress={() => void logoutAllDevices()}
+            />
+          </RowGroup>
         </View>
       </ScrollView>
     </ScreenContainer>

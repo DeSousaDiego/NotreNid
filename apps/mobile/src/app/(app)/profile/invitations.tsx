@@ -147,14 +147,13 @@ export default function InvitationsScreen() {
 
   return (
     <ScreenContainer scroll edges={['top', 'left', 'right', 'bottom']}>
-      <View style={{ gap: theme.spacing.lg }}>
-        <View style={{ gap: theme.spacing.xs }}>
+      <View style={{ gap: theme.spacing.md }}>
+        <View style={{ gap: 2 }}>
           <AppText variant="title" color="primary" accessibilityRole="header">
             Inviter quelqu’un
           </AppText>
           <AppText variant="body" color="textMuted">
-            Générez un code à partager avec la personne que vous invitez — aucun email n’est
-            nécessaire.
+            Partagez un code avec la personne invitée, sans email.
           </AppText>
         </View>
 
@@ -234,7 +233,7 @@ export default function InvitationsScreen() {
             </View>
           </InvitationCard>
         ) : activeInvitation ? (
-          <InvitationCard>
+          <InvitationCard compact>
             <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
               <Ionicons
                 name="mail-open-outline"
@@ -243,11 +242,11 @@ export default function InvitationsScreen() {
                 accessible={false}
                 importantForAccessibility="no"
               />
-              <View style={{ flex: 1, gap: theme.spacing.xs }}>
+              <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="section" color="primary">
                   Un code est déjà actif
                 </AppText>
-                <AppText variant="body" color="textMuted">
+                <AppText variant="caption" color="textMuted">
                   Il n’est affichable qu’au moment de sa création. Valable jusqu’au{' '}
                   {formatExpiry(activeInvitation.expiresAt)}.
                 </AppText>
@@ -271,7 +270,7 @@ export default function InvitationsScreen() {
         {activeInvitation ? (
           <Button
             label="Désactiver ce code"
-            variant="ghost"
+            variant="dangerOutline"
             onPress={() => setConfirmRevoke(true)}
           />
         ) : null}
@@ -291,14 +290,15 @@ export default function InvitationsScreen() {
   );
 }
 
-/** Petit « carton d'invitation » : fond lin chaud, une pastille miel en coin. */
-function InvitationCard({ children }: { children: ReactNode }) {
+/** Petit « carton d'invitation » : fond lin chaud, une pastille miel en coin. `compact` :
+ * simple rappel (code déjà actif), moins haut que le carton d'un code tout juste créé. */
+function InvitationCard({ children, compact = false }: { children: ReactNode; compact?: boolean }) {
   const theme = useTheme();
   return (
     <View
       style={{
         gap: theme.spacing.md,
-        padding: theme.spacing.lg,
+        padding: compact ? theme.spacing.md : theme.spacing.lg,
         borderRadius: theme.radii.xl,
         backgroundColor: theme.colors.tintLinen,
         overflow: 'hidden',

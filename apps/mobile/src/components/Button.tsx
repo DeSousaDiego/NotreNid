@@ -4,7 +4,9 @@ import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+/** `dangerOutline` : action destructive secondaire (contour + texte `danger`, jamais un aplat) —
+ * pour une action qu'on veut identifiable comme destructive sans la rendre dominante. */
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline';
 
 export interface ButtonProps {
   label: string;
@@ -29,7 +31,11 @@ export function Button({
   const theme = useTheme();
   const isInteractive = !disabled && !loading;
 
+  const isOutline = variant === 'ghost' || variant === 'dangerOutline';
+
   const backgroundFor = (pressed: boolean): string => {
+    if (variant === 'dangerOutline')
+      return pressed ? withOpacity(theme.colors.danger, 0.08) : 'transparent';
     if (variant === 'ghost') return 'transparent';
     const base =
       variant === 'primary'
@@ -40,7 +46,12 @@ export function Button({
     return pressed ? withOpacity(base, 0.85) : base;
   };
 
-  const textColor = variant === 'ghost' ? theme.colors.primary : theme.colors.onPrimary;
+  const textColor =
+    variant === 'ghost'
+      ? theme.colors.primary
+      : variant === 'dangerOutline'
+        ? theme.colors.danger
+        : theme.colors.onPrimary;
 
   return (
     <Pressable
@@ -56,8 +67,11 @@ export function Button({
           borderRadius: theme.radii.md,
           paddingHorizontal: theme.spacing.lg,
           backgroundColor: backgroundFor(pressed),
-          borderWidth: variant === 'ghost' ? 1 : 0,
-          borderColor: theme.colors.border,
+          borderWidth: isOutline ? 1 : 0,
+          borderColor:
+            variant === 'dangerOutline'
+              ? withOpacity(theme.colors.danger, 0.45)
+              : theme.colors.border,
           opacity: disabled ? 0.5 : 1,
         },
         style,
