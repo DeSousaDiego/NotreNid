@@ -1,11 +1,41 @@
 import {
   BOOK_FIELDS,
   CD_FIELDS,
+  customMetadataDisplayRows,
   DVD_FIELDS,
   formatBookFormatLabel,
   humanizeMetadataKey,
   metadataDisplayRows,
 } from './metadataFields';
+
+describe('customMetadataDisplayRows', () => {
+  const schema = [
+    { key: 'players', label: 'Nombre de joueurs', type: 'number' as const },
+    { key: 'complete', label: 'Boîte complète', type: 'boolean' as const },
+  ];
+
+  it('uses schema labels and order, then humanized keys for fields outside the schema', () => {
+    expect(
+      customMetadataDisplayRows({ extra_info: 'x', complete: true, players: 4 }, schema),
+    ).toEqual([
+      { label: 'Nombre de joueurs', value: '4' },
+      { label: 'Boîte complète', value: 'Oui' },
+      { label: 'Extra info', value: 'x' },
+    ]);
+  });
+
+  it('renders booleans as Oui/Non and skips empty values', () => {
+    expect(customMetadataDisplayRows({ complete: false, players: null, note: '' }, schema)).toEqual(
+      [{ label: 'Boîte complète', value: 'Non' }],
+    );
+  });
+
+  it('falls back to humanized keys when the category has no schema', () => {
+    expect(customMetadataDisplayRows({ releaseFormat: '180g' }, null)).toEqual([
+      { label: 'Release format', value: '180g' },
+    ]);
+  });
+});
 
 describe('formatBookFormatLabel', () => {
   it('translates Hardcover to Relié', () => {

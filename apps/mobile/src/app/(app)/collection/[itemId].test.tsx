@@ -34,9 +34,15 @@ jest.mock('../../../providers/HouseholdProvider', () => ({
 }));
 
 const mockRouterPush = jest.fn();
+const mockStackScreen = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockRouterPush(...args) },
-  Stack: { Screen: (_props: { options?: { title?: string } }) => null },
+  Stack: {
+    Screen: (props: { options?: { title?: string } }) => {
+      mockStackScreen(props);
+      return null;
+    },
+  },
   useLocalSearchParams: () => ({ itemId: 'item-1' }),
 }));
 
@@ -236,7 +242,7 @@ describe('ItemDetailScreen', () => {
     );
   });
 
-  it('shows every owner', async () => {
+  it('names every owner in plain words, not only through avatars', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       owners: [ALIX, ELLIE],
@@ -244,7 +250,114 @@ describe('ItemDetailScreen', () => {
     const view = await renderScreen(<ItemDetailScreen />);
 
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
-    expect(view.getByLabelText('Propriétaires : Alix, Ellie')).toBeTruthy();
+    expect(view.getByText('À Alix et Ellie')).toBeTruthy();
+  });
+
+  it('names a single owner', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('À Alix')).toBeTruthy());
+  });
+
+  it('shows the creator and year right under the title, never repeated in the sections below', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      book: { ...BASE_ITEM.book, publicationYear: 1965, publisher: 'Robert Laffont' },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Frank Herbert · 1965')).toBeTruthy());
+    const texts = flattenText(view.toJSON());
+    expect(texts.indexOf('Dune')).toBeLessThan(texts.indexOf('Frank Herbert · 1965'));
+    expect(view.queryByText('Auteur')).toBeNull();
+    expect(view.queryByText('Année')).toBeNull();
+    expect(view.getByText('Éditeur')).toBeTruthy();
+  });
+
+  it('shows no credit line at all when neither creator nor year is known', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      book: { ...BASE_ITEM.book, author: null },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(view.queryByText(/·/)).toBeNull();
+  });
+
+  it('marks the item title as the screen heading and never sets it as the native header title', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByRole('header', { name: 'Dune' })).toBeTruthy());
+    expect(view.getAllByText('Dune')).toHaveLength(1);
+    expect(mockStackScreen).not.toHaveBeenCalledWith(
+      expect.objectContaining({ options: expect.objectContaining({ title: 'Dune' }) }),
+    );
+  });
+
+  it('shows personal notes in their own "Vos notes" block, before the identifiers', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      notes: 'Offert par mamie pour nos trois ans.',
+      barcode: '9782070368228',
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Vos notes')).toBeTruthy());
+    expect(view.getByRole('header', { name: 'Vos notes' })).toBeTruthy();
+    const texts = flattenText(view.toJSON());
+    expect(texts.indexOf('Offert par mamie pour nos trois ans.')).toBeLessThan(
+      texts.indexOf('Identifiants'),
+    );
+  });
+
+  it('shows no "Vos notes" block when the item has no notes', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(view.queryByText('Vos notes')).toBeNull();
+    expect(view.queryByTestId('personal-notes')).toBeNull();
+  });
+
+  it('groups ISBN, region and barcode under "Identifiants", apart from the edition details', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      barcode: '3333297000000',
+      book: null,
+      dvd: {
+        itemId: 'item-1',
+        director: 'Denis Villeneuve',
+        releaseYear: 2021,
+        edition: 'Collector',
+        region: '2',
+        format: 'Blu-ray',
+        durationMinutes: 155,
+      },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('À propos de cette édition')).toBeTruthy());
+    const texts = flattenText(view.toJSON());
+    const identifiers = texts.indexOf('Identifiants');
+    for (const label of ['Édition', 'Format', 'Durée', 'État']) {
+      expect(texts.indexOf(label)).toBeGreaterThan(texts.indexOf('À propos de cette édition'));
+      expect(texts.indexOf(label)).toBeLessThan(identifiers);
+    }
+    for (const label of ['Région', 'Code-barres']) {
+      expect(texts.indexOf(label)).toBeGreaterThan(identifiers);
+    }
+    expect(view.getByRole('header', { name: 'Identifiants' })).toBeTruthy();
+  });
+
+  it('shows no "Identifiants" section when the item has none', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(view.queryByText('Identifiants')).toBeNull();
   });
 
   it('shows the dvd format alongside the other technical details', async () => {
@@ -264,7 +377,8 @@ describe('ItemDetailScreen', () => {
     });
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByText('Réalisateur')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Denis Villeneuve · 2021')).toBeTruthy());
+    expect(view.queryByText('Réalisateur')).toBeNull();
     expect(view.getByText('Format')).toBeTruthy();
     expect(view.getByText('Blu-ray')).toBeTruthy();
   });
@@ -303,6 +417,7 @@ describe('ItemDetailScreen', () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       title: 'Discovery',
+      category: { ...BASE_ITEM.category, id: 'cat-cd', slug: 'cd', name: 'CD' },
       book: null,
       cd: {
         itemId: 'item-1',
@@ -314,8 +429,43 @@ describe('ItemDetailScreen', () => {
     });
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByText('Artiste')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Daft Punk · 2001')).toBeTruthy());
+    expect(view.queryByText('Artiste')).toBeNull();
     expect(view.queryByText('Album')).toBeNull();
+    expect(view.getByText('À propos de cet album')).toBeTruthy();
+  });
+
+  it('uses the category schema labels and order for custom metadata, with booleans as Oui/Non', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      category: {
+        ...BASE_ITEM.category,
+        slug: 'jeux',
+        name: 'Jeux',
+        isSystem: false,
+        metadataSchema: [
+          { key: 'players', label: 'Nombre de joueurs', type: 'number' },
+          { key: 'complete', label: 'Boîte complète', type: 'boolean' },
+          { key: 'cooperative', label: 'Coopératif', type: 'boolean' },
+        ],
+      },
+      book: null,
+      customMetadata: { cooperative: false, legacyNote: 'v2', complete: true, players: 4 },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('À propos de cet objet')).toBeTruthy());
+    expect(view.getByText('Oui')).toBeTruthy();
+    expect(view.getByText('Non')).toBeTruthy();
+    expect(view.queryByText('true')).toBeNull();
+    expect(view.queryByText('false')).toBeNull();
+
+    const texts = flattenText(view.toJSON());
+    const order = ['Nombre de joueurs', 'Boîte complète', 'Coopératif', 'Legacy note'].map(
+      (label) => texts.indexOf(label),
+    );
+    expect(order.every((index) => index !== -1)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
   it('humanizes customMetadata keys for a custom category (camelCase/snake_case), leaving values untouched', async () => {
@@ -340,7 +490,7 @@ describe('ItemDetailScreen', () => {
     const view = await renderScreen(<ItemDetailScreen />);
 
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
-    await fireEvent.press(view.getByLabelText('Modifier cet item'));
+    await fireEvent.press(view.getByLabelText('Modifier cet objet'));
 
     expect(mockRouterPush).toHaveBeenCalledWith({
       pathname: '/(app)/collection/edit/[itemId]',
@@ -348,37 +498,65 @@ describe('ItemDetailScreen', () => {
     });
   });
 
-  it('shows a second FAB to archive an active item, alongside Modifier', async () => {
-    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+  it('offers archiving as a discreet row at the end of the content, never as a second FAB', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      barcode: '9782070368228',
+    });
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByLabelText('Modifier cet item')).toBeTruthy());
-    expect(view.getByLabelText('Archiver cet item')).toBeTruthy();
-    expect(view.queryByLabelText('Restaurer cet item')).toBeNull();
+    await waitFor(() => expect(view.getByLabelText('Modifier cet objet')).toBeTruthy());
+    expect(view.getByRole('button', { name: 'Archiver cet objet' })).toBeTruthy();
+    expect(view.getByText('Vous pourrez le restaurer à tout moment.')).toBeTruthy();
+    expect(view.queryByLabelText(/cet item/)).toBeNull();
+
+    const texts = flattenText(view.toJSON());
+    expect(texts.indexOf('Archiver cet objet')).toBeGreaterThan(texts.indexOf('Code-barres'));
+    expect(texts.indexOf('Archiver cet objet')).toBeGreaterThan(
+      texts.findIndex((text) => text.startsWith('Ajouté par')),
+    );
   });
 
-  it('hides Modifier/Archiver and shows only Restaurer for an archived item', async () => {
+  it('shows an archived banner at the top with a labelled restore button, and no Modifier/Archiver', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       archivedAt: '2026-02-01T00:00:00.000Z',
     });
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
-    expect(view.queryByLabelText('Modifier cet item')).toBeNull();
-    expect(view.queryByLabelText('Archiver cet item')).toBeNull();
-    expect(view.getByLabelText('Restaurer cet item')).toBeTruthy();
+    await waitFor(() =>
+      expect(view.getByText('Cet objet est rangé dans les archives.')).toBeTruthy(),
+    );
+    expect(view.getByRole('button', { name: 'Remettre dans la collection' })).toBeTruthy();
+    expect(view.queryByLabelText('Modifier cet objet')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Archiver cet objet' })).toBeNull();
+
+    const texts = flattenText(view.toJSON());
+    expect(texts.indexOf('Cet objet est rangé dans les archives.')).toBeLessThan(
+      texts.indexOf('Dune'),
+    );
   });
 
-  it('archives the item from its own FAB after confirmation', async () => {
+  it('shows no archived banner for an active item', async () => {
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(view.queryByTestId('archived-banner')).toBeNull();
+  });
+
+  it('archives the item from its row after confirmation', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue(BASE_ITEM);
     (mockApiClient.items.archive as jest.Mock).mockResolvedValue(undefined);
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByLabelText('Archiver cet item')).toBeTruthy());
-    await fireEvent.press(view.getByLabelText('Archiver cet item'));
+    await waitFor(() =>
+      expect(view.getByRole('button', { name: 'Archiver cet objet' })).toBeTruthy(),
+    );
+    await fireEvent.press(view.getByRole('button', { name: 'Archiver cet objet' }));
 
     await waitFor(() => expect(view.getByText('Archiver cet objet ?')).toBeTruthy());
+    expect(mockApiClient.items.archive).not.toHaveBeenCalled();
     await fireEvent.press(view.getByRole('button', { name: 'Archiver' }));
 
     await waitFor(() =>
@@ -386,7 +564,7 @@ describe('ItemDetailScreen', () => {
     );
   });
 
-  it('restores an archived item from its FAB, without a confirmation step (same as before)', async () => {
+  it('restores an archived item from the banner button, without a confirmation step (same as before)', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       archivedAt: '2026-02-01T00:00:00.000Z',
@@ -394,15 +572,17 @@ describe('ItemDetailScreen', () => {
     (mockApiClient.items.restore as jest.Mock).mockResolvedValue(undefined);
     const view = await renderScreen(<ItemDetailScreen />);
 
-    await waitFor(() => expect(view.getByLabelText('Restaurer cet item')).toBeTruthy());
-    await fireEvent.press(view.getByLabelText('Restaurer cet item'));
+    await waitFor(() =>
+      expect(view.getByRole('button', { name: 'Remettre dans la collection' })).toBeTruthy(),
+    );
+    await fireEvent.press(view.getByRole('button', { name: 'Remettre dans la collection' }));
 
     await waitFor(() =>
       expect(mockApiClient.items.restore).toHaveBeenCalledWith('household-1', 'item-1'),
     );
   });
 
-  it('orders book metadata rows exactly as the form does (ISBN right after Auteur, before Éditeur)', async () => {
+  it('keeps the form order for book details (Éditeur, Langue, Pages, Format) and puts the ISBN under Identifiants', async () => {
     (mockApiClient.items.get as jest.Mock).mockResolvedValue({
       ...BASE_ITEM,
       book: {
@@ -417,12 +597,19 @@ describe('ItemDetailScreen', () => {
       },
     });
     const view = await renderScreen(<ItemDetailScreen />);
-    await waitFor(() => expect(view.getByText('Auteur')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Frank Herbert · 1965')).toBeTruthy());
 
     const texts = flattenText(view.toJSON());
-    const order = ['Auteur', 'ISBN', 'Éditeur', 'Année', 'Langue', 'Pages', 'Format'].map((label) =>
-      texts.indexOf(label),
-    );
+    const order = [
+      'À propos de cette édition',
+      'Éditeur',
+      'Langue',
+      'Pages',
+      'Format',
+      'État',
+      'Identifiants',
+      'ISBN',
+    ].map((label) => texts.indexOf(label));
     expect(order.every((index) => index !== -1)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });

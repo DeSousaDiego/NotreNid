@@ -1,4 +1,4 @@
-import type { BookMetadata, CdMetadata, DvdMetadata } from '@notre-nid/shared';
+import type { BookMetadata, CategoryFieldSchema, CdMetadata, DvdMetadata } from '@notre-nid/shared';
 
 export interface MetadataFieldConfig {
   key:
@@ -161,6 +161,42 @@ export function humanizeMetadataKey(key: string): string {
     .trim();
   if (!words) return key;
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function formatCustomMetadataValue(value: unknown): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return value ? 'Oui' : 'Non';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * Lignes d'affichage des `customMetadata` d'une catégorie personnalisée : libellé
+ * et ordre du `metadataSchema` de la catégorie quand il décrit le champ, puis les
+ * clés hors schéma (données plus anciennes que le schéma, par exemple) avec
+ * `humanizeMetadataKey` en repli. Booléens en « Oui »/« Non » ; valeurs vides
+ * ignorées, comme pour les champs natifs.
+ */
+export function customMetadataDisplayRows(
+  customMetadata: Record<string, unknown>,
+  schema: CategoryFieldSchema[] | null | undefined,
+): MetadataDisplayRow[] {
+  const rows: MetadataDisplayRow[] = [];
+  const describedKeys = new Set<string>();
+
+  for (const field of schema ?? []) {
+    describedKeys.add(field.key);
+    const value = formatCustomMetadataValue(customMetadata[field.key]);
+    if (value !== null) rows.push({ label: field.label || humanizeMetadataKey(field.key), value });
+  }
+
+  for (const [key, raw] of Object.entries(customMetadata)) {
+    if (describedKeys.has(key)) continue;
+    const value = formatCustomMetadataValue(raw);
+    if (value !== null) rows.push({ label: humanizeMetadataKey(key), value });
+  }
+
+  return rows;
 }
 
 /**
