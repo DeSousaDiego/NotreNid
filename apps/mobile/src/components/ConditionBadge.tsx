@@ -22,6 +22,7 @@ export function ConditionBadge({ condition }: ConditionBadgeProps) {
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
+        maxWidth: '100%',
         gap: theme.spacing.xs,
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: 4,
@@ -39,7 +40,7 @@ export function ConditionBadge({ condition }: ConditionBadgeProps) {
           backgroundColor: theme.colors[info.color],
         }}
       />
-      <AppText variant="caption" color="text">
+      <AppText variant="caption" color="text" style={{ flexShrink: 1 }}>
         {info.label}
       </AppText>
     </View>

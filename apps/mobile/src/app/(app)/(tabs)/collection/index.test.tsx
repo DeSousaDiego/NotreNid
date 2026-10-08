@@ -157,6 +157,50 @@ describe('CollectionScreen — loading and error states', () => {
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
     expect(listMock()).toHaveBeenCalledTimes(2);
   });
+
+  it('keeps the loaded items on screen when a pull-to-refresh fails — never swaps them for the error state', async () => {
+    listMock()
+      .mockResolvedValueOnce(page([ITEM]))
+      .mockRejectedValueOnce(new Error('network down'));
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    await fireEvent(view.getByTestId('collection-item-list'), 'refresh');
+
+    await waitFor(() => expect(listMock()).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(view.getByTestId('collection-item-list').props.refreshing).toBe(false),
+    );
+    expect(view.getByText('Dune')).toBeTruthy();
+    expect(view.queryByText("Une erreur inattendue s'est produite.")).toBeNull();
+    expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
+  });
+
+  it('keeps page 1 on screen when fetching page 2 fails, and lets a later endReached retry it', async () => {
+    let page2Attempts = 0;
+    listMock().mockImplementation((_householdId: string, params: { page?: number }) => {
+      if (params.page === 2) {
+        page2Attempts += 1;
+        return page2Attempts === 1
+          ? Promise.reject(new Error('network down'))
+          : Promise.resolve(page([ITEM_2], { page: 2, totalPages: 2 }));
+      }
+      return Promise.resolve(page([ITEM], { page: 1, totalPages: 2 }));
+    });
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    await fireEvent(view.getByTestId('collection-item-list'), 'endReached');
+    await waitFor(() => expect(page2Attempts).toBe(1));
+    await waitFor(() => expect(view.queryByTestId('collection-pagination-spinner')).toBeNull());
+
+    expect(view.getByText('Dune')).toBeTruthy();
+    expect(view.queryByText("Une erreur inattendue s'est produite.")).toBeNull();
+
+    await fireEvent(view.getByTestId('collection-item-list'), 'endReached');
+    await waitFor(() => expect(view.getByText('Dune 2')).toBeTruthy());
+    expect(page2Attempts).toBe(2);
+  });
 });
 
 describe('CollectionScreen — empty states', () => {

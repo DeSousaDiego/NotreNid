@@ -21,7 +21,7 @@ import {
 } from '../../../components';
 import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations';
 import { useItem } from '../../../hooks/useItem';
-import { getErrorMessage } from '../../../lib/errorMessage';
+import { getErrorMessage, isNotFoundError } from '../../../lib/errorMessage';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import {
   BOOK_FIELDS,
@@ -87,14 +87,25 @@ export default function ItemDetailScreen() {
     );
   }
 
-  if (itemQuery.isError || !itemQuery.data) {
+  // Données d'abord : un refetch en échec (TanStack Query v5 conserve `data`) ne
+  // remplace jamais une fiche déjà affichée par un écran d'erreur. Sans donnée,
+  // seul un vrai 404 de l'API signifie « introuvable » : une panne réseau ou
+  // serveur garde le message générique et « Réessayer ».
+  if (!itemQuery.data) {
+    const notFound = !itemQuery.error || isNotFoundError(itemQuery.error);
     return (
       <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
-        <ErrorState
-          title="Objet introuvable"
-          message={itemQuery.error ? getErrorMessage(itemQuery.error) : "Cet objet n'existe pas."}
-          onRetry={() => void itemQuery.refetch()}
-        />
+        {notFound ? (
+          <ErrorState
+            title="Objet introuvable"
+            message="Cet objet n’existe pas ou n’est plus accessible depuis ce foyer."
+          />
+        ) : (
+          <ErrorState
+            message={getErrorMessage(itemQuery.error)}
+            onRetry={() => void itemQuery.refetch()}
+          />
+        )}
       </ScreenContainer>
     );
   }
@@ -270,7 +281,7 @@ function InfoRow({
         borderBottomColor: theme.colors.border,
       }}
     >
-      <AppText variant="label" color="textMuted">
+      <AppText variant="label" color="textMuted" style={{ flexShrink: 1 }}>
         {label}
       </AppText>
       {children}
@@ -370,16 +381,23 @@ function MetadataSection({ item }: { item: NonNullable<ReturnType<typeof useItem
             key={row.label}
             style={{
               flexDirection: 'row',
-              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              gap: theme.spacing.md,
               paddingVertical: theme.spacing.xs,
               borderBottomWidth: index === rows.length - 1 ? 0 : 1,
               borderBottomColor: theme.colors.border,
             }}
           >
-            <AppText variant="body" color="textMuted">
+            {/* `flexShrink` vaut 0 par défaut en React Native : sans ces contraintes,
+                une valeur longue (édition, éditeur, texte agrandi) sortait de l'écran
+                au lieu de passer à la ligne. Le label garde au plus 40 % de la
+                largeur, la valeur occupe le reste, toujours alignée à droite. */}
+            <AppText variant="body" color="textMuted" style={{ flexShrink: 1, maxWidth: '40%' }}>
               {row.label}
             </AppText>
-            <AppText variant="body">{row.value}</AppText>
+            <AppText variant="body" style={{ flex: 1, textAlign: 'right' }}>
+              {row.value}
+            </AppText>
           </View>
         ))}
       </View>

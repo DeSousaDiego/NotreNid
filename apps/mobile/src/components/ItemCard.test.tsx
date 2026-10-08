@@ -44,6 +44,18 @@ describe('ItemCard', () => {
     expect(view.queryByLabelText(/Note :/)).toBeNull();
   });
 
+  it('laisse la rangée de badges passer à la ligne, sans retirer aucun badge', async () => {
+    const item = mockItem();
+    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
+
+    const badges = view.getByTestId('item-card-badges');
+    expect([badges.props.style].flat()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ flexDirection: 'row', flexWrap: 'wrap' })]),
+    );
+    expect(view.getByLabelText(`Catégorie : ${item.category.name}`)).toBeTruthy();
+    expect(view.getByLabelText(/^État : /)).toBeTruthy();
+  });
+
   it('expose un accessibilityLabel enrichi sur le Pressable, jamais seulement titre + catégorie', async () => {
     const item = mockItem({ rating: 4 });
     const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);

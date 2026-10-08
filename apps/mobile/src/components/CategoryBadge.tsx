@@ -25,6 +25,9 @@ export function CategoryBadge({ name, slug }: CategoryBadgeProps) {
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'flex-start',
+        // Un badge seul plus large que son conteneur (nom long, texte agrandi) se
+        // limite à la largeur disponible et son libellé passe à la ligne.
+        maxWidth: '100%',
         gap: theme.spacing.xs,
         paddingHorizontal: theme.spacing.sm,
         paddingVertical: 4,
@@ -35,7 +38,7 @@ export function CategoryBadge({ name, slug }: CategoryBadgeProps) {
       }}
     >
       <CategoryIllustration slug={slug} size={ILLUSTRATION_SIZE} />
-      <AppText variant="caption" color="primary">
+      <AppText variant="caption" color="primary" style={{ flexShrink: 1 }}>
         {name}
       </AppText>
     </View>

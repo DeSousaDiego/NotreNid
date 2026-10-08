@@ -88,7 +88,12 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
             {subtitle}
           </AppText>
         ) : null}
-        <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginTop: 4 }}>
+        {/* `flexWrap` : avec un texte agrandi ou un nom de catégorie long, le second
+            badge passe à la ligne au lieu de déborder de la carte. */}
+        <View
+          testID="item-card-badges"
+          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs, marginTop: 4 }}
+        >
           <CategoryBadge name={item.category.name} slug={item.category.slug} />
           <ConditionBadge condition={item.condition} />
         </View>

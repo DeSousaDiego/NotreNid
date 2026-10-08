@@ -1,5 +1,6 @@
+import { ApiError, NetworkError } from '@notre-nid/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import { ToastProvider } from '../../../components';
@@ -119,8 +120,10 @@ function flattenText(node: unknown): string[] {
   return [];
 }
 
-function renderScreen(ui: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderScreen(
+  ui: ReactElement,
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider fontsLoaded={false}>
@@ -441,5 +444,111 @@ describe('ItemDetailScreen', () => {
 
     const texts = flattenText(withBarcode.toJSON());
     expect(texts.indexOf('Format')).toBeLessThan(texts.indexOf('Code-barres'));
+  });
+
+  it('lets a long metadata value wrap within the row instead of pushing it off screen', async () => {
+    const longEdition = 'Édition collector 2 DVD + livret illustré de 64 pages';
+    (mockApiClient.items.get as jest.Mock).mockResolvedValue({
+      ...BASE_ITEM,
+      book: null,
+      dvd: {
+        itemId: 'item-1',
+        director: 'Denis Villeneuve',
+        releaseYear: null,
+        edition: longEdition,
+        region: null,
+        format: null,
+        durationMinutes: null,
+      },
+    });
+    const view = await renderScreen(<ItemDetailScreen />);
+    await waitFor(() => expect(view.getByText(longEdition)).toBeTruthy());
+
+    const flatStyle = (node: { props: { style?: unknown } }) =>
+      Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean));
+
+    // La valeur prend l'espace restant (et peut donc passer à la ligne) ; le label,
+    // borné en largeur, ne peut plus la repousser hors de la ligne.
+    expect(flatStyle(view.getByText(longEdition))).toEqual(
+      expect.objectContaining({ flex: 1, textAlign: 'right' }),
+    );
+    expect(flatStyle(view.getByText('Édition'))).toEqual(
+      expect.objectContaining({ flexShrink: 1, maxWidth: '40%' }),
+    );
+    // Ni `numberOfLines` ni troncature : la valeur reste lisible en entier.
+    expect(view.getByText(longEdition).props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe('ItemDetailScreen — error states', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows "Objet introuvable" without a retry for a genuine 404', async () => {
+    (mockApiClient.items.get as jest.Mock).mockRejectedValue(
+      new ApiError({
+        statusCode: 404,
+        code: 'NOT_FOUND',
+        message: "Cet item n'existe pas.",
+        details: [],
+      }),
+    );
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByText('Objet introuvable')).toBeTruthy());
+    expect(
+      view.getByText('Cet objet n’existe pas ou n’est plus accessible depuis ce foyer.'),
+    ).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
+  });
+
+  it('shows the generic network message with a retry, never "Objet introuvable", when the API is unreachable', async () => {
+    (mockApiClient.items.get as jest.Mock)
+      .mockRejectedValueOnce(new NetworkError())
+      .mockResolvedValueOnce(BASE_ITEM);
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() =>
+      expect(
+        view.getByText('Impossible de joindre le service. Vérifiez votre connexion et réessayez.'),
+      ).toBeTruthy(),
+    );
+    expect(view.queryByText('Objet introuvable')).toBeNull();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Réessayer' }));
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+  });
+
+  it('treats a server error as retryable, not as a missing item', async () => {
+    (mockApiClient.items.get as jest.Mock).mockRejectedValue(
+      new ApiError({
+        statusCode: 500,
+        code: 'INTERNAL_ERROR',
+        message: 'Erreur interne.',
+        details: [],
+      }),
+    );
+    const view = await renderScreen(<ItemDetailScreen />);
+
+    await waitFor(() => expect(view.getByRole('button', { name: 'Réessayer' })).toBeTruthy());
+    expect(view.queryByText('Objet introuvable')).toBeNull();
+  });
+
+  it('keeps the item on screen when a background refetch fails', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    (mockApiClient.items.get as jest.Mock)
+      .mockResolvedValueOnce(BASE_ITEM)
+      .mockRejectedValueOnce(new NetworkError());
+    const view = await renderScreen(<ItemDetailScreen />, queryClient);
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+
+    expect(mockApiClient.items.get).toHaveBeenCalledTimes(2);
+    expect(view.getByText('Dune')).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Réessayer' })).toBeNull();
   });
 });

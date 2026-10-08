@@ -18,3 +18,9 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof SharingUnavailableError) return error.message;
   return "Une erreur inattendue s'est produite.";
 }
+
+/** Vrai 404 renvoyé par l'API (ressource absente ou hors du foyer courant) — jamais
+ * une erreur réseau ni une panne serveur, qui doivent rester « réessayables ». */
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof ApiError && error.statusCode === 404;
+}

@@ -98,7 +98,11 @@ export default function CollectionScreen() {
             <ItemCardSkeleton key={key} />
           ))}
         </View>
-      ) : itemsQuery.isError ? (
+      ) : itemsQuery.isError && !itemsQuery.data ? (
+        // Données d'abord (même règle qu'Accueil/Archives) : un pull-to-refresh ou un
+        // `fetchNextPage` en échec passe la query en erreur (TanStack Query v5) tout en
+        // conservant les pages déjà chargées — elles restent affichées. L'écran
+        // d'erreur ne remplace la liste que si rien n'a jamais pu être chargé.
         <ErrorState
           message={getErrorMessage(itemsQuery.error)}
           onRetry={() => void itemsQuery.refetch()}
