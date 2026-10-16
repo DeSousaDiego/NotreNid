@@ -25,21 +25,24 @@ export function creditLineForItem(item: Item): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-const MAX_NAMED_OWNERS = 3;
-
 /**
  * Propriétaires en toutes lettres : « À Julie », « À Julie et Diego »,
- * « À Julie, Diego et Sam », au-delà « À Julie, Diego et 2 autres ». `null` si la
- * liste est vide (un item a toujours au moins un propriétaire côté API, mais un
- * compte supprimé ne doit jamais produire « À  »).
+ * « À Julie, Diego et Sam ». Au-delà de `maxNamed` prénoms (3 par défaut, fiche
+ * détail ; 2 sur une carte de liste), les derniers sont résumés : « À Julie,
+ * Diego et 2 autres » / « À Julie et 2 autres ». `null` si la liste est vide (un
+ * item a toujours au moins un propriétaire côté API, mais un compte supprimé ne
+ * doit jamais produire « À  »).
  */
-export function ownersPhrase(owners: Pick<PublicUser, 'displayName'>[]): string | null {
+export function ownersPhrase(
+  owners: Pick<PublicUser, 'displayName'>[],
+  { maxNamed = 3 }: { maxNamed?: number } = {},
+): string | null {
   const names = owners.map((owner) => owner.displayName.trim()).filter(Boolean);
   if (names.length === 0) return null;
   if (names.length === 1) return `À ${names[0]}`;
-  if (names.length <= MAX_NAMED_OWNERS) {
+  if (names.length <= maxNamed) {
     return `À ${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
   }
-  const others = names.length - (MAX_NAMED_OWNERS - 1);
-  return `À ${names.slice(0, MAX_NAMED_OWNERS - 1).join(', ')} et ${others} autres`;
+  const shown = Math.max(maxNamed - 1, 1);
+  return `À ${names.slice(0, shown).join(', ')} et ${names.length - shown} autres`;
 }

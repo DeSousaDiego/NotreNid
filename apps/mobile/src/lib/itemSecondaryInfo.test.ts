@@ -41,6 +41,14 @@ describe('ownersPhrase', () => {
     ).toBe('À Julie, Diego et 3 autres');
   });
 
+  it('keeps a compact list card line to two names at most', () => {
+    const three = [owner('Julie'), owner('Diego'), owner('Sam')];
+    expect(ownersPhrase(three, { maxNamed: 2 })).toBe('À Julie et 2 autres');
+    expect(ownersPhrase([owner('Julie'), owner('Diego')], { maxNamed: 2 })).toBe(
+      'À Julie et Diego',
+    );
+  });
+
   it('returns null rather than a dangling « À » when no named owner remains', () => {
     expect(ownersPhrase([])).toBeNull();
     expect(ownersPhrase([owner('  ')])).toBeNull();

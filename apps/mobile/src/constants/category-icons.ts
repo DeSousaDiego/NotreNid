@@ -26,6 +26,12 @@ export function getCategoryTint(slug: string): ColorToken {
   return TINTS_BY_SLUG[slug] ?? 'surface';
 }
 
+/** Fond d'une couverture (miniature ou grande) : teinte de catégorie, lin pour une
+ * catégorie personnalisée — jamais le `surface` quasi invisible sur le fond crème. */
+export function getCategoryCoverTint(slug: string): ColorToken {
+  return TINTS_BY_SLUG[slug] ?? 'tintLinen';
+}
+
 export function getCategoryIcon(slug: string): IconName {
   return ICONS_BY_SLUG[slug] ?? DEFAULT_ICON;
 }

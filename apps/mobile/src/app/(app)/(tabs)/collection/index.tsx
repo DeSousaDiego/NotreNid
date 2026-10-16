@@ -1,8 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native';
 
 import {
+  AppText,
   Chip,
   EmptyState,
   ErrorState,
@@ -12,9 +14,11 @@ import {
   ScreenContainer,
   SearchField,
 } from '../../../../components';
+import { CONDITION_INFO } from '../../../../constants/condition';
 import { useCategories } from '../../../../hooks/useCategories';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useItems } from '../../../../hooks/useItems';
+import { useMembers } from '../../../../hooks/useMembers';
 import { useTabBarClearance } from '../../../../hooks/useTabBarClearance';
 import { getErrorMessage } from '../../../../lib/errorMessage';
 import { useCollectionFilters } from '../../../../providers/CollectionFiltersProvider';
@@ -27,6 +31,7 @@ export default function CollectionScreen() {
   const { filters: activeFilters, setFilters: setActiveFilters } = useCollectionFilters();
   const categoriesQuery = useCategories(householdId);
   const categories = (categoriesQuery.data ?? []).filter((category) => category.isSystem);
+  const membersQuery = useMembers(householdId);
   const tabBarClearance = useTabBarClearance();
 
   const [search, setSearch] = useState('');
@@ -49,11 +54,41 @@ export default function CollectionScreen() {
   const isFetchingNextPageRef = useRef(false);
 
   const items = itemsQuery.data?.pages.flatMap((page) => page.data) ?? [];
-  const activeFilterCount = [
-    activeFilters.categoryId,
-    activeFilters.condition,
-    activeFilters.ownerId,
-  ].filter(Boolean).length;
+
+  // Filtres choisis dans l'écran Filtres et invisibles autrement : propriétaire,
+  // état, et une catégorie absente des chips rapides (catégorie personnalisée).
+  // Une catégorie système sélectionnée est déjà visible (chip active) : ni pastille
+  // ni badge pour elle.
+  const pills: { key: string; label: string; onRemove: () => void }[] = [];
+  const { categoryId } = activeFilters;
+  if (categoryId && !categories.some((c) => c.id === categoryId)) {
+    pills.push({
+      key: 'category',
+      label: categoriesQuery.data?.find((c) => c.id === categoryId)?.name ?? 'Catégorie',
+      onRemove: () => setActiveFilters({ ...activeFilters, categoryId: undefined }),
+    });
+  }
+  if (activeFilters.ownerId) {
+    const owner = membersQuery.data?.find((m) => m.user.id === activeFilters.ownerId);
+    pills.push({
+      key: 'owner',
+      label: owner ? `À ${owner.user.displayName}` : 'Un propriétaire',
+      onRemove: () => setActiveFilters({ ...activeFilters, ownerId: undefined }),
+    });
+  }
+  if (activeFilters.condition) {
+    pills.push({
+      key: 'condition',
+      label: CONDITION_INFO[activeFilters.condition].label,
+      onRemove: () => setActiveFilters({ ...activeFilters, condition: undefined }),
+    });
+  }
+  const activeFilterCount = pills.length;
+  // Distinct du badge : une catégorie choisie par chip rapide restreint bien la liste
+  // (« aucun résultat » plutôt que « nid vide »), même si le badge ne la compte pas.
+  const isNarrowed = Boolean(
+    filters.search || activeFilters.categoryId || activeFilters.ownerId || activeFilters.condition,
+  );
 
   return (
     <ScreenContainer edges={['left', 'right']}>
@@ -90,6 +125,17 @@ export default function CollectionScreen() {
             />
           ))}
         </ScrollView>
+
+        {pills.length > 0 ? (
+          <View
+            testID="collection-active-filters"
+            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}
+          >
+            {pills.map((pill) => (
+              <ActiveFilterPill key={pill.key} label={pill.label} onRemove={pill.onRemove} />
+            ))}
+          </View>
+        ) : null}
       </View>
 
       {itemsQuery.isLoading ? (
@@ -116,12 +162,12 @@ export default function CollectionScreen() {
         <EmptyState
           icon="leaf-outline"
           title={
-            filters.search || activeFilterCount > 0
+            isNarrowed
               ? 'Aucun objet ne correspond à votre recherche.'
               : 'Votre nid est encore vide.'
           }
           message={
-            filters.search || activeFilterCount > 0
+            isNarrowed
               ? 'Essayez de modifier votre recherche ou vos filtres.'
               : 'Ajoutez votre premier trésor.'
           }
@@ -162,5 +208,37 @@ export default function CollectionScreen() {
         />
       )}
     </ScreenContainer>
+  );
+}
+
+/** Pastille sauge d'un filtre actif, retirable d'un tap (zone tactile portée à
+ * 44 pt par `hitSlop` sans alourdir la pastille). */
+function ActiveFilterPill({ label, onRemove }: { label: string; onRemove: () => void }) {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Retirer le filtre : ${label}`}
+      onPress={onRemove}
+      hitSlop={{ top: 6, bottom: 6 }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        maxWidth: '100%',
+        minHeight: 32,
+        paddingLeft: theme.spacing.md,
+        paddingRight: theme.spacing.sm,
+        borderRadius: theme.radii.full,
+        backgroundColor: theme.colors.tintSage,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <AppText variant="label" color="primary" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {label}
+      </AppText>
+      <Ionicons name="close" size={theme.iconSizes.sm} color={theme.colors.primary} />
+    </Pressable>
   );
 }

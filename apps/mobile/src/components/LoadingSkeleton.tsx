@@ -56,10 +56,9 @@ export function LoadingSkeleton({
 }
 
 /**
- * Squelette d'une carte de collection (voir ItemCard) : quatre bandes reprenant
- * l'empilement réel (titre, info secondaire, badges, propriétaires) plutôt que
- * trois barres génériques — réduit le saut visuel au chargement sans reproduire
- * chaque détail (pas de forme par badge/avatar, juste le bon nombre de lignes).
+ * Squelette d'une carte de collection (voir ItemCard) : même surface, même
+ * miniature portrait 48×64, et les trois lignes réelles (titre, créateur · année,
+ * propriétaires) — pas de forme par avatar, juste les bonnes proportions.
  */
 export function ItemCardSkeleton() {
   const theme = useTheme();
@@ -67,28 +66,18 @@ export function ItemCardSkeleton() {
     <View
       style={{
         flexDirection: 'row',
+        alignItems: 'center',
         gap: theme.spacing.md,
         padding: theme.spacing.md,
-        borderRadius: theme.radii.md,
+        borderRadius: theme.radii.lg,
         backgroundColor: theme.colors.surface,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
       }}
     >
-      <LoadingSkeleton width={56} height={56} radius={theme.radii.sm} />
-      <View style={{ flex: 1, gap: 4 }}>
-        <LoadingSkeleton width="70%" height={16} />
-        <LoadingSkeleton width="40%" height={12} />
-        <View style={{ flexDirection: 'row', gap: theme.spacing.xs, marginTop: 4 }}>
-          <LoadingSkeleton width={64} height={22} radius={theme.radii.sm} />
-          <LoadingSkeleton width={56} height={22} radius={theme.radii.sm} />
-        </View>
-        <LoadingSkeleton
-          width={72}
-          height={20}
-          radius={theme.radii.full}
-          style={{ marginTop: 4 }}
-        />
+      <LoadingSkeleton width={48} height={64} radius={theme.radii.sm} />
+      <View style={{ flex: 1, gap: 6 }}>
+        <LoadingSkeleton width="70%" height={18} />
+        <LoadingSkeleton width="45%" height={12} />
+        <LoadingSkeleton width="35%" height={16} radius={theme.radii.full} />
       </View>
     </View>
   );

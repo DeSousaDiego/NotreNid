@@ -1,7 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { useEffect } from 'react';
 
-import { CollectionFiltersProvider } from '../../../../providers/CollectionFiltersProvider';
+import {
+  CollectionFiltersProvider,
+  DEFAULT_COLLECTION_FILTERS,
+  useCollectionFilters,
+  type CollectionFiltersState,
+} from '../../../../providers/CollectionFiltersProvider';
 import { ThemeProvider } from '../../../../theme';
 
 import CollectionScreen from './index';
@@ -24,7 +30,19 @@ jest.mock('expo-router', () => ({
 const mockApiClient = {
   categories: { list: jest.fn() },
   items: { list: jest.fn() },
+  households: { listMembers: jest.fn() },
 } as unknown as import('@notre-nid/api-client').ApiClient;
+
+/** Simule des filtres déjà appliqués depuis l'écran Filtres (état partagé du provider). */
+function PresetFilters({ filters }: { filters: Partial<CollectionFiltersState> }) {
+  const { setFilters } = useCollectionFilters();
+  // `filters` est créé une seule fois par `renderScreen` et `setFilters` est stable :
+  // l'effet ne s'exécute qu'au montage.
+  useEffect(() => {
+    setFilters({ ...DEFAULT_COLLECTION_FILTERS, ...filters });
+  }, [filters, setFilters]);
+  return null;
+}
 
 jest.mock('../../../../providers/AuthProvider', () => ({
   useApiClient: () => mockApiClient,
@@ -102,12 +120,13 @@ function page(data: unknown[], meta?: Partial<{ page: number; totalPages: number
   };
 }
 
-function renderScreen() {
+function renderScreen(presetFilters?: Partial<CollectionFiltersState>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider fontsLoaded={false}>
         <CollectionFiltersProvider>
+          {presetFilters ? <PresetFilters filters={presetFilters} /> : null}
           <CollectionScreen />
         </CollectionFiltersProvider>
       </ThemeProvider>
@@ -123,6 +142,9 @@ function listMock(): ListMock {
 beforeEach(() => {
   jest.clearAllMocks();
   (mockApiClient.categories.list as jest.Mock).mockResolvedValue([BOOK_CATEGORY]);
+  (mockApiClient.households.listMembers as jest.Mock).mockResolvedValue([
+    { id: 'member-1', role: 'OWNER', joinedAt: '2026-01-01T00:00:00.000Z', user: PUBLIC_USER },
+  ]);
 });
 
 describe('CollectionScreen — loading and error states', () => {
@@ -314,20 +336,62 @@ describe('CollectionScreen — filters', () => {
     );
   });
 
-  it('reflects the active filter count as a visible badge on the filters button, and clears it back to none via "Toutes"', async () => {
+  it('never counts a quick category chip in the filters badge — it is already visible as the selected chip', async () => {
     listMock().mockResolvedValue(page([ITEM]));
     const view = await renderScreen();
     await waitFor(() => expect(view.getByLabelText('Livre')).toBeTruthy());
 
-    expect(view.queryByText('1')).toBeNull();
-
     await fireEvent.press(view.getByLabelText('Livre'));
-    await waitFor(() => expect(view.getByText('1')).toBeTruthy());
-    expect(view.getByLabelText('Filtres (1 actifs)')).toBeTruthy();
-
-    await fireEvent.press(view.getByLabelText('Toutes'));
-    await waitFor(() => expect(view.queryByText('1')).toBeNull());
+    await waitFor(() =>
+      expect(listMock()).toHaveBeenCalledWith(
+        'household-1',
+        expect.objectContaining({ categoryId: 'category-book' }),
+      ),
+    );
     expect(view.getByLabelText('Filtres')).toBeTruthy();
+    expect(view.queryByText('1')).toBeNull();
+    expect(view.queryByTestId('collection-active-filters')).toBeNull();
+  });
+
+  it('summarizes owner and condition filters as removable pills, counted in the badge', async () => {
+    listMock().mockResolvedValue(page([ITEM]));
+    const view = await renderScreen({ ownerId: 'user-1', condition: 'VERY_GOOD' });
+
+    const ownerPill = { name: 'Retirer le filtre : À Alix' };
+    await waitFor(() => expect(view.getByRole('button', ownerPill)).toBeTruthy());
+    expect(view.getByRole('button', { name: 'Retirer le filtre : Très bon état' })).toBeTruthy();
+    expect(view.getByLabelText('Filtres (2 actifs)')).toBeTruthy();
+
+    await fireEvent.press(view.getByRole('button', ownerPill));
+
+    await waitFor(() => expect(view.queryByRole('button', ownerPill)).toBeNull());
+    expect(view.getByLabelText('Filtres (1 actifs)')).toBeTruthy();
+    await waitFor(() =>
+      expect(listMock()).toHaveBeenLastCalledWith(
+        'household-1',
+        expect.objectContaining({ ownerId: undefined, condition: 'VERY_GOOD' }),
+      ),
+    );
+  });
+
+  it('shows a custom category picked in the filters screen as a pill, since no quick chip shows it', async () => {
+    const CUSTOM_CATEGORY = {
+      ...BOOK_CATEGORY,
+      id: 'category-vinyl',
+      name: 'Vinyles',
+      slug: 'vinyles',
+      isSystem: false,
+      householdId: 'household-1',
+    };
+    (mockApiClient.categories.list as jest.Mock).mockResolvedValue([
+      BOOK_CATEGORY,
+      CUSTOM_CATEGORY,
+    ]);
+    listMock().mockResolvedValue(page([ITEM]));
+    const view = await renderScreen({ categoryId: 'category-vinyl' });
+
+    await waitFor(() => expect(view.getByText('Vinyles')).toBeTruthy());
+    expect(view.getByLabelText('Filtres (1 actifs)')).toBeTruthy();
   });
 });
 

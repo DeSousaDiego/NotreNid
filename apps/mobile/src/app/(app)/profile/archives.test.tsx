@@ -117,4 +117,30 @@ describe('ArchivesScreen', () => {
       params: { itemId: 'item-42' },
     });
   });
+
+  it('renders the collection card (owner in plain words, no condition badge)', async () => {
+    (mockApiClient.items.list as jest.Mock).mockResolvedValue(
+      pageOf([mockItem({ archivedAt: '2026-02-01T00:00:00.000Z' })]),
+    );
+    const view = await renderScreen(<ArchivesScreen />);
+
+    await waitFor(() => expect(view.getByText('À Alix')).toBeTruthy());
+    expect(view.queryByLabelText(/^État : /)).toBeNull();
+  });
+
+  it('does not add a second horizontal padding on top of the screen container, and spaces its skeletons', async () => {
+    (mockApiClient.items.list as jest.Mock).mockReturnValueOnce(new Promise(() => {}));
+    const loading = await renderScreen(<ArchivesScreen />);
+    expect(loading.getByTestId('archives-loading-skeleton').props.style).toEqual(
+      expect.objectContaining({ gap: expect.any(Number) }),
+    );
+
+    (mockApiClient.items.list as jest.Mock).mockResolvedValue(pageOf([mockItem()]));
+    const view = await renderScreen(<ArchivesScreen />);
+    await waitFor(() => expect(view.getByTestId('archives-item-list')).toBeTruthy());
+
+    const contentStyle = view.getByTestId('archives-item-list').props.contentContainerStyle;
+    expect(contentStyle).not.toHaveProperty('padding');
+    expect(contentStyle).not.toHaveProperty('paddingHorizontal');
+  });
 });

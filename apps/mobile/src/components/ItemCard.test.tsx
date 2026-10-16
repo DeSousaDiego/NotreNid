@@ -1,3 +1,4 @@
+import type { PublicUser } from '@notre-nid/shared';
 import { fireEvent } from '@testing-library/react-native';
 
 import { mockItem } from '../test-utils/mockItem';
@@ -10,11 +11,24 @@ jest.mock('expo-image', () => {
   return { Image };
 });
 
+function user(id: string, displayName: string): PublicUser {
+  return {
+    id,
+    email: `${id}@example.com`,
+    displayName,
+    avatarUrl: null,
+    createdAt: '',
+    updatedAt: '',
+  };
+}
+
+const flatStyle = (node: { props: { style?: unknown } }) =>
+  Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean));
+
 describe('ItemCard', () => {
-  it('affiche le titre, l’information secondaire et déclenche onPress', async () => {
+  it('affiche le titre, le créateur et déclenche onPress', async () => {
     const onPress = jest.fn();
-    const item = mockItem();
-    const view = await renderWithTheme(<ItemCard item={item} onPress={onPress} />);
+    const view = await renderWithTheme(<ItemCard item={mockItem()} onPress={onPress} />);
 
     expect(view.getByText('Les Misérables')).toBeTruthy();
     expect(view.getByText('Victor Hugo')).toBeTruthy();
@@ -23,40 +37,99 @@ describe('ItemCard', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('n’affiche aucune information secondaire lorsqu’elle est absente', async () => {
+  it('laisse le titre tenir sur deux lignes au plus, jamais une seule', async () => {
+    const title = 'Le Seigneur des anneaux : La Communauté de l’anneau, édition illustrée';
+    const view = await renderWithTheme(<ItemCard item={mockItem({ title })} onPress={jest.fn()} />);
+
+    expect(view.getByText(title).props.numberOfLines).toBe(2);
+  });
+
+  it('affiche « créateur · année » quand les deux sont connus', async () => {
+    const base = mockItem();
+    const item = mockItem({ book: { ...base.book!, publicationYear: 1862 } });
+    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
+
+    expect(view.getByText('Victor Hugo · 1862')).toBeTruthy();
+  });
+
+  it('montre l’artiste et l’année pour un CD', async () => {
+    const item = mockItem({
+      title: 'The Dark Side of the Moon',
+      category: { ...mockItem().category, id: 'category-cd', slug: 'cd', name: 'CD' },
+      book: null,
+      cd: { itemId: 'item-1', artist: 'Pink Floyd', releaseYear: 1973, label: null, format: null },
+    });
+    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
+
+    expect(view.getByText('Pink Floyd · 1973')).toBeTruthy();
+  });
+
+  it('n’invente aucune ligne secondaire lorsqu’elle est absente', async () => {
     const item = mockItem({ book: null, cd: null, dvd: null });
     const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
 
     expect(view.queryByText('Victor Hugo')).toBeNull();
+    expect(view.queryByText(/·/)).toBeNull();
   });
 
-  it('affiche la note lorsqu’elle est renseignée', async () => {
-    const item = mockItem({ rating: 3.5 });
-    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
+  it('nomme le ou les propriétaires en toutes lettres', async () => {
+    const single = await renderWithTheme(<ItemCard item={mockItem()} onPress={jest.fn()} />);
+    expect(single.getByText('À Alix')).toBeTruthy();
 
-    expect(view.getByLabelText('Note : 3.5 sur 5')).toBeTruthy();
-  });
-
-  it('n’affiche aucune étoile lorsque la note est absente', async () => {
-    const item = mockItem({ rating: null });
-    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
-
-    expect(view.queryByLabelText(/Note :/)).toBeNull();
-  });
-
-  it('laisse la rangée de badges passer à la ligne, sans retirer aucun badge', async () => {
-    const item = mockItem();
-    const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
-
-    const badges = view.getByTestId('item-card-badges');
-    expect([badges.props.style].flat()).toEqual(
-      expect.arrayContaining([expect.objectContaining({ flexDirection: 'row', flexWrap: 'wrap' })]),
+    const two = await renderWithTheme(
+      <ItemCard
+        item={mockItem({ owners: [user('u1', 'Julie'), user('u2', 'Diego')] })}
+        onPress={jest.fn()}
+      />,
     );
-    expect(view.getByLabelText(`Catégorie : ${item.category.name}`)).toBeTruthy();
-    expect(view.getByLabelText(/^État : /)).toBeTruthy();
+    expect(two.getByText('À Julie et Diego')).toBeTruthy();
   });
 
-  it('expose un accessibilityLabel enrichi sur le Pressable, jamais seulement titre + catégorie', async () => {
+  it('résume au-delà de deux propriétaires pour garder une ligne courte', async () => {
+    const view = await renderWithTheme(
+      <ItemCard
+        item={mockItem({
+          owners: [user('u1', 'Julie'), user('u2', 'Diego'), user('u3', 'Sam')],
+        })}
+        onPress={jest.fn()}
+      />,
+    );
+
+    expect(view.getByText('À Julie et 2 autres')).toBeTruthy();
+  });
+
+  it('affiche une note compacte lorsqu’elle est renseignée, et rien sinon', async () => {
+    const rated = await renderWithTheme(
+      <ItemCard item={mockItem({ rating: 3.5 })} onPress={jest.fn()} />,
+    );
+    expect(rated.getByTestId('item-card-rating')).toBeTruthy();
+    expect(rated.getByText('3,5')).toBeTruthy();
+
+    const unrated = await renderWithTheme(
+      <ItemCard item={mockItem({ rating: null })} onPress={jest.fn()} />,
+    );
+    expect(unrated.queryByTestId('item-card-rating')).toBeNull();
+  });
+
+  it('n’affiche plus ni badge d’état ni badge de catégorie', async () => {
+    const view = await renderWithTheme(<ItemCard item={mockItem()} onPress={jest.fn()} />);
+
+    expect(view.queryByLabelText(/^État : /)).toBeNull();
+    expect(view.queryByText('Bon état')).toBeNull();
+    expect(view.queryByLabelText(/^Catégorie : /)).toBeNull();
+  });
+
+  it('garde la ligne basse en flexWrap pour le texte agrandi', async () => {
+    const view = await renderWithTheme(
+      <ItemCard item={mockItem({ rating: 4 })} onPress={jest.fn()} />,
+    );
+
+    expect(flatStyle(view.getByTestId('item-card-footer'))).toEqual(
+      expect.objectContaining({ flexDirection: 'row', flexWrap: 'wrap' }),
+    );
+  });
+
+  it('expose un accessibilityLabel complet sur le Pressable', async () => {
     const item = mockItem({ rating: 4 });
     const view = await renderWithTheme(<ItemCard item={item} onPress={jest.fn()} />);
 
@@ -67,88 +140,37 @@ describe('ItemCard', () => {
 });
 
 describe('itemCardAccessibilityLabel', () => {
-  it('reprend titre, catégorie, état et le propriétaire unique par défaut', () => {
-    const item = mockItem();
-
-    expect(itemCardAccessibilityLabel(item)).toBe(
-      'Les Misérables, Livre, Bon état, propriétaire Alix',
+  it('reprend titre, créateur, catégorie et propriétaire, sans l’état', () => {
+    expect(itemCardAccessibilityLabel(mockItem())).toBe(
+      'Les Misérables, Victor Hugo, Livre, appartient à Alix',
     );
   });
 
-  it('ajoute la note (virgule française) lorsqu’elle est renseignée', () => {
-    const item = mockItem({ rating: 3.5 });
+  it('sépare créateur et année par une virgule plutôt que le point médian', () => {
+    const base = mockItem();
+    const item = mockItem({ book: { ...base.book!, publicationYear: 1862 } });
 
-    expect(itemCardAccessibilityLabel(item)).toContain('note 3,5 sur 5');
+    expect(itemCardAccessibilityLabel(item)).toContain('Victor Hugo, 1862');
+  });
+
+  it('ajoute la note (virgule française) lorsqu’elle est renseignée', () => {
+    expect(itemCardAccessibilityLabel(mockItem({ rating: 3.5 }))).toContain('note 3,5 sur 5');
   });
 
   it('omet tout segment de note lorsqu’elle est absente', () => {
-    const item = mockItem({ rating: null });
-
-    expect(itemCardAccessibilityLabel(item)).not.toContain('note');
+    expect(itemCardAccessibilityLabel(mockItem({ rating: null }))).not.toContain('note');
   });
 
-  it('nomme les deux propriétaires quand il y en a exactement deux', () => {
-    const item = mockItem({
-      owners: [
-        {
-          id: 'user-1',
-          email: 'a@example.com',
-          displayName: 'Alix',
-          avatarUrl: null,
-          createdAt: '',
-          updatedAt: '',
-        },
-        {
-          id: 'user-2',
-          email: 'b@example.com',
-          displayName: 'Sam',
-          avatarUrl: null,
-          createdAt: '',
-          updatedAt: '',
-        },
-      ],
-    });
-
-    expect(itemCardAccessibilityLabel(item)).toContain('propriétaires Alix et Sam');
-  });
-
-  it('reste concis (un compte, pas une liste de noms) à partir de trois propriétaires', () => {
-    const item = mockItem({
-      owners: [
-        {
-          id: 'user-1',
-          email: 'a@example.com',
-          displayName: 'Alix',
-          avatarUrl: null,
-          createdAt: '',
-          updatedAt: '',
-        },
-        {
-          id: 'user-2',
-          email: 'b@example.com',
-          displayName: 'Sam',
-          avatarUrl: null,
-          createdAt: '',
-          updatedAt: '',
-        },
-        {
-          id: 'user-3',
-          email: 'c@example.com',
-          displayName: 'Jo',
-          avatarUrl: null,
-          createdAt: '',
-          updatedAt: '',
-        },
-      ],
-    });
-
-    expect(itemCardAccessibilityLabel(item)).toContain('3 propriétaires');
-    expect(itemCardAccessibilityLabel(item)).not.toContain('Jo');
-  });
-
-  it('n’ajoute aucun segment propriétaire quand il n’y en a aucun', () => {
-    const item = mockItem({ owners: [] });
-
-    expect(itemCardAccessibilityLabel(item)).toBe('Les Misérables, Livre, Bon état');
+  it('nomme jusqu’à trois propriétaires, puis résume', () => {
+    expect(
+      itemCardAccessibilityLabel(mockItem({ owners: [user('u1', 'Alix'), user('u2', 'Sam')] })),
+    ).toContain('appartient à Alix et Sam');
+    expect(
+      itemCardAccessibilityLabel(
+        mockItem({
+          owners: [user('u1', 'Alix'), user('u2', 'Sam'), user('u3', 'Jo'), user('u4', 'Lou')],
+        }),
+      ),
+    ).toContain('appartient à Alix, Sam et 2 autres');
   });
 });

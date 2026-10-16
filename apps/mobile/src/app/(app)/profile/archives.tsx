@@ -24,7 +24,7 @@ export default function ArchivesScreen() {
   return (
     <ScreenContainer edges={['left', 'right', 'bottom']}>
       {itemsQuery.isLoading ? (
-        <View>
+        <View testID="archives-loading-skeleton" style={{ gap: theme.spacing.sm }}>
           {[0, 1, 2].map((key) => (
             <ItemCardSkeleton key={key} />
           ))}
@@ -46,11 +46,10 @@ export default function ArchivesScreen() {
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{
-            padding: theme.spacing.lg,
-            gap: theme.spacing.sm,
-            paddingBottom: theme.spacing.xl,
-          }}
+          testID="archives-item-list"
+          // Le padding horizontal vient déjà de `ScreenContainer` (même alignement que
+          // la Collection) : ne pas le doubler ici.
+          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
           renderItem={({ item }) => (
             <ItemCard
               item={item}

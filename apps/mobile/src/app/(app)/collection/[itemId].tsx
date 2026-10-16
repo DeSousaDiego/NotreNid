@@ -20,7 +20,7 @@ import {
   StarRating,
   useToast,
 } from '../../../components';
-import { getCategoryTint } from '../../../constants/category-icons';
+import { getCategoryCoverTint } from '../../../constants/category-icons';
 import { CONDITION_INFO } from '../../../constants/condition';
 import { useArchiveItem, useRestoreItem } from '../../../hooks/useItemMutations';
 import { useItem } from '../../../hooks/useItem';
@@ -37,7 +37,7 @@ import {
   type MetadataDisplayRow,
   type MetadataFieldConfig,
 } from '../../../screens/item-form/metadataFields';
-import { useTheme, type ColorToken } from '../../../theme';
+import { useTheme } from '../../../theme';
 
 const COVER_WIDTH_RATIO = 0.6;
 const COVER_ASPECT_RATIO = 3 / 4;
@@ -67,13 +67,6 @@ function aboutSectionTitle(slug: string): string {
   if (slug === 'cd') return 'À propos de cet album';
   if (slug === 'book' || slug === 'dvd') return 'À propos de cette édition';
   return 'À propos de cet objet';
-}
-
-/** Teinte de catégorie (comme l'Accueil) ; lin pour une catégorie personnalisée,
- * qui n'en a pas — jamais le `surface` quasi invisible sur le fond crème. */
-function coverBackground(slug: string): ColorToken {
-  const tint = getCategoryTint(slug);
-  return tint === 'surface' ? 'tintLinen' : tint;
 }
 
 export default function ItemDetailScreen() {
@@ -189,7 +182,7 @@ export default function ItemDetailScreen() {
                 width: `${COVER_WIDTH_RATIO * 100}%`,
                 aspectRatio: COVER_ASPECT_RATIO,
                 borderRadius: theme.radii.lg,
-                backgroundColor: theme.colors[coverBackground(item.category.slug)],
+                backgroundColor: theme.colors[getCategoryCoverTint(item.category.slug)],
               }}
             />
           </View>
