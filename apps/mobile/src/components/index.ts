@@ -17,6 +17,7 @@ export { InvitationCodeField } from './InvitationCodeField';
 export { ItemCard } from './ItemCard';
 export { ItemCardSkeleton, LoadingSkeleton } from './LoadingSkeleton';
 export { ItemCover } from './ItemCover';
+export { ItemThumbnail, ITEM_THUMBNAIL_HEIGHT, ITEM_THUMBNAIL_WIDTH } from './ItemThumbnail';
 export { OwnerAvatarGroup } from './OwnerAvatarGroup';
 export { PasswordField } from './PasswordField';
 export { RecentItemRow, RecentItemRowSkeleton } from './RecentItemRow';

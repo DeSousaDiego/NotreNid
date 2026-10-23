@@ -92,7 +92,12 @@ export default function CollectionScreen() {
 
   return (
     <ScreenContainer edges={['left', 'right']}>
-      <View style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md }}>
+      {/* En-tête de taille fixe (`flexShrink: 0`) : la liste en dessous est la seule
+          zone qui s'adapte à la hauteur restante. */}
+      <View
+        testID="collection-header"
+        style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md, flexShrink: 0 }}
+      >
         <View style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
             <SearchField value={search} onChangeText={setSearch} onClear={() => setSearch('')} />
@@ -106,9 +111,15 @@ export default function CollectionScreen() {
           />
         </View>
 
+        {/* Un `ScrollView` horizontal a par défaut `flexGrow: 1` / `flexShrink: 1` : dans
+            une colonne, il peut absorber la hauteur de ses voisins (piège React Native
+            connu, invisible sous Jest qui ne calcule aucune mise en page). Sa hauteur est
+            figée sur celle des chips pour que les pastilles en dessous restent visibles. */}
         <ScrollView
+          testID="collection-category-chips"
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0, flexShrink: 0 }}
           contentContainerStyle={{ gap: theme.spacing.xs }}
         >
           <Chip
@@ -129,7 +140,12 @@ export default function CollectionScreen() {
         {pills.length > 0 ? (
           <View
             testID="collection-active-filters"
-            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: theme.spacing.xs,
+              flexShrink: 0,
+            }}
           >
             {pills.map((pill) => (
               <ActiveFilterPill key={pill.key} label={pill.label} onRemove={pill.onRemove} />

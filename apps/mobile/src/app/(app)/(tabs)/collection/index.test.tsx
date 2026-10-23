@@ -10,6 +10,7 @@ import {
 } from '../../../../providers/CollectionFiltersProvider';
 import { ThemeProvider } from '../../../../theme';
 
+import FiltersScreen from './filters';
 import CollectionScreen from './index';
 
 // expo-image's module-level analytics-integration probing isn't compatible with
@@ -24,7 +25,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 const mockRouterPush = jest.fn();
 jest.mock('expo-router', () => ({
-  router: { push: (...args: unknown[]) => mockRouterPush(...args) },
+  router: { push: (...args: unknown[]) => mockRouterPush(...args), back: jest.fn() },
 }));
 
 const mockApiClient = {
@@ -298,6 +299,90 @@ describe('CollectionScreen — search', () => {
     );
     // Un seul appel réseau pour la recherche complète, pas un par caractère tapé.
     expect(listMock()).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Parcours réel du téléphone : la Collection reste montée sous l'écran Filtres
+ * (même Stack, même `CollectionFiltersProvider`), on choisit un propriétaire et un
+ * état, « Appliquer », puis retour à la Collection. `filtersMounted` simule
+ * l'ouverture/fermeture de l'écran Filtres (le `router` est mocké).
+ */
+async function renderCollectionWithFilters() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const ui = (filtersMounted: boolean) => (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider fontsLoaded={false}>
+        <CollectionFiltersProvider>
+          <CollectionScreen />
+          {filtersMounted ? <FiltersScreen /> : null}
+        </CollectionFiltersProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+  const view = await render(ui(false));
+  return {
+    view,
+    openFilters: () => view.rerender(ui(true)),
+    closeFilters: () => view.rerender(ui(false)),
+  };
+}
+
+describe('CollectionScreen — filters screen round trip', () => {
+  it('keeps the header rows at their own height so the pills below the chips stay visible', async () => {
+    listMock().mockResolvedValue(page([ITEM]));
+    const view = await renderScreen({ ownerId: 'user-1' });
+    await waitFor(() => expect(view.getByTestId('collection-active-filters')).toBeTruthy());
+
+    const flat = (style: unknown) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+    expect(flat(view.getByTestId('collection-category-chips').props.style)).toEqual(
+      expect.objectContaining({ flexGrow: 0, flexShrink: 0 }),
+    );
+    expect(flat(view.getByTestId('collection-header').props.style)).toEqual(
+      expect.objectContaining({ flexShrink: 0 }),
+    );
+  });
+
+  it('shows one removable pill per filter applied from the Filters screen, and keeps both in sync', async () => {
+    listMock().mockResolvedValue(page([ITEM]));
+    const { view, openFilters, closeFilters } = await renderCollectionWithFilters();
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    await openFilters();
+    await waitFor(() => expect(view.getByRole('button', { name: 'Alix' })).toBeTruthy());
+    await fireEvent.press(view.getByRole('button', { name: 'Alix' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Très bon état' }));
+    await fireEvent.press(view.getByRole('button', { name: 'Appliquer les filtres' }));
+    await closeFilters();
+
+    await waitFor(() =>
+      expect(listMock()).toHaveBeenLastCalledWith(
+        'household-1',
+        expect.objectContaining({ ownerId: 'user-1', condition: 'VERY_GOOD' }),
+      ),
+    );
+    const ownerPill = { name: 'Retirer le filtre : À Alix' };
+    const conditionPill = { name: 'Retirer le filtre : Très bon état' };
+    await waitFor(() => expect(view.getByRole('button', ownerPill)).toBeTruthy());
+    expect(view.getByRole('button', conditionPill)).toBeTruthy();
+
+    await fireEvent.press(view.getByRole('button', ownerPill));
+    await waitFor(() => expect(view.queryByRole('button', ownerPill)).toBeNull());
+    expect(view.getByRole('button', conditionPill)).toBeTruthy();
+    await waitFor(() =>
+      expect(listMock()).toHaveBeenLastCalledWith(
+        'household-1',
+        expect.objectContaining({ ownerId: undefined, condition: 'VERY_GOOD' }),
+      ),
+    );
+
+    // Rouvrir Filtres : le brouillon repart de l'état réel (propriétaire « Tous »).
+    await openFilters();
+    await waitFor(() =>
+      expect(view.getByRole('button', { name: 'Tous', selected: true })).toBeTruthy(),
+    );
+    expect(view.getByRole('button', { name: 'Très bon état', selected: true })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Alix', selected: false })).toBeTruthy();
   });
 });
 

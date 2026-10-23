@@ -3,6 +3,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import { itemCardAccessibilityLabel } from '../../../components/ItemCard';
+import { expectedThumbnail, thumbnailStyles } from '../../../test-utils/thumbnail';
 import { mockItem } from '../../../test-utils/mockItem';
 import { ThemeProvider } from '../../../theme';
 
@@ -126,6 +127,22 @@ describe('ArchivesScreen', () => {
 
     await waitFor(() => expect(view.getByText('À Alix')).toBeTruthy());
     expect(view.queryByLabelText(/^État : /)).toBeNull();
+  });
+
+  it('gives archived items the same tinted thumbnail as Collection, with and without an image', async () => {
+    (mockApiClient.items.list as jest.Mock).mockResolvedValue(
+      pageOf([
+        mockItem({ id: 'with-image', coverImageUrl: 'https://cdn.test/cover.jpg' }),
+        mockItem({ id: 'without-image', title: 'Sans couverture', coverImageUrl: null }),
+      ]),
+    );
+    const view = await renderScreen(<ArchivesScreen />);
+    await waitFor(() => expect(view.getByText('Sans couverture')).toBeTruthy());
+
+    expect(thumbnailStyles(view)).toEqual([
+      expectedThumbnail('tintSage'),
+      expectedThumbnail('tintSage'),
+    ]);
   });
 
   it('does not add a second horizontal padding on top of the screen container, and spaces its skeletons', async () => {

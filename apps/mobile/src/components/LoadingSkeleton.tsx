@@ -3,6 +3,8 @@ import { AccessibilityInfo, Animated, View, type ViewStyle } from 'react-native'
 
 import { useTheme } from '../theme';
 
+import { ITEM_THUMBNAIL_HEIGHT, ITEM_THUMBNAIL_WIDTH } from './ItemThumbnail';
+
 export interface LoadingSkeletonProps {
   width?: number | `${number}%`;
   height?: number;
@@ -73,7 +75,11 @@ export function ItemCardSkeleton() {
         backgroundColor: theme.colors.surface,
       }}
     >
-      <LoadingSkeleton width={48} height={64} radius={theme.radii.sm} />
+      <LoadingSkeleton
+        width={ITEM_THUMBNAIL_WIDTH}
+        height={ITEM_THUMBNAIL_HEIGHT}
+        radius={theme.radii.sm}
+      />
       <View style={{ flex: 1, gap: 6 }}>
         <LoadingSkeleton width="70%" height={18} />
         <LoadingSkeleton width="45%" height={12} />

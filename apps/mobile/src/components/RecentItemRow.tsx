@@ -1,23 +1,19 @@
 import type { Item } from '@notre-nid/shared';
 import { Pressable, View } from 'react-native';
 
-import { getCategoryTint } from '../constants/category-icons';
 import { secondaryInfoForItem } from '../lib/itemSecondaryInfo';
 import { formatRelativeDate } from '../lib/relativeDate';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
 import { CategoryBadge } from './CategoryBadge';
-import { ItemCover } from './ItemCover';
+import { ItemThumbnail, ITEM_THUMBNAIL_HEIGHT, ITEM_THUMBNAIL_WIDTH } from './ItemThumbnail';
 import { LoadingSkeleton } from './LoadingSkeleton';
 
 export interface RecentItemRowProps {
   item: Item;
   onPress: () => void;
 }
-
-const COVER_WIDTH = 48;
-const COVER_HEIGHT = 64;
 
 /**
  * Label concis : le `Pressable` avale les labels descendants, donc tout ce qui est
@@ -59,18 +55,7 @@ export function RecentItemRow({ item, onPress }: RecentItemRowProps) {
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <ItemCover
-        uri={item.coverImageUrl}
-        categorySlug={item.category.slug}
-        illustrationSize={32}
-        transition={150}
-        style={{
-          width: COVER_WIDTH,
-          height: COVER_HEIGHT,
-          borderRadius: theme.radii.sm,
-          backgroundColor: theme.colors[getCategoryTint(item.category.slug)],
-        }}
-      />
+      <ItemThumbnail uri={item.coverImageUrl} categorySlug={item.category.slug} />
 
       <View style={{ flex: 1, gap: 2, justifyContent: 'center' }}>
         <AppText variant="section" numberOfLines={1}>
@@ -101,7 +86,11 @@ export function RecentItemRowSkeleton() {
     <View
       style={{ flexDirection: 'row', gap: theme.spacing.md, paddingVertical: theme.spacing.md }}
     >
-      <LoadingSkeleton width={COVER_WIDTH} height={COVER_HEIGHT} radius={theme.radii.sm} />
+      <LoadingSkeleton
+        width={ITEM_THUMBNAIL_WIDTH}
+        height={ITEM_THUMBNAIL_HEIGHT}
+        radius={theme.radii.sm}
+      />
       <View style={{ flex: 1, gap: 6, justifyContent: 'center' }}>
         <LoadingSkeleton width="65%" height={18} />
         <LoadingSkeleton width="40%" height={12} />

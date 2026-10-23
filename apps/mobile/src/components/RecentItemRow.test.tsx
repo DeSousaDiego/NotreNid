@@ -3,6 +3,8 @@ import { fireEvent } from '@testing-library/react-native';
 import { mockItem } from '../test-utils/mockItem';
 import { renderWithTheme } from '../test-utils/renderWithTheme';
 
+import { expectedThumbnail, thumbnailStyles } from '../test-utils/thumbnail';
+
 import { RecentItemRow, recentItemAccessibilityLabel } from './RecentItemRow';
 
 jest.mock('expo-image', () => {
@@ -22,6 +24,13 @@ describe('RecentItemRow', () => {
 
     await fireEvent.press(view.getByRole('button'));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the shared list thumbnail (same treatment as Collection and Archives)', async () => {
+    const item = mockItem({ coverImageUrl: 'https://cdn.test/cover.jpg' });
+    const view = await renderWithTheme(<RecentItemRow item={item} onPress={jest.fn()} />);
+
+    expect(thumbnailStyles(view)).toEqual([expectedThumbnail('tintSage')]);
   });
 
   it('shows the category badge next to a real cover', async () => {

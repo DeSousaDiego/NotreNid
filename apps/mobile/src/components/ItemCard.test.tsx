@@ -5,6 +5,7 @@ import { mockItem } from '../test-utils/mockItem';
 import { renderWithTheme } from '../test-utils/renderWithTheme';
 
 import { itemCardAccessibilityLabel, ItemCard } from './ItemCard';
+import { expectedThumbnail, thumbnailStyles } from '../test-utils/thumbnail';
 
 jest.mock('expo-image', () => {
   const { Image } = jest.requireActual('react-native');
@@ -110,6 +111,26 @@ describe('ItemCard', () => {
     );
     expect(unrated.queryByTestId('item-card-rating')).toBeNull();
   });
+
+  it.each([
+    { slug: 'book', name: 'Livre', tint: 'tintSage' as const },
+    { slug: 'cd', name: 'CD', tint: 'tintPeach' as const },
+    { slug: 'dvd', name: 'DVD', tint: 'tintHoney' as const },
+  ])(
+    'donne à un $name la miniature 48×64 teintée de l’Accueil, avec ou sans image',
+    async ({ slug, name, tint }) => {
+      const category = { ...mockItem().category, id: `category-${slug}`, slug, name };
+      for (const coverImageUrl of [null, 'https://example.com/cover.jpg']) {
+        const view = await renderWithTheme(
+          <ItemCard item={mockItem({ category, coverImageUrl })} onPress={jest.fn()} />,
+        );
+
+        // Même taille pour toutes les catégories (plus de CD carré) et teinte de
+        // catégorie comme conteneur, image réelle ou non.
+        expect(thumbnailStyles(view)).toEqual([expectedThumbnail(tint)]);
+      }
+    },
+  );
 
   it('n’affiche plus ni badge d’état ni badge de catégorie', async () => {
     const view = await renderWithTheme(<ItemCard item={mockItem()} onPress={jest.fn()} />);

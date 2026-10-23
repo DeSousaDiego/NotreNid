@@ -2,12 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import type { Item } from '@notre-nid/shared';
 import { Pressable, View } from 'react-native';
 
-import { getCategoryCoverTint } from '../constants/category-icons';
 import { creditLineForItem, ownersPhrase } from '../lib/itemSecondaryInfo';
 import { useTheme } from '../theme';
 
 import { AppText } from './AppText';
-import { ItemCover } from './ItemCover';
+import { ItemThumbnail } from './ItemThumbnail';
 import { OwnerAvatarGroup } from './OwnerAvatarGroup';
 import { formatRatingLabel } from './StarRating';
 
@@ -16,15 +15,7 @@ export interface ItemCardProps {
   onPress: () => void;
 }
 
-/** Miniature portrait (livre, film), comme `RecentItemRow` ; carrée pour un CD, dans
- * la même largeur pour que la colonne de texte reste alignée d'une carte à l'autre. */
-export const ITEM_CARD_COVER_WIDTH = 48;
-const COVER_PORTRAIT_HEIGHT = 64;
 const OWNER_AVATAR_SIZE = 20;
-
-function coverHeightForSlug(slug: string): number {
-  return slug === 'cd' ? ITEM_CARD_COVER_WIDTH : COVER_PORTRAIT_HEIGHT;
-}
 
 /**
  * Le `Pressable` « avale » tout label descendant (VoiceOver/TalkBack n'annoncent
@@ -79,20 +70,7 @@ export function ItemCard({ item, onPress }: ItemCardProps) {
         theme.elevation.low,
       ]}
     >
-      <View style={{ width: ITEM_CARD_COVER_WIDTH, alignItems: 'center' }}>
-        <ItemCover
-          uri={item.coverImageUrl}
-          categorySlug={item.category.slug}
-          illustrationSize={32}
-          transition={150}
-          style={{
-            width: ITEM_CARD_COVER_WIDTH,
-            height: coverHeightForSlug(item.category.slug),
-            borderRadius: theme.radii.sm,
-            backgroundColor: theme.colors[getCategoryCoverTint(item.category.slug)],
-          }}
-        />
-      </View>
+      <ItemThumbnail uri={item.coverImageUrl} categorySlug={item.category.slug} />
 
       <View style={{ flex: 1, gap: 2 }}>
         <AppText variant="section" numberOfLines={2}>

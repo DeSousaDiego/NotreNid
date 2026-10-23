@@ -18,6 +18,7 @@ export interface ItemCoverProps {
    * explicitement sur le comportement déjà en place à chaque appel plutôt que
    * d'en changer un silencieusement lors de ce refactor. */
   transition?: number;
+  testID?: string;
 }
 
 /**
@@ -35,6 +36,7 @@ export function ItemCover({
   illustrationSize,
   style,
   transition = 0,
+  testID,
 }: ItemCoverProps) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [lastUri, setLastUri] = useState(uri);
@@ -45,7 +47,10 @@ export function ItemCover({
   const showImage = Boolean(uri) && !loadFailed;
 
   return (
-    <View style={[{ alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}>
+    <View
+      testID={testID}
+      style={[{ alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, style]}
+    >
       {showImage ? (
         <Image
           source={{ uri: uri as string }}
