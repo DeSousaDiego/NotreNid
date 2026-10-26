@@ -2,7 +2,6 @@ import type { ItemSortField } from '@notre-nid/shared';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Button, Chip, ScreenContainer } from '../../../../components';
 import { CONDITION_OPTIONS } from '../../../../constants/condition';
@@ -44,7 +43,6 @@ function FilterSection({ title, children }: { title: string; children: ReactNode
  */
 export default function FiltersScreen() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const { householdId } = useHousehold();
   const { filters, setFilters } = useCollectionFilters();
   const [draft, setDraft] = useState<CollectionFiltersState>(filters);
@@ -62,17 +60,25 @@ export default function FiltersScreen() {
   const handleReset = () => setDraft(DEFAULT_COLLECTION_FILTERS);
 
   return (
+    // Zone système basse confiée au bord `bottom` de `ScreenContainer` (SafeAreaView
+    // native) : il n'applique que la part réellement recouverte — rien quand la barre
+    // d'onglets, qui la réserve déjà, est visible sous cet écran ; la vraie valeur
+    // sinon. L'ancien `insets.bottom` ajouté au footer la comptait une seconde fois
+    // au-dessus de la tab bar, réduisant d'autant la zone de défilement.
     <ScreenContainer
       scroll
-      edges={['left', 'right']}
-      contentStyle={{ paddingBottom: theme.spacing.md }}
+      edges={['left', 'right', 'bottom']}
+      // Marge standard (`spacing.lg`) sous la dernière section, au-dessus du footer
+      // bordé et ombré — au lieu de 12 px qui la laissaient paraître rognée.
+      contentStyle={{ paddingBottom: theme.spacing.lg }}
       footer={
         <View
+          testID="filters-footer"
           style={[
             {
               paddingHorizontal: theme.spacing.lg,
               paddingTop: theme.spacing.xs,
-              paddingBottom: insets.bottom + theme.spacing.xs,
+              paddingBottom: theme.spacing.xs,
               backgroundColor: theme.colors.background,
               borderTopWidth: 1,
               borderTopColor: theme.colors.border,

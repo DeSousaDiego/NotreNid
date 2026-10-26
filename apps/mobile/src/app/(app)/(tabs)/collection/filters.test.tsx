@@ -14,12 +14,12 @@ import FiltersScreen from './filters';
 // though this screen never renders one (see docs/PHASE_STATUS.md Phase 3B).
 jest.mock('expo-image', () => ({ Image: () => null }));
 
-// The fixed footer (docs/PHASE_STATUS.md) needs a real `useSafeAreaInsets`; this
-// test doesn't render a `SafeAreaProvider` — only `useSafeAreaInsets` is mocked,
-// the rest of the module (`SafeAreaView`, used by `ScreenContainer`) stays real.
+// Une vraie zone système basse (barre de gestes) : l'écran ne doit plus l'ajouter
+// lui-même au footer (voir le test « bottom spacing »). Seul `useSafeAreaInsets` est
+// mocké ; `SafeAreaView` (utilisée par `ScreenContainer`) reste réelle.
 jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 34, left: 0 }),
 }));
 
 const mockApiClient = createMockApiClient();
@@ -143,5 +143,49 @@ describe('FiltersScreen', () => {
 
     expect(view.getByLabelText('Livre').props.accessibilityState.selected).toBe(false);
     expect(view.getByLabelText('Toutes').props.accessibilityState.selected).toBe(true);
+  });
+
+  describe('bottom spacing', () => {
+    const flat = (style: unknown) =>
+      Object.assign({}, ...[style].flat(Infinity).filter(Boolean)) as Record<string, unknown>;
+
+    type Node = { props: Record<string, unknown>; children?: unknown };
+    function findNode(node: Node, match: (n: Node) => boolean): Node | null {
+      if (match(node)) return node;
+      for (const child of Array.isArray(node.children) ? (node.children as Node[]) : []) {
+        if (typeof child !== 'object' || child === null) continue;
+        const found = findNode(child, match);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    it('never adds the bottom inset to the footer itself (counted once, by the safe area edge)', async () => {
+      const view = await renderScreen(() => {});
+      await waitFor(() => expect(view.getByLabelText('Livre')).toBeTruthy());
+
+      // Insets mockés à 34 : le footer garde sa petite marge propre, sans les 34.
+      expect(flat(view.getByTestId('filters-footer').props.style).paddingBottom).toBe(4);
+
+      // C'est le bord `bottom` de `ScreenContainer` (SafeAreaView native, qui n'applique
+      // que la part réellement recouverte — rien au-dessus de la tab bar) qui s'en charge.
+      const safeArea = findNode(view.toJSON() as Node, (n) => n.props.edges !== undefined);
+      const edges = safeArea?.props.edges;
+      const hasBottom = Array.isArray(edges)
+        ? edges.includes('bottom')
+        : Boolean(edges && (edges as Record<string, unknown>).bottom);
+      expect(hasBottom).toBe(true);
+    });
+
+    it('keeps a standard, comfortable margin under the last section — not a large fixed padding', async () => {
+      const view = await renderScreen(() => {});
+      await waitFor(() => expect(view.getByText('Ordre')).toBeTruthy());
+
+      const content = flat(view.getByTestId('screen-container-scroll').props.contentContainerStyle);
+      expect(content.paddingBottom).toBe(16);
+      // La dernière section reste dans la zone défilante, au-dessus du footer.
+      const texts = JSON.stringify(view.toJSON());
+      expect(texts.indexOf('Décroissant')).toBeLessThan(texts.indexOf('Appliquer les filtres'));
+    });
   });
 });
