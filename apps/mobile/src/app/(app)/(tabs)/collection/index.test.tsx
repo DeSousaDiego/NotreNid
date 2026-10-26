@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { BottomTabBarHeightContext } from 'expo-router/build/react-navigation/bottom-tabs/utils/BottomTabBarHeightContext';
 import { useEffect } from 'react';
 
 import {
@@ -327,6 +328,30 @@ async function renderCollectionWithFilters() {
     closeFilters: () => view.rerender(ui(false)),
   };
 }
+
+describe('CollectionScreen — end of list', () => {
+  it('reserves the real tab bar height plus a small spacing after the last card, inside the scrollable content', async () => {
+    listMock().mockResolvedValue(page([ITEM, ITEM_2]));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = await render(
+      <BottomTabBarHeightContext.Provider value={97}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider fontsLoaded={false}>
+            <CollectionFiltersProvider>
+              <CollectionScreen />
+            </CollectionFiltersProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </BottomTabBarHeightContext.Provider>,
+    );
+    await waitFor(() => expect(view.getByText('Dune 2')).toBeTruthy());
+
+    const list = view.getByTestId('collection-item-list');
+    const content = Object.assign({}, ...[list.props.contentContainerStyle].flat());
+    // 97 pt mesurés par Expo Router (barre + navigation à 3 boutons) + `spacing.sm`.
+    expect(content.paddingBottom).toBe(105);
+  });
+});
 
 describe('CollectionScreen — filters screen round trip', () => {
   it('keeps the header rows at their own height so the pills below the chips stay visible', async () => {

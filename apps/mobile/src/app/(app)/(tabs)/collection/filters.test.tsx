@@ -14,8 +14,8 @@ import FiltersScreen from './filters';
 // though this screen never renders one (see docs/PHASE_STATUS.md Phase 3B).
 jest.mock('expo-image', () => ({ Image: () => null }));
 
-// Une vraie zone système basse (barre de gestes) : l'écran ne doit plus l'ajouter
-// lui-même au footer (voir le test « bottom spacing »). Seul `useSafeAreaInsets` est
+// Une vraie zone système basse : l'écran ne doit jamais l'ajouter lui-même (la tab bar
+// la réserve déjà, voir le test « bottom spacing »). Seul `useSafeAreaInsets` est
 // mocké ; `SafeAreaView` (utilisée par `ScreenContainer`) reste réelle.
 jest.mock('react-native-safe-area-context', () => ({
   ...jest.requireActual('react-native-safe-area-context'),
@@ -160,21 +160,24 @@ describe('FiltersScreen', () => {
       return null;
     }
 
-    it('never adds the bottom inset to the footer itself (counted once, by the safe area edge)', async () => {
+    it('adds no system-area compensation under "Appliquer" — the tab bar below already reserves it', async () => {
       const view = await renderScreen(() => {});
       await waitFor(() => expect(view.getByLabelText('Livre')).toBeTruthy());
 
-      // Insets mockés à 34 : le footer garde sa petite marge propre, sans les 34.
-      expect(flat(view.getByTestId('filters-footer').props.style).paddingBottom).toBe(4);
+      // Insets mockés à 34 : le footer garde seulement sa marge propre (`spacing.sm`),
+      // comme le footer d'Ajout/Modification moins la zone système.
+      expect(flat(view.getByTestId('filters-footer').props.style).paddingBottom).toBe(8);
 
-      // C'est le bord `bottom` de `ScreenContainer` (SafeAreaView native, qui n'applique
-      // que la part réellement recouverte — rien au-dessus de la tab bar) qui s'en charge.
+      // Et aucun bord `bottom` de SafeAreaView : mesurant la fenêtre, il rajoutait toute
+      // la zone système au-dessus de la tab bar (bouton trop haut, constaté au téléphone).
       const safeArea = findNode(view.toJSON() as Node, (n) => n.props.edges !== undefined);
       const edges = safeArea?.props.edges;
-      const hasBottom = Array.isArray(edges)
+      expect(edges).toBeDefined();
+      // Selon la version, `edges` arrive en tableau ou en objet (`{ bottom: 'off', … }`).
+      const bottomEdge = Array.isArray(edges)
         ? edges.includes('bottom')
-        : Boolean(edges && (edges as Record<string, unknown>).bottom);
-      expect(hasBottom).toBe(true);
+        : (edges as Record<string, unknown>).bottom;
+      expect([false, undefined, 'off']).toContain(bottomEdge);
     });
 
     it('keeps a standard, comfortable margin under the last section — not a large fixed padding', async () => {

@@ -60,14 +60,14 @@ export default function FiltersScreen() {
   const handleReset = () => setDraft(DEFAULT_COLLECTION_FILTERS);
 
   return (
-    // Zone système basse confiée au bord `bottom` de `ScreenContainer` (SafeAreaView
-    // native) : il n'applique que la part réellement recouverte — rien quand la barre
-    // d'onglets, qui la réserve déjà, est visible sous cet écran ; la vraie valeur
-    // sinon. L'ancien `insets.bottom` ajouté au footer la comptait une seconde fois
-    // au-dessus de la tab bar, réduisant d'autant la zone de défilement.
+    // Écran d'onglet : la tab bar, visible juste en dessous, réserve déjà la zone
+    // système basse (elle ajoute `insets.bottom` à son propre padding). Aucune
+    // compensation ici — ni bord `bottom` de SafeAreaView (qui, mesurant la fenêtre,
+    // rajoutait toute la zone système au-dessus de la tab bar : bouton trop haut), ni
+    // `insets.bottom` dans le footer. Même réglage que la Collection.
     <ScreenContainer
       scroll
-      edges={['left', 'right', 'bottom']}
+      edges={['left', 'right']}
       // Marge standard (`spacing.lg`) sous la dernière section, au-dessus du footer
       // bordé et ombré — au lieu de 12 px qui la laissaient paraître rognée.
       contentStyle={{ paddingBottom: theme.spacing.lg }}
@@ -78,7 +78,9 @@ export default function FiltersScreen() {
             {
               paddingHorizontal: theme.spacing.lg,
               paddingTop: theme.spacing.xs,
-              paddingBottom: theme.spacing.xs,
+              // Comme le footer d'Ajout/Modification (`insets.bottom + spacing.sm`), moins
+              // la zone système, déjà réservée par la tab bar.
+              paddingBottom: theme.spacing.sm,
               backgroundColor: theme.colors.background,
               borderTopWidth: 1,
               borderTopColor: theme.colors.border,
