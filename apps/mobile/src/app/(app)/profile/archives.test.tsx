@@ -159,5 +159,7 @@ describe('ArchivesScreen', () => {
     const contentStyle = view.getByTestId('archives-item-list').props.contentContainerStyle;
     expect(contentStyle).not.toHaveProperty('padding');
     expect(contentStyle).not.toHaveProperty('paddingHorizontal');
+    // Hors onglets (pas de tab bar) : simple marge de fin, jamais la hauteur de tab bar.
+    expect(contentStyle.paddingBottom).toBe(8);
   });
 });

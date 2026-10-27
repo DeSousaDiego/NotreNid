@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native';
 
@@ -19,7 +20,6 @@ import { useCategories } from '../../../../hooks/useCategories';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useItems } from '../../../../hooks/useItems';
 import { useMembers } from '../../../../hooks/useMembers';
-import { useTabBarClearance } from '../../../../hooks/useTabBarClearance';
 import { getErrorMessage } from '../../../../lib/errorMessage';
 import { useCollectionFilters } from '../../../../providers/CollectionFiltersProvider';
 import { useHousehold } from '../../../../providers/HouseholdProvider';
@@ -32,7 +32,12 @@ export default function CollectionScreen() {
   const categoriesQuery = useCategories(householdId);
   const categories = (categoriesQuery.data ?? []).filter((category) => category.isSystem);
   const membersQuery = useMembers(householdId);
-  const tabBarClearance = useTabBarClearance();
+  // Hauteur réelle de la tab bar (zone système incluse), mesurée par la navigation :
+  // la dernière carte la passait dessous avec l'ancienne estimation partagée.
+  // `expo-router/js-tabs` est le point d'entrée public de la tab bar qu'utilise
+  // l'app (Expo Router embarque sa propre copie de `@react-navigation/bottom-tabs`,
+  // non installé ici : le hook de ce paquet lirait un autre contexte et lèverait).
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -193,7 +198,10 @@ export default function CollectionScreen() {
           testID="collection-item-list"
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: tabBarClearance }}
+          contentContainerStyle={{
+            gap: theme.spacing.sm,
+            paddingBottom: tabBarHeight + theme.spacing.sm,
+          }}
           renderItem={({ item }) => (
             <ItemCard
               item={item}

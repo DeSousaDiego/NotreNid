@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { BottomTabBarHeightContext } from 'expo-router/build/react-navigation/bottom-tabs/utils/BottomTabBarHeightContext';
 import { useEffect } from 'react';
 
 import {
@@ -27,6 +26,13 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockRouterPush = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockRouterPush(...args), back: jest.fn() },
+}));
+
+// Hauteur de tab bar que mesurerait la navigation : 49 pt de barre + 48 pt de zone
+// système (navigation Android à 3 boutons, configuration du téléphone de test).
+const mockUseBottomTabBarHeight = jest.fn(() => 97);
+jest.mock('expo-router/js-tabs', () => ({
+  useBottomTabBarHeight: () => mockUseBottomTabBarHeight(),
 }));
 
 const mockApiClient = {
@@ -330,26 +336,27 @@ async function renderCollectionWithFilters() {
 }
 
 describe('CollectionScreen — end of list', () => {
-  it('reserves the real tab bar height plus a small spacing after the last card, inside the scrollable content', async () => {
+  it('pads the scrollable content with the real tab bar height plus a small spacing, read from the navigation', async () => {
     listMock().mockResolvedValue(page([ITEM, ITEM_2]));
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = await render(
-      <BottomTabBarHeightContext.Provider value={97}>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider fontsLoaded={false}>
-            <CollectionFiltersProvider>
-              <CollectionScreen />
-            </CollectionFiltersProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
-      </BottomTabBarHeightContext.Provider>,
-    );
+    const view = await renderScreen();
     await waitFor(() => expect(view.getByText('Dune 2')).toBeTruthy());
 
+    expect(mockUseBottomTabBarHeight).toHaveBeenCalled();
     const list = view.getByTestId('collection-item-list');
     const content = Object.assign({}, ...[list.props.contentContainerStyle].flat());
-    // 97 pt mesurés par Expo Router (barre + navigation à 3 boutons) + `spacing.sm`.
+    // 97 pt de tab bar + `spacing.sm` : padding du contenu défilant uniquement.
     expect(content.paddingBottom).toBe(105);
+  });
+
+  it('follows the measured tab bar height (gesture navigation: smaller system area)', async () => {
+    mockUseBottomTabBarHeight.mockReturnValue(73);
+    listMock().mockResolvedValue(page([ITEM]));
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    const list = view.getByTestId('collection-item-list');
+    expect(Object.assign({}, ...[list.props.contentContainerStyle].flat()).paddingBottom).toBe(81);
+    mockUseBottomTabBarHeight.mockReturnValue(97);
   });
 });
 
