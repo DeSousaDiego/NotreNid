@@ -28,13 +28,6 @@ jest.mock('expo-router', () => ({
   router: { push: (...args: unknown[]) => mockRouterPush(...args), back: jest.fn() },
 }));
 
-// Hauteur de tab bar que mesurerait la navigation : 49 pt de barre + 48 pt de zone
-// système (navigation Android à 3 boutons, configuration du téléphone de test).
-const mockUseBottomTabBarHeight = jest.fn(() => 97);
-jest.mock('expo-router/js-tabs', () => ({
-  useBottomTabBarHeight: () => mockUseBottomTabBarHeight(),
-}));
-
 const mockApiClient = {
   categories: { list: jest.fn() },
   items: { list: jest.fn() },
@@ -336,27 +329,37 @@ async function renderCollectionWithFilters() {
 }
 
 describe('CollectionScreen — end of list', () => {
-  it('pads the scrollable content with the real tab bar height plus a small spacing, read from the navigation', async () => {
-    listMock().mockResolvedValue(page([ITEM, ITEM_2]));
-    const view = await renderScreen();
-    await waitFor(() => expect(view.getByText('Dune 2')).toBeTruthy());
+  const flat = (style: unknown) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
 
-    expect(mockUseBottomTabBarHeight).toHaveBeenCalled();
-    const list = view.getByTestId('collection-item-list');
-    const content = Object.assign({}, ...[list.props.contentContainerStyle].flat());
-    // 97 pt de tab bar + `spacing.sm` : padding du contenu défilant uniquement.
-    expect(content.paddingBottom).toBe(105);
-  });
-
-  it('follows the measured tab bar height (gesture navigation: smaller system area)', async () => {
-    mockUseBottomTabBarHeight.mockReturnValue(73);
+  it('constrains the screen content to the visible height (flex: 1), not just flexGrow', async () => {
     listMock().mockResolvedValue(page([ITEM]));
     const view = await renderScreen();
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
 
+    // Conteneur commun de l'en-tête et de la liste (vue de contenu de ScreenContainer).
+    const container = view.getByTestId('collection-header').parent;
+    expect(container).toBeTruthy();
+    expect(container?.children).toContain(view.getByTestId('collection-item-list'));
+    expect(flat(container?.props.style)).toEqual(expect.objectContaining({ flex: 1 }));
+  });
+
+  it('lets the list take only the remaining height and ends it with a simple spacing — no tab bar compensation', async () => {
+    listMock().mockResolvedValue(page([ITEM, ITEM_2]));
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByText('Dune 2')).toBeTruthy());
+
     const list = view.getByTestId('collection-item-list');
-    expect(Object.assign({}, ...[list.props.contentContainerStyle].flat()).paddingBottom).toBe(81);
-    mockUseBottomTabBarHeight.mockReturnValue(97);
+    expect(flat(list.props.style)).toEqual(expect.objectContaining({ flex: 1 }));
+    expect(flat(list.props.contentContainerStyle).paddingBottom).toBe(8);
+  });
+
+  it('leaves no layout diagnostic behind', async () => {
+    listMock().mockResolvedValue(page([ITEM]));
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    expect(view.queryByTestId('debug-list-footer')).toBeNull();
+    expect(view.queryByText(/DEBUG/)).toBeNull();
   });
 });
 

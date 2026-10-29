@@ -1,16 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native';
 
 import {
   AppText,
@@ -40,25 +31,6 @@ export default function CollectionScreen() {
   const categoriesQuery = useCategories(householdId);
   const categories = (categoriesQuery.data ?? []).filter((category) => category.isSystem);
   const membersQuery = useMembers(householdId);
-  // Hauteur réelle de la tab bar (zone système incluse), mesurée par la navigation :
-  // la dernière carte la passait dessous avec l'ancienne estimation partagée.
-  // `expo-router/js-tabs` est le point d'entrée public de la tab bar qu'utilise
-  // l'app (Expo Router embarque sa propre copie de `@react-navigation/bottom-tabs`,
-  // non installé ici : le hook de ce paquet lirait un autre contexte et lèverait).
-  const tabBarHeight = useBottomTabBarHeight();
-
-  // ─── DEBUG TEMPORAIRE (layout du bas de Collection) — ne pas commiter ───
-  const debugListRef = useRef<FlatList>(null);
-  const { height: debugWindowHeight } = useWindowDimensions();
-  const [debug, setDebug] = useState<Record<string, number>>({});
-  const recordDebug = (patch: Record<string, number>) => {
-    setDebug((previous) => {
-      const next = { ...previous, ...patch };
-      if (__DEV__) console.warn('[CollectionLayoutDebug]', JSON.stringify(next));
-      return next;
-    });
-  };
-  // ────────────────────────────────────────────────────────────────────────
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -117,17 +89,15 @@ export default function CollectionScreen() {
   );
 
   return (
-    <ScreenContainer edges={['left', 'right']}>
+    // `flex: 1` (et non le `flexGrow: 1` par défaut de ScreenContainer) : sans
+    // contrainte de hauteur, la FlatList prenait la hauteur de son contenu et
+    // débordait sous la tab bar, où le conteneur des onglets la rognait — aucun
+    // `paddingBottom` ne rendait alors la dernière carte visible (mesuré sur
+    // téléphone : liste finissant 129 pt sous le haut de la tab bar).
+    <ScreenContainer edges={['left', 'right']} contentStyle={{ flex: 1 }}>
       {/* En-tête de taille fixe (`flexShrink: 0`) : la liste en dessous est la seule
           zone qui s'adapte à la hauteur restante. */}
       <View
-        // DEBUG TEMPORAIRE — ne pas commiter.
-        onLayout={(event) =>
-          recordDebug({
-            headerY: event.nativeEvent.layout.y,
-            headerHeight: event.nativeEvent.layout.height,
-          })
-        }
         testID="collection-header"
         style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md, flexShrink: 0 }}
       >
@@ -223,36 +193,14 @@ export default function CollectionScreen() {
         />
       ) : (
         <FlatList
-          ref={debugListRef}
-          // DEBUG TEMPORAIRE : viewport réel de la liste (layout local + position fenêtre).
-          onLayout={(event) => {
-            const { y, height } = event.nativeEvent.layout;
-            recordDebug({
-              tabBarHeight,
-              paddingBottom: tabBarHeight + theme.spacing.sm,
-              windowHeight: debugWindowHeight,
-              listLayoutY: y,
-              listViewportHeight: height,
-            });
-            const native = debugListRef.current?.getNativeScrollRef() as unknown as {
-              measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
-            } | null;
-            native?.measureInWindow?.((_x, windowY, _w, windowH) => {
-              recordDebug({
-                listWindowTop: windowY,
-                listWindowBottom: windowY + windowH,
-                tabBarTopInWindow: debugWindowHeight - tabBarHeight,
-              });
-            });
-          }}
-          onContentSizeChange={(_width, height) => recordDebug({ contentHeight: height })}
           testID="collection-item-list"
+          // Hauteur restante sous l'en-tête, exactement : le viewport s'arrête au-dessus
+          // de la tab bar (qui a sa propre place dans le layout des onglets), d'où une
+          // simple marge de fin plutôt qu'une compensation de sa hauteur.
+          style={{ flex: 1 }}
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{
-            gap: theme.spacing.sm,
-            paddingBottom: tabBarHeight + theme.spacing.sm,
-          }}
+          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
           renderItem={({ item }) => (
             <ItemCard
               item={item}
@@ -272,46 +220,13 @@ export default function CollectionScreen() {
           refreshing={itemsQuery.isRefetching && !itemsQuery.isFetchingNextPage}
           onRefresh={() => void itemsQuery.refetch()}
           ListFooterComponent={
-            <>
-              {itemsQuery.isFetchingNextPage ? (
-                <ActivityIndicator
-                  testID="collection-pagination-spinner"
-                  style={{ marginTop: theme.spacing.md }}
-                  color={theme.colors.primary}
-                />
-              ) : null}
-              {/* DEBUG TEMPORAIRE — ne pas commiter. Couleurs en dur volontaires. */}
-              <View
-                testID="debug-list-footer"
-                onLayout={(event) =>
-                  recordDebug({
-                    footerY: event.nativeEvent.layout.y,
-                    footerHeight: event.nativeEvent.layout.height,
-                  })
-                }
-                style={{
-                  height: 200,
-                  backgroundColor: '#FF00FF',
-                  borderWidth: 4,
-                  borderColor: '#00FF00',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 8,
-                }}
-              >
-                <Text style={{ color: '#000000', fontSize: 18, fontWeight: 'bold' }}>
-                  DEBUG LIST FOOTER
-                </Text>
-                {Object.entries(debug).map(([key, value]) => (
-                  <Text key={key} style={{ color: '#000000', fontSize: 11 }}>
-                    {key}: {Math.round(value)}
-                  </Text>
-                ))}
-                <Text style={{ color: '#000000', fontSize: 18, fontWeight: 'bold' }}>
-                  ▼ FIN DU FOOTER ▼
-                </Text>
-              </View>
-            </>
+            itemsQuery.isFetchingNextPage ? (
+              <ActivityIndicator
+                testID="collection-pagination-spinner"
+                style={{ marginTop: theme.spacing.md }}
+                color={theme.colors.primary}
+              />
+            ) : null
           }
         />
       )}

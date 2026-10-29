@@ -6,8 +6,8 @@ import { useTheme } from '../theme';
  * Hauteur estimée du contenu de la tab bar (icône + libellé + paddings), hors zone
  * de sécurité ; combinée à `insets.bottom` (Bloc 4, correctif « dernier item
  * masqué »). Utilisée par l'Accueil et le Profil, validés sur téléphone avec cette
- * valeur. La Collection, elle, lit la hauteur réelle via `useBottomTabBarHeight`
- * (`expo-router/js-tabs`) : sa dernière carte restait recouverte avec l'estimation.
+ * valeur. La Collection n'en a pas besoin : sa FlatList est contrainte à la hauteur
+ * visible (`flex: 1`) et se termine déjà au-dessus de la tab bar.
  */
 const TAB_BAR_CONTENT_HEIGHT = 56;
 
