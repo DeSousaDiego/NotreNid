@@ -2,7 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import {
   AppText,
@@ -38,6 +46,19 @@ export default function CollectionScreen() {
   // l'app (Expo Router embarque sa propre copie de `@react-navigation/bottom-tabs`,
   // non installé ici : le hook de ce paquet lirait un autre contexte et lèverait).
   const tabBarHeight = useBottomTabBarHeight();
+
+  // ─── DEBUG TEMPORAIRE (layout du bas de Collection) — ne pas commiter ───
+  const debugListRef = useRef<FlatList>(null);
+  const { height: debugWindowHeight } = useWindowDimensions();
+  const [debug, setDebug] = useState<Record<string, number>>({});
+  const recordDebug = (patch: Record<string, number>) => {
+    setDebug((previous) => {
+      const next = { ...previous, ...patch };
+      if (__DEV__) console.warn('[CollectionLayoutDebug]', JSON.stringify(next));
+      return next;
+    });
+  };
+  // ────────────────────────────────────────────────────────────────────────
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
@@ -100,6 +121,13 @@ export default function CollectionScreen() {
       {/* En-tête de taille fixe (`flexShrink: 0`) : la liste en dessous est la seule
           zone qui s'adapte à la hauteur restante. */}
       <View
+        // DEBUG TEMPORAIRE — ne pas commiter.
+        onLayout={(event) =>
+          recordDebug({
+            headerY: event.nativeEvent.layout.y,
+            headerHeight: event.nativeEvent.layout.height,
+          })
+        }
         testID="collection-header"
         style={{ gap: theme.spacing.sm, marginBottom: theme.spacing.md, flexShrink: 0 }}
       >
@@ -195,6 +223,29 @@ export default function CollectionScreen() {
         />
       ) : (
         <FlatList
+          ref={debugListRef}
+          // DEBUG TEMPORAIRE : viewport réel de la liste (layout local + position fenêtre).
+          onLayout={(event) => {
+            const { y, height } = event.nativeEvent.layout;
+            recordDebug({
+              tabBarHeight,
+              paddingBottom: tabBarHeight + theme.spacing.sm,
+              windowHeight: debugWindowHeight,
+              listLayoutY: y,
+              listViewportHeight: height,
+            });
+            const native = debugListRef.current?.getNativeScrollRef() as unknown as {
+              measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+            } | null;
+            native?.measureInWindow?.((_x, windowY, _w, windowH) => {
+              recordDebug({
+                listWindowTop: windowY,
+                listWindowBottom: windowY + windowH,
+                tabBarTopInWindow: debugWindowHeight - tabBarHeight,
+              });
+            });
+          }}
+          onContentSizeChange={(_width, height) => recordDebug({ contentHeight: height })}
           testID="collection-item-list"
           data={items}
           keyExtractor={(item) => item.id}
@@ -221,13 +272,46 @@ export default function CollectionScreen() {
           refreshing={itemsQuery.isRefetching && !itemsQuery.isFetchingNextPage}
           onRefresh={() => void itemsQuery.refetch()}
           ListFooterComponent={
-            itemsQuery.isFetchingNextPage ? (
-              <ActivityIndicator
-                testID="collection-pagination-spinner"
-                style={{ marginTop: theme.spacing.md }}
-                color={theme.colors.primary}
-              />
-            ) : null
+            <>
+              {itemsQuery.isFetchingNextPage ? (
+                <ActivityIndicator
+                  testID="collection-pagination-spinner"
+                  style={{ marginTop: theme.spacing.md }}
+                  color={theme.colors.primary}
+                />
+              ) : null}
+              {/* DEBUG TEMPORAIRE — ne pas commiter. Couleurs en dur volontaires. */}
+              <View
+                testID="debug-list-footer"
+                onLayout={(event) =>
+                  recordDebug({
+                    footerY: event.nativeEvent.layout.y,
+                    footerHeight: event.nativeEvent.layout.height,
+                  })
+                }
+                style={{
+                  height: 200,
+                  backgroundColor: '#FF00FF',
+                  borderWidth: 4,
+                  borderColor: '#00FF00',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 8,
+                }}
+              >
+                <Text style={{ color: '#000000', fontSize: 18, fontWeight: 'bold' }}>
+                  DEBUG LIST FOOTER
+                </Text>
+                {Object.entries(debug).map(([key, value]) => (
+                  <Text key={key} style={{ color: '#000000', fontSize: 11 }}>
+                    {key}: {Math.round(value)}
+                  </Text>
+                ))}
+                <Text style={{ color: '#000000', fontSize: 18, fontWeight: 'bold' }}>
+                  ▼ FIN DU FOOTER ▼
+                </Text>
+              </View>
+            </>
           }
         />
       )}
