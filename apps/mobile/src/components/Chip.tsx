@@ -12,6 +12,12 @@ export interface ChipProps {
   accessibilityLabel?: string;
 }
 
+/** Hauteur visible de la chip ; `CHIP_HIT_SLOP` complète la zone tactile à 44 pt
+ * sans grossir l'écran (prévoir au moins `2 × CHIP_HIT_SLOP` entre deux rangées
+ * pour que les zones tactiles ne se chevauchent pas). */
+const CHIP_HEIGHT = 36;
+export const CHIP_HIT_SLOP = (44 - CHIP_HEIGHT) / 2;
+
 /** Étiquette sélectionnable (filtres, catégories). */
 export function Chip({
   label,
@@ -29,8 +35,9 @@ export function Chip({
       accessibilityLabel={accessibilityLabel ?? label}
       disabled={disabled}
       onPress={onPress}
+      hitSlop={{ top: CHIP_HIT_SLOP, bottom: CHIP_HIT_SLOP }}
       style={({ pressed }) => ({
-        minHeight: 36,
+        minHeight: CHIP_HEIGHT,
         paddingHorizontal: theme.spacing.md,
         borderRadius: theme.radii.full,
         borderWidth: 1,

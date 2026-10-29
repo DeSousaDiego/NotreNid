@@ -1,6 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
+import { CollectionFiltersProvider } from '../../providers/CollectionFiltersProvider';
 import { useHousehold } from '../../providers/HouseholdProvider';
 import { HouseholdSelectView } from '../../screens/HouseholdSelectView';
 import { NoHouseholdView } from '../../screens/NoHouseholdView';
@@ -13,7 +14,9 @@ import { useAuth } from '../../providers/AuthProvider';
  * flow d'ajout (`add-item`, Bloc 2 — sous-Stack imbriqué, voir add-item/_layout.tsx)
  * et les sous-pages Profil — pour que la barre d'onglets se masque naturellement (ils
  * ne sont plus des descendants du <Tabs>) et qu'un bouton retour natif apparaisse,
- * sans hack de `tabBarStyle` ni listener de navigation (Bloc 4).
+ * sans hack de `tabBarStyle` ni listener de navigation (Bloc 4). L'écran Filtres de la
+ * Collection en fait partie (Lot C) ; le filtre partagé qu'il édite est donc fourni ici,
+ * au-dessus de l'onglet Collection et de lui.
  */
 export default function AppLayout() {
   const theme = useTheme();
@@ -48,24 +51,27 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: theme.colors.background },
-        headerTintColor: theme.colors.text,
-        headerTitleStyle: { fontFamily: theme.fonts.semiBold },
-        headerShadowVisible: false,
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="add-item" options={{ headerShown: false }} />
-      <Stack.Screen name="collection/[itemId]" options={{ title: '' }} />
-      <Stack.Screen name="collection/edit/[itemId]" options={{ title: '' }} />
-      <Stack.Screen name="profile/edit" options={{ title: 'Modifier mon profil' }} />
-      <Stack.Screen name="profile/members" options={{ title: 'Membres' }} />
-      <Stack.Screen name="profile/invitations" options={{ title: 'Invitations' }} />
-      <Stack.Screen name="profile/categories" options={{ title: 'Catégories' }} />
-      <Stack.Screen name="profile/archives" options={{ title: 'Archives' }} />
-      <Stack.Screen name="profile/join" options={{ title: 'Rejoindre un foyer' }} />
-    </Stack>
+    <CollectionFiltersProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: theme.colors.background },
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: { fontFamily: theme.fonts.semiBold },
+          headerShadowVisible: false,
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="add-item" options={{ headerShown: false }} />
+        <Stack.Screen name="collection/[itemId]" options={{ title: '' }} />
+        <Stack.Screen name="collection/filters" options={{ title: 'Filtres' }} />
+        <Stack.Screen name="collection/edit/[itemId]" options={{ title: '' }} />
+        <Stack.Screen name="profile/edit" options={{ title: 'Modifier mon profil' }} />
+        <Stack.Screen name="profile/members" options={{ title: 'Membres' }} />
+        <Stack.Screen name="profile/invitations" options={{ title: 'Invitations' }} />
+        <Stack.Screen name="profile/categories" options={{ title: 'Catégories' }} />
+        <Stack.Screen name="profile/archives" options={{ title: 'Archives' }} />
+        <Stack.Screen name="profile/join" options={{ title: 'Rejoindre un foyer' }} />
+      </Stack>
+    </CollectionFiltersProvider>
   );
 }

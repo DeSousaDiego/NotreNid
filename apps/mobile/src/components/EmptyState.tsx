@@ -34,7 +34,7 @@ export function EmptyState({
       }}
     >
       <Ionicons name={icon} size={48} color={theme.colors.primaryMuted} />
-      <AppText variant="section" style={{ textAlign: 'center' }}>
+      <AppText variant="section" accessibilityRole="header" style={{ textAlign: 'center' }}>
         {title}
       </AppText>
       {message ? (

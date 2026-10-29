@@ -1,36 +1,55 @@
-import type { ItemSortField } from '@notre-nid/shared';
+import type { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppText, Button, Chip, ScreenContainer } from '../../../../components';
-import { CONDITION_OPTIONS } from '../../../../constants/condition';
-import { useCategories } from '../../../../hooks/useCategories';
-import { useMembers } from '../../../../hooks/useMembers';
+import { Button, Chip, CHIP_HIT_SLOP, ScreenContainer } from '../../../components';
+import { COLLECTION_SORT_PRESETS, isSortPresetSelected } from '../../../constants/collectionSort';
+import { CONDITION_OPTIONS } from '../../../constants/condition';
+import { useCategories } from '../../../hooks/useCategories';
+import { useMembers } from '../../../hooks/useMembers';
 import {
   DEFAULT_COLLECTION_FILTERS,
   useCollectionFilters,
   type CollectionFiltersState,
-} from '../../../../providers/CollectionFiltersProvider';
-import { useHousehold } from '../../../../providers/HouseholdProvider';
-import { useTheme } from '../../../../theme';
+} from '../../../providers/CollectionFiltersProvider';
+import { useHousehold } from '../../../providers/HouseholdProvider';
+import { FormSection } from '../../../screens/item-form/FormSection';
+import { useTheme } from '../../../theme';
 
-const SORT_OPTIONS: { value: ItemSortField; label: string }[] = [
-  { value: 'createdAt', label: 'Date d’ajout' },
-  { value: 'title', label: 'Titre' },
-  { value: 'updatedAt', label: 'Dernière modification' },
-  { value: 'condition', label: 'État' },
-];
-
-function FilterSection({ title, children }: { title: string; children: ReactNode }) {
+/** Titre léger des formulaires (repère terracotta + libellé vert forêt) et chips
+ * dessous. L'écart entre rangées (`2 × CHIP_HIT_SLOP`) garde des zones tactiles de
+ * 44 pt jointives, sans chevauchement d'une rangée sur l'autre. */
+function FilterSection({
+  icon,
+  title,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  children: ReactNode;
+}) {
   const theme = useTheme();
   return (
-    <View style={{ gap: theme.spacing.sm }}>
-      <AppText variant="section">{title}</AppText>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
+    <FormSection icon={icon} title={title}>
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          columnGap: theme.spacing.xs,
+          rowGap: 2 * CHIP_HIT_SLOP,
+        }}
+      >
         {children}
       </View>
-    </View>
+    </FormSection>
+  );
+}
+
+function isDefaultFilters(filters: CollectionFiltersState): boolean {
+  return (Object.keys(DEFAULT_COLLECTION_FILTERS) as (keyof CollectionFiltersState)[]).every(
+    (key) => filters[key] === DEFAULT_COLLECTION_FILTERS[key],
   );
 }
 
@@ -40,9 +59,12 @@ function FilterSection({ title, children }: { title: string; children: ReactNode
  * la sheet de filtres déjà ouverte, ce qui devenait exigu sur petit écran.
  * Comportement "brouillon + Appliquer" : les changements ne sont commités dans
  * le filtre partagé qu'au tap sur le bouton, jamais en live pendant la sélection.
+ * Route hors des onglets (Stack `(app)`, comme le Détail) : la tab bar n'y est pas
+ * affichée, l'écran garde son en-tête avec retour.
  */
 export default function FiltersScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { householdId } = useHousehold();
   const { filters, setFilters } = useCollectionFilters();
   const [draft, setDraft] = useState<CollectionFiltersState>(filters);
@@ -60,27 +82,23 @@ export default function FiltersScreen() {
   const handleReset = () => setDraft(DEFAULT_COLLECTION_FILTERS);
 
   return (
-    // Écran d'onglet : la tab bar, visible juste en dessous, réserve déjà la zone
-    // système basse (elle ajoute `insets.bottom` à son propre padding). Aucune
-    // compensation ici — ni bord `bottom` de SafeAreaView (qui, mesurant la fenêtre,
-    // rajoutait toute la zone système au-dessus de la tab bar : bouton trop haut), ni
-    // `insets.bottom` dans le footer. Même réglage que la Collection.
     <ScreenContainer
       scroll
+      // Pas de bord `bottom` : le footer gère lui-même la zone système (plus de tab
+      // bar sous cet écran), comme le footer d'Ajout/Modification.
       edges={['left', 'right']}
-      // Marge standard (`spacing.lg`) sous la dernière section, au-dessus du footer
-      // bordé et ombré — au lieu de 12 px qui la laissaient paraître rognée.
       contentStyle={{ paddingBottom: theme.spacing.lg }}
       footer={
         <View
           testID="filters-footer"
           style={[
             {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
               paddingHorizontal: theme.spacing.lg,
-              paddingTop: theme.spacing.xs,
-              // Comme le footer d'Ajout/Modification (`insets.bottom + spacing.sm`), moins
-              // la zone système, déjà réservée par la tab bar.
-              paddingBottom: theme.spacing.sm,
+              paddingTop: theme.spacing.sm,
+              paddingBottom: insets.bottom + theme.spacing.sm,
               backgroundColor: theme.colors.background,
               borderTopWidth: 1,
               borderTopColor: theme.colors.border,
@@ -88,20 +106,22 @@ export default function FiltersScreen() {
             theme.elevation.low,
           ]}
         >
-          <Button label="Appliquer les filtres" onPress={handleApply} />
+          {/* Action secondaire : bouton discret de 44 pt, inactif quand il n'y a
+              rien à réinitialiser ; « Appliquer » reste l'action principale. */}
+          <Button
+            label="Réinitialiser"
+            variant="ghost"
+            onPress={handleReset}
+            disabled={isDefaultFilters(draft)}
+          />
+          <View style={{ flex: 1 }}>
+            <Button label="Appliquer les filtres" onPress={handleApply} />
+          </View>
         </View>
       }
     >
       <View style={{ gap: theme.spacing.lg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-          <Pressable accessibilityRole="button" onPress={handleReset} hitSlop={8}>
-            <AppText variant="label" color="secondary">
-              Réinitialiser
-            </AppText>
-          </Pressable>
-        </View>
-
-        <FilterSection title="Catégories">
+        <FilterSection icon="albums-outline" title="Catégorie">
           <Chip
             label="Toutes"
             selected={draft.categoryId === undefined}
@@ -117,9 +137,9 @@ export default function FiltersScreen() {
           ))}
         </FilterSection>
 
-        <FilterSection title="Propriétaires">
+        <FilterSection icon="people-outline" title="Appartient à">
           <Chip
-            label="Tous"
+            label="Tout le monde"
             selected={draft.ownerId === undefined}
             onPress={() => setDraft((d) => ({ ...d, ownerId: undefined }))}
           />
@@ -133,7 +153,7 @@ export default function FiltersScreen() {
           ))}
         </FilterSection>
 
-        <FilterSection title="État">
+        <FilterSection icon="sparkles-outline" title="État">
           <Chip
             label="Tous"
             selected={draft.condition === undefined}
@@ -149,28 +169,15 @@ export default function FiltersScreen() {
           ))}
         </FilterSection>
 
-        <FilterSection title="Trier par">
-          {SORT_OPTIONS.map((option) => (
+        <FilterSection icon="swap-vertical-outline" title="Trier par">
+          {COLLECTION_SORT_PRESETS.map((preset) => (
             <Chip
-              key={option.value}
-              label={option.label}
-              selected={draft.sort === option.value}
-              onPress={() => setDraft((d) => ({ ...d, sort: option.value }))}
+              key={preset.key}
+              label={preset.label}
+              selected={isSortPresetSelected(preset, draft)}
+              onPress={() => setDraft((d) => ({ ...d, sort: preset.sort, order: preset.order }))}
             />
           ))}
-        </FilterSection>
-
-        <FilterSection title="Ordre">
-          <Chip
-            label="Croissant"
-            selected={draft.order === 'asc'}
-            onPress={() => setDraft((d) => ({ ...d, order: 'asc' }))}
-          />
-          <Chip
-            label="Décroissant"
-            selected={draft.order === 'desc'}
-            onPress={() => setDraft((d) => ({ ...d, order: 'desc' }))}
-          />
         </FilterSection>
       </View>
     </ScreenContainer>

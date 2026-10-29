@@ -6,6 +6,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, View } from 'react-
 import {
   AppText,
   Chip,
+  EmptyNest,
   EmptyState,
   ErrorState,
   IconButton,
@@ -84,8 +85,8 @@ export default function CollectionScreen() {
   const activeFilterCount = pills.length;
   // Distinct du badge : une catégorie choisie par chip rapide restreint bien la liste
   // (« aucun résultat » plutôt que « nid vide »), même si le badge ne la compte pas.
-  const isNarrowed = Boolean(
-    filters.search || activeFilters.categoryId || activeFilters.ownerId || activeFilters.condition,
+  const hasFilters = Boolean(
+    activeFilters.categoryId || activeFilters.ownerId || activeFilters.condition,
   );
 
   return (
@@ -172,25 +173,6 @@ export default function CollectionScreen() {
           message={getErrorMessage(itemsQuery.error)}
           onRetry={() => void itemsQuery.refetch()}
         />
-      ) : items.length === 0 ? (
-        // Un titre distinct pour une bibliothèque réellement vide vs une
-        // recherche/un filtre sans résultat — sinon « Votre nid est encore
-        // vide. » s'affiche même quand le foyer possède déjà des dizaines
-        // d'objets, simplement non retournés par la recherche/le filtre
-        // courant (voir docs/PHASE_STATUS.md).
-        <EmptyState
-          icon="leaf-outline"
-          title={
-            isNarrowed
-              ? 'Aucun objet ne correspond à votre recherche.'
-              : 'Votre nid est encore vide.'
-          }
-          message={
-            isNarrowed
-              ? 'Essayez de modifier votre recherche ou vos filtres.'
-              : 'Ajoutez votre premier trésor.'
-          }
-        />
       ) : (
         <FlatList
           testID="collection-item-list"
@@ -200,7 +182,29 @@ export default function CollectionScreen() {
           style={{ flex: 1 }}
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
+          // `flexGrow: 1` : l'état vide (rendu DANS la liste, pour garder le
+          // pull-to-refresh — un autre membre peut avoir ajouté le premier objet)
+          // occupe toute la hauteur et reste centré.
+          contentContainerStyle={{
+            flexGrow: 1,
+            gap: theme.spacing.sm,
+            paddingBottom: theme.spacing.sm,
+          }}
+          ListEmptyComponent={
+            <CollectionEmptyState
+              search={filters.search}
+              hasFilters={hasFilters}
+              onClearSearch={() => setSearch('')}
+              onClearFilters={() =>
+                setActiveFilters({
+                  ...activeFilters,
+                  categoryId: undefined,
+                  ownerId: undefined,
+                  condition: undefined,
+                })
+              }
+            />
+          }
           renderItem={({ item }) => (
             <ItemCard
               item={item}
@@ -232,6 +236,60 @@ export default function CollectionScreen() {
       )}
     </ScreenContainer>
   );
+}
+
+/**
+ * Un message par situation, jamais trompeur — le nid n'est « vide » que sans
+ * recherche ni filtre (voir docs/PHASE_STATUS.md). Recherche et filtres sont deux
+ * états distincts : « Effacer les filtres » garde la recherche en cours (et le tri),
+ * « Effacer la recherche » garde les filtres. Avec les deux actifs, seule l'action
+ * sur les filtres est proposée ; la recherche s'efface depuis son champ.
+ */
+function CollectionEmptyState({
+  search,
+  hasFilters,
+  onClearSearch,
+  onClearFilters,
+}: {
+  search: string | undefined;
+  hasFilters: boolean;
+  onClearSearch: () => void;
+  onClearFilters: () => void;
+}) {
+  if (search && hasFilters) {
+    return (
+      <EmptyState
+        icon="search-outline"
+        title="Aucun objet ne correspond à cette recherche et à ces filtres."
+        message="Essayez d’effacer les filtres ou de modifier la recherche."
+        actionLabel="Effacer les filtres"
+        onAction={onClearFilters}
+      />
+    );
+  }
+  if (search) {
+    return (
+      <EmptyState
+        icon="search-outline"
+        title={`Aucun objet ne correspond à « ${search} ».`}
+        message="Essayez un autre titre, auteur ou artiste."
+        actionLabel="Effacer la recherche"
+        onAction={onClearSearch}
+      />
+    );
+  }
+  if (hasFilters) {
+    return (
+      <EmptyState
+        icon="options-outline"
+        title="Aucun objet ne correspond à ces filtres."
+        message="Essayez de modifier ou d’effacer certains filtres."
+        actionLabel="Effacer les filtres"
+        onAction={onClearFilters}
+      />
+    );
+  }
+  return <EmptyNest onAdd={() => router.push('/(app)/add-item/category')} />;
 }
 
 /** Pastille sauge d'un filtre actif, retirable d'un tap (zone tactile portée à

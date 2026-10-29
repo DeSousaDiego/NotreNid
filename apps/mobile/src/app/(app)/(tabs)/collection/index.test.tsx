@@ -10,7 +10,7 @@ import {
 } from '../../../../providers/CollectionFiltersProvider';
 import { ThemeProvider } from '../../../../theme';
 
-import FiltersScreen from './filters';
+import FiltersScreen from '../../collection/filters';
 import CollectionScreen from './index';
 
 // expo-image's module-level analytics-integration probing isn't compatible with
@@ -227,47 +227,126 @@ describe('CollectionScreen — loading and error states', () => {
 });
 
 describe('CollectionScreen — empty states', () => {
-  it('shows the true empty-library wording when the household has no item at all', async () => {
+  /** Liste vide dès qu'une recherche ou un filtre est envoyé ; Dune sinon. */
+  function emptyWhenNarrowed() {
+    listMock().mockImplementation(
+      (
+        _householdId: string,
+        params: { search?: string; categoryId?: string; ownerId?: string; condition?: string },
+      ) =>
+        Promise.resolve(
+          page(
+            params.search || params.categoryId || params.ownerId || params.condition ? [] : [ITEM],
+          ),
+        ),
+    );
+  }
+
+  it('shows the shared empty nest with an "Ajouter un objet" CTA when the household has no item at all', async () => {
     listMock().mockResolvedValue(page([]));
     const view = await renderScreen();
 
     await waitFor(() => expect(view.getByText('Votre nid est encore vide.')).toBeTruthy());
     expect(view.getByText('Ajoutez votre premier trésor.')).toBeTruthy();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Ajouter un objet' }));
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/add-item/category');
   });
 
-  it('shows a distinct "no results" wording for a text search that matches nothing — never claims the library is empty', async () => {
-    listMock().mockImplementation((_householdId: string, params: { search?: string }) =>
-      Promise.resolve(page(params.search ? [] : [ITEM])),
-    );
+  it('names the searched term when a text search matches nothing, and offers to clear the search only', async () => {
+    emptyWhenNarrowed();
     const view = await renderScreen();
-
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
 
     await fireEvent.changeText(view.getByPlaceholderText('Rechercher…'), 'introuvable');
 
     await waitFor(
-      () => expect(view.getByText('Aucun objet ne correspond à votre recherche.')).toBeTruthy(),
+      () => expect(view.getByText('Aucun objet ne correspond à « introuvable ».')).toBeTruthy(),
       { timeout: 3000 },
     );
-    expect(view.getByText('Essayez de modifier votre recherche ou vos filtres.')).toBeTruthy();
+    expect(view.getByText('Essayez un autre titre, auteur ou artiste.')).toBeTruthy();
+    // Aucun filtre actif : jamais « modifiez vos filtres », jamais « nid vide ».
+    expect(view.queryByText(/filtres/)).toBeNull();
     expect(view.queryByText('Votre nid est encore vide.')).toBeNull();
+
+    // Le bouton visible de l'état vide (le champ a aussi sa croix, même libellé).
+    await fireEvent.press(view.getByText('Effacer la recherche'));
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy(), { timeout: 3000 });
+    expect(view.getByPlaceholderText('Rechercher…').props.value).toBe('');
   });
 
-  it('shows the same "no results" wording for a category filter that matches nothing', async () => {
-    listMock().mockImplementation((_householdId: string, params: { categoryId?: string }) =>
-      Promise.resolve(page(params.categoryId ? [] : [ITEM])),
-    );
-    const view = await renderScreen();
+  it('shows a filters-specific message for a filter that matches nothing, and "Effacer les filtres" restores the list', async () => {
+    emptyWhenNarrowed();
+    const view = await renderScreen({ condition: 'POOR', sort: 'title', order: 'asc' });
 
+    await waitFor(() =>
+      expect(view.getByText('Aucun objet ne correspond à ces filtres.')).toBeTruthy(),
+    );
+    expect(view.getByText('Essayez de modifier ou d’effacer certains filtres.')).toBeTruthy();
+    expect(view.queryByText('Votre nid est encore vide.')).toBeNull();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Effacer les filtres' }));
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    // Le tri choisi n'est pas un filtre : il est conservé.
+    expect(listMock()).toHaveBeenLastCalledWith(
+      'household-1',
+      expect.objectContaining({ condition: undefined, sort: 'title', order: 'asc' }),
+    );
+  });
+
+  it('counts a quick category chip as a filter (no "empty nest" claim)', async () => {
+    emptyWhenNarrowed();
+    const view = await renderScreen();
     await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
     await waitFor(() => expect(view.getByLabelText('Livre')).toBeTruthy());
 
     await fireEvent.press(view.getByLabelText('Livre'));
 
     await waitFor(() =>
-      expect(view.getByText('Aucun objet ne correspond à votre recherche.')).toBeTruthy(),
+      expect(view.getByText('Aucun objet ne correspond à ces filtres.')).toBeTruthy(),
     );
-    expect(view.getByText('Essayez de modifier votre recherche ou vos filtres.')).toBeTruthy();
+    expect(view.queryByText('Votre nid est encore vide.')).toBeNull();
+  });
+
+  it('with both a search and filters, says so and clears the filters while keeping the search', async () => {
+    listMock().mockImplementation(
+      (_householdId: string, params: { search?: string; ownerId?: string }) =>
+        Promise.resolve(page(params.search && params.ownerId ? [] : [ITEM])),
+    );
+    const view = await renderScreen({ ownerId: 'user-1' });
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+
+    await fireEvent.changeText(view.getByPlaceholderText('Rechercher…'), 'dune');
+    await waitFor(
+      () =>
+        expect(
+          view.getByText('Aucun objet ne correspond à cette recherche et à ces filtres.'),
+        ).toBeTruthy(),
+      { timeout: 3000 },
+    );
+    expect(view.queryByText('Effacer la recherche')).toBeNull();
+
+    await fireEvent.press(view.getByRole('button', { name: 'Effacer les filtres' }));
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
+    expect(listMock()).toHaveBeenLastCalledWith(
+      'household-1',
+      expect.objectContaining({ search: 'dune', ownerId: undefined }),
+    );
+    expect(view.getByPlaceholderText('Rechercher…').props.value).toBe('dune');
+  });
+
+  it('keeps pull-to-refresh available on the empty nest — another member may add the first item', async () => {
+    listMock()
+      .mockResolvedValueOnce(page([]))
+      .mockResolvedValueOnce(page([ITEM]));
+    const view = await renderScreen();
+    await waitFor(() => expect(view.getByText('Votre nid est encore vide.')).toBeTruthy());
+
+    await fireEvent(view.getByTestId('collection-item-list'), 'refresh');
+
+    await waitFor(() => expect(view.getByText('Dune')).toBeTruthy());
     expect(view.queryByText('Votre nid est encore vide.')).toBeNull();
   });
 });
@@ -304,7 +383,7 @@ describe('CollectionScreen — search', () => {
 
 /**
  * Parcours réel du téléphone : la Collection reste montée sous l'écran Filtres
- * (même Stack, même `CollectionFiltersProvider`), on choisit un propriétaire et un
+ * (Stack `(app)`, même `CollectionFiltersProvider`), on choisit un propriétaire et un
  * état, « Appliquer », puis retour à la Collection. `filtersMounted` simule
  * l'ouverture/fermeture de l'écran Filtres (le `router` est mocké).
  */
@@ -411,10 +490,10 @@ describe('CollectionScreen — filters screen round trip', () => {
       ),
     );
 
-    // Rouvrir Filtres : le brouillon repart de l'état réel (propriétaire « Tous »).
+    // Rouvrir Filtres : le brouillon repart de l'état réel (propriétaire « Tout le monde »).
     await openFilters();
     await waitFor(() =>
-      expect(view.getByRole('button', { name: 'Tous', selected: true })).toBeTruthy(),
+      expect(view.getByRole('button', { name: 'Tout le monde', selected: true })).toBeTruthy(),
     );
     expect(view.getByRole('button', { name: 'Très bon état', selected: true })).toBeTruthy();
     expect(view.getByRole('button', { name: 'Alix', selected: false })).toBeTruthy();
