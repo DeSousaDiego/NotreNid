@@ -32,6 +32,9 @@ import { UsersModule } from './users/users.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: path.resolve(__dirname, '../../../.env'),
+      // En test, tout l'environnement est fourni explicitement (test/setup-e2e-env.ts, CI) :
+      // le .env de dev (sa base, son stockage R2, ses clés fournisseurs) ne doit jamais fuiter.
+      ignoreEnvFile: process.env['APP_ENV'] === 'test',
     }),
     // Limite globale par défaut, appliquée à toutes les routes non couvertes par un
     // @Throttle() plus spécifique (voir AuthController pour les limites renforcées).

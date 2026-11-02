@@ -415,7 +415,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Supprime un fichier précédemment téléversé. */
+        /** Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404. */
         delete: operations["UploadsController_remove"];
         options?: never;
         head?: never;
@@ -2071,12 +2071,14 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                householdId: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description URL publique de l'image téléversée. */
+            /** @description Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -2118,6 +2120,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                householdId: string;
                 uploadId: string;
             };
             cookie?: never;

@@ -289,3 +289,39 @@ Les couvertures récupérées par le lookup barcode (comme celles uploadées man
 **Politique d'image** (`ProductImageValidator`) : la jaquette physique du fournisseur reste prioritaire sur l'affiche TMDB (choix du propriétaire), **seulement si** elle est en HTTPS (jamais de réécriture d'une URL `http://` tierce), répond 2xx après redirections vers une destination HTTPS et, s'il annonce un `Content-Type`, que ce soit un type image (un en-tête absent est toléré). Jamais de requête vers une IP littérale ou `localhost` (URL fournie par un tiers). HEAD avec repli GET d'un octet si le CDN refuse HEAD ; délai court (1,5 s, `PRODUCT_IMAGE_CHECK_TIMEOUT_MS`) exécuté **en parallèle** de TMDB ; tout échec → affiche TMDB, jamais d'échec de résolution. Constaté au POC : 3 images vidéo sur 4 inexploitables (404, domaine mort, absente). Pas de proxy ni de copie vers le stockage à ce stade. Limite connue assumée : le choix d'image est figé dans la réponse mise en cache (30 j si `matched`, 24 h si `partial`) — un échec ponctuel de vérification garde l'affiche TMDB jusqu'à expiration.
 
 **Contrat public** : seul `source` gagne la valeur `'digiteyes'` (ajout non cassant, typé à la main dans `packages/api-client`, non décrit dans le schéma OpenAPI ; le mobile ne le lit pas). `docs/openapi.json` ne change que par le texte du résumé de la route.
+
+## Release 0A — Environnements séparés et garde-fou destructif commun
+
+**Constat.** Le `.env` local ciblait la base Neon de production. `db:seed` et `db:reset` n'avaient aucun garde-fou. Les e2e chargeaient ce même `.env` (via `ConfigModule`) et auraient écrit dans Neon et dans R2.
+
+**`APP_ENV` plutôt que `NODE_ENV`.** `NODE_ENV` règle le comportement des librairies et vaut `development` aussi bien sur un poste branché par erreur sur la production qu'en dev réel : ce n'est pas un signal fiable pour distinguer les bases. `APP_ENV` est déclaré explicitement. Absent, toute opération destructive est refusée.
+
+**Un seul garde-fou** (`apps/api/src/database-safety/database-safety.ts`, fonctions pures sans dépendance Nest/Prisma), appelé par `prisma.config.ts`, le seed, les e2e, `scripts/db-test.ts` et le démarrage de l'API. Il est conservateur : il faut à la fois un `APP_ENV` non-production, un hôte absent de `PRODUCTION_DATABASE_HOSTS`, et un hôte local ou explicitement autorisé (`DESTRUCTIVE_DB_ALLOWED_HOSTS`). Un hôte distant inconnu est refusé, même en dev.
+
+**`prisma.config.ts` comme point de contrôle.** Le CLI Prisma le charge pour chaque commande. Inspecter `process.argv` y protège aussi un `prisma migrate reset` tapé à la main, pas seulement les scripts `package.json`. Un wrapper par script aurait laissé ce trou ; les deux points appellent la même fonction.
+
+**Pas de confirmation interactive.** Elle se contourne par réflexe (`--force`, `yes |`) et ne fonctionne pas en CI. Le refus repose sur des signaux vérifiables.
+
+**Base e2e.** Les e2e ne lisent que `DATABASE_URL_TEST` (jamais `DATABASE_URL`), avec pour défaut le service `postgres-test` (tmpfs, port 5433). Ils refusent une cible identique à la base de dev. Avec `APP_ENV=test`, `AppModule` ignore le fichier `.env`, pour qu'aucune clé fournisseur ni aucun stockage R2 ne fuite dans les tests ; `STORAGE_DRIVER=local` est imposé.
+
+## Release 0A — Table `uploads` : l'autorisation vient de la base, pas du nom de fichier
+
+**Vulnérabilité.** L'identifiant renvoyé au client était la clé de stockage (`<uuid>.<ext>`), qui est aussi visible dans l'URL publique de l'image. `DELETE /households/:hid/uploads/:id` vérifiait l'appartenance au foyer `:hid`, puis supprimait cette clé sans aucun lien avec `:hid`. N'importe quel utilisateur pouvait créer son propre foyer et supprimer la couverture ou l'avatar d'un autre foyer.
+
+**Correction.**
+- Chaque téléversement de foyer crée une ligne `Upload` : `storageKey` unique, `householdId`, `uploadedById` nullable (`SET NULL`, compatible avec une future suppression de compte), `kind`, `contentType`, `sizeBytes`.
+- L'identifiant exposé est `Upload.id`. La suppression exige `id` ET `householdId`. Tout autre cas (autre foyer, inconnu, ancienne clé) produit la même 404, qui ne révèle pas l'existence du fichier ailleurs.
+- Le contrat est inchangé : `{ id, url }`, `id` opaque.
+
+**Ordres choisis.**
+- Création : stockage, puis ligne. Si l'écriture en base échoue, le fichier est supprimé (compensation journalisée si elle échoue aussi).
+- Suppression : stockage, puis ligne. Si le stockage échoue, la ligne reste et l'opération peut être relancée. Un fichier déjà absent est traité comme supprimé, pour que la ligne puisse disparaître.
+- Aucun ordre n'évite tous les cas sans transaction distribuée ; ceux-ci laissent au pire un fichier orphelin, jamais une ligne qui autorise à supprimer le fichier d'autrui.
+
+**Avatars hors table.** Ils sont rattachés à l'utilisateur (`User.avatarUploadId`) et ne passent par aucune route de foyer. Le bug ne les rendait vulnérables qu'à travers la route de foyer, désormais fermée. Les intégrer aurait élargi le lot sans gain de sécurité.
+
+**Pas de backfill.** Les anciennes couvertures ne sont connues que par `items.coverImageUrl`, une URL libre non validée, et leur auteur n'a jamais été enregistré. Les rattacher reviendrait à deviner : une URL pointant vers l'avatar ou la couverture d'autrui aurait suffi à offrir le droit de la supprimer. Elles restent affichées mais ne sont plus supprimables via l'API. Le mobile ne supprime de toute façon que le fichier qu'il vient de téléverser dans la session de formulaire.
+
+**Limites connues.**
+- La suppression d'un foyer supprime ses lignes `uploads` en cascade sans supprimer les fichiers R2 (orphelins). C'est un sujet pré-existant, laissé à un lot ultérieur.
+- Un fichier encore référencé par un item peut être supprimé par un membre du foyer : le comportement est le même qu'avant, à l'intérieur du foyer.

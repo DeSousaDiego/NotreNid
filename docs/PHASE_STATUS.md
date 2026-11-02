@@ -2,6 +2,47 @@
 
 ## Phase courante
 
+**Release 0A — Sécurité immédiate (pré-release Play Store, 2026-10-30)** : implémenté et validé (2026-11-02). Validations :
+
+- **DEV** (branche Neon `dev-test`) : `migrate deploy` a appliqué `add_uploads`, et `migrate diff` ne détecte aucune dérive. L'API démarre avec `STORAGE_DRIVER=local`, sans aucun appel R2.
+- **TEST** (branche Neon `test`) : e2e 5 suites / 24 tests verts, dont `uploads.e2e-spec.ts`.
+- **Global :** API unitaires 541/541 en série, api-client 10/10, lint, typecheck, format et builds verts.
+- **Production :** jamais touchée.
+
+Note TEST : la branche avait été créée avec le schéma mais sans historique Prisma (`_prisma_migrations` vide). Elle a été « baselinée » (`prisma migrate resolve --applied` sur les 9 migrations, après un `migrate diff` qui confirmait un schéma identique). Les insertions idempotentes des catégories système ont ensuite été rejouées (`prisma db execute`). Une branche recréée de la même façon nécessitera la même opération ; une base vide se prépare directement avec `test:e2e`. Deux corrections :
+
+- **Séparation des environnements.**
+  - `APP_ENV` explicite (`development|test|production`).
+  - Base de test dédiée : `DATABASE_URL_TEST`, service `postgres-test` dans docker-compose.
+  - Les e2e ignorent le `.env` de dev et imposent `STORAGE_DRIVER=local`.
+  - Garde-fou commun `apps/api/src/database-safety/database-safety.ts`, appelé par :
+    - `prisma.config.ts`, pour toute commande du CLI Prisma (`migrate reset|dev`, `db push|execute`) ;
+    - le seed ;
+    - le setup e2e et `scripts/db-test.ts` ;
+    - le démarrage de l'API, qui refuse une base déclarée production hors `APP_ENV=production`.
+  - `APP_ENV=production` est fixé dans l'image Docker.
+  - Constat d'origine : le `.env` local ciblait la base Neon de production, et les e2e y auraient écrit (ainsi que dans R2).
+- **Isolation des uploads.**
+  - Vulnérabilité confirmée : `DELETE /households/:hid/uploads/:uploadId` ne vérifiait que l'appartenance au foyer de la route. Il supprimait ensuite l'objet de stockage nommé `:uploadId`, un nom visible dans l'URL publique, quel que soit son foyer.
+  - Nouvelle table `uploads`, migration `20261030120000_add_uploads`, additive, sans backfill ; voir l'en-tête de la migration.
+  - L'autorisation repose désormais sur la ligne `Upload` (`id` + `householdId`).
+  - Compensation : le fichier stocké est supprimé si l'écriture en base échoue.
+  - Ordre de suppression : stockage, puis ligne.
+  - Les avatars ne sont pas concernés : ils sont rattachés à l'utilisateur et n'ont jamais été exposés par une route de foyer.
+  - Le contrat d'API est inchangé : `{ id, url }`, et `id` reste opaque pour le mobile.
+
+Migration à appliquer en production **avant** le déploiement du backend. Actions manuelles restantes :
+
+- appliquer la migration sur Neon avec `db:migrate:deploy`, en passant l'URL dans l'environnement de la commande (voir `docs/DEPLOYMENT.md`) ;
+- sur tout nouveau poste, renseigner `APP_ENV`, `DATABASE_URL` (DEV), `DATABASE_URL_TEST`, `PRODUCTION_DATABASE_HOSTS` et `DESTRUCTIVE_DB_ALLOWED_HOSTS`.
+
+Restes pour le Lot 0B (non traités ici) :
+
+- `trust proxy` ;
+- timeout du client mobile ;
+- coercion des timeouts des providers et validation de l'environnement ;
+- `LOG_LEVEL`.
+
 **Bloc 3H — Digit-Eyes, fournisseur produit DVD/Blu-ray** (2026-10-06) : ✅ implémenté et vérifié localement, **non activé en production**. Abstraction `DvdProductProvider` (jeton `DVD_PRODUCT_PROVIDER`) avec `DigitEyesProvider` (nouveau) et `UpcItemDbProvider` (conservé comme rollback, tests inchangés), sélection au démarrage par `DVD_PRODUCT_PROVIDER` (`upcitemdb` par défaut). Classification extraite dans `dvd-product-classification.ts` (+ liste blanche de catégories vidéo), corrections ciblées du nettoyage de titre TMDB (crochets vides/année, apostrophes), validation des jaquettes fournisseur (`ProductImageValidator`), erreurs provider qualifiées (`BarcodeProviderError.kind`). Fixtures `test-fixtures/digiteyes/` tirées des réponses réelles du POC. Contrat : `source` accepte `'digiteyes'` (ajout). **Reste manuel** : activation Digit-Eyes (99 $), clés dans Render, puis `DVD_PRODUCT_PROVIDER=digiteyes` — voir `docs/GO_LIVE_CHECKLIST.md` étape 13 bis. Détail des choix : `docs/DECISIONS.md`, Bloc 3H.
 
 **Bloc 3G — Scan caméra réel (`expo-camera`)** : ✅ implémenté et vérifié localement (typecheck/lint/format/tests verts, voir section dédiée ci-dessous). Dernier incrément du flow d'ajout par code-barres (Livre/CD/DVD), qui remplace la saisie manuelle temporaire du Bloc 3A par un vrai viseur caméra. En attente de l'accord explicite du propriétaire avant commit/push, et d'un nouveau build EAS (module natif) pour toute vérification sur téléphone réel.

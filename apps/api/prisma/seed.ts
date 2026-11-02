@@ -8,6 +8,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { HouseholdRole, ItemCondition, PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 
+import { assertSafeDatabaseForDestructiveOperation } from '../src/database-safety/database-safety';
+
+// Vérifié AVANT toute connexion : sur une base de production (ou non vérifiable), le seed
+// s'arrête sans rien créer ni modifier — comptes de démo au mot de passe connu inclus.
+const seedTarget = assertSafeDatabaseForDestructiveOperation('le seed');
+
 const adapter = new PrismaPg({ connectionString: process.env['DATABASE_URL'] });
 const prisma = new PrismaClient({ adapter });
 
@@ -42,7 +48,7 @@ async function upsertSystemCategories() {
 }
 
 async function main() {
-  console.log('Seed — début.');
+  console.log(`Seed — début (cible : ${seedTarget}).`);
 
   const systemCategories = await upsertSystemCategories();
 

@@ -24,27 +24,28 @@ enum ItemCondition {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  displayName  String
-  avatarUrl    String?
+  id             String   @id @default(uuid())
+  email          String   @unique
+  passwordHash   String
+  displayName    String
+  avatarUrl      String?
   // Nom de fichier de stockage (ex. "<uuid>.jpg") retourné par UploadsService.save()
   // lors du dernier avatar téléversé — jamais exposé publiquement (PublicUser). Permet
   // de supprimer proprement l'ancien fichier lors d'un remplacement/retrait sans
   // dériver une clé fragile depuis avatarUrl (Bloc 4, docs/PHASE_STATUS.md).
   avatarUploadId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  createdHouseholds   Household[]           @relation("HouseholdCreatedBy")
-  memberships         HouseholdMember[]
-  sentInvitations     HouseholdInvitation[] @relation("InvitationInvitedBy")
-  createdItems        Item[]                @relation("ItemCreatedBy")
-  updatedItems        Item[]                @relation("ItemUpdatedBy")
-  ownedItems          ItemOwner[]
-  refreshSessions     RefreshSession[]
-  auditLogs           AuditLog[]
+  createdHouseholds Household[]           @relation("HouseholdCreatedBy")
+  memberships       HouseholdMember[]
+  sentInvitations   HouseholdInvitation[] @relation("InvitationInvitedBy")
+  createdItems      Item[]                @relation("ItemCreatedBy")
+  updatedItems      Item[]                @relation("ItemUpdatedBy")
+  ownedItems        ItemOwner[]
+  refreshSessions   RefreshSession[]
+  auditLogs         AuditLog[]
+  uploads           Upload[]              @relation("UploadUploadedBy")
 
   @@map("users")
 }
@@ -62,6 +63,7 @@ model Household {
   categories  Category[]
   items       Item[]
   auditLogs   AuditLog[]
+  uploads     Upload[]
 
   @@map("households")
 }
@@ -156,15 +158,15 @@ model Item {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  household     Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  category      Category      @relation(fields: [categoryId], references: [id])
-  createdBy     User          @relation("ItemCreatedBy", fields: [createdById], references: [id])
-  updatedBy     User          @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
-  owners        ItemOwner[]
-  countries     ItemCountry[]
-  bookMetadata  BookMetadata?
-  cdMetadata    CdMetadata?
-  dvdMetadata   DvdMetadata?
+  household    Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  category     Category      @relation(fields: [categoryId], references: [id])
+  createdBy    User          @relation("ItemCreatedBy", fields: [createdById], references: [id])
+  updatedBy    User          @relation("ItemUpdatedBy", fields: [updatedById], references: [id])
+  owners       ItemOwner[]
+  countries    ItemCountry[]
+  bookMetadata BookMetadata?
+  cdMetadata   CdMetadata?
+  dvdMetadata  DvdMetadata?
 
   @@index([householdId])
   @@map("items")
@@ -252,14 +254,14 @@ model DvdMetadata {
 }
 
 model RefreshSession {
-  id           String    @id @default(uuid())
-  userId       String
-  tokenHash    String    @unique
-  deviceName   String?
-  expiresAt    DateTime
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  lastUsedAt   DateTime  @default(now())
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  deviceName String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -281,4 +283,38 @@ model AuditLog {
 
   @@index([householdId])
   @@map("audit_logs")
+}
+
+enum UploadKind {
+  ITEM_COVER
+}
+
+/// Fichier téléversé dans un foyer (Release 0A, docs/PHASE_STATUS.md). C'est CETTE ligne,
+/// et non la clé de stockage, qui autorise une suppression : `DELETE
+/// /households/:householdId/uploads/:uploadId` ne touche un fichier que si
+/// `id = :uploadId AND householdId = :householdId`.
+///
+/// Les avatars n'y figurent pas : ils restent rattachés à l'utilisateur (`User.avatarUploadId`)
+/// et ne sont jamais gérés par une route de foyer. Les couvertures téléversées avant cette
+/// table n'ont pas de ligne (aucun backfill, voir la migration) : elles restent affichées
+/// mais ne sont plus supprimables via l'API.
+model Upload {
+  id           String     @id @default(uuid())
+  /// Nom de l'objet dans le stockage (ex. "<uuid>.jpg") — jamais utilisé comme autorisation.
+  storageKey   String     @unique
+  householdId  String
+  /// Nullable : l'upload appartient au foyer, pas à son auteur (compatible avec une future
+  /// suppression de compte).
+  uploadedById String?
+  kind         UploadKind @default(ITEM_COVER)
+  contentType  String
+  sizeBytes    Int
+  createdAt    DateTime   @default(now())
+
+  household  Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  uploadedBy User?     @relation("UploadUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([householdId])
+  @@index([uploadedById])
+  @@map("uploads")
 }

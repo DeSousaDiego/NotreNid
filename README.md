@@ -44,7 +44,7 @@ pnpm install
 cp .env.example .env
 docker compose up -d
 pnpm db:generate
-pnpm --filter @notre-nid/api exec prisma migrate dev   # applique les migrations
+pnpm --filter @notre-nid/api run db:migrate              # applique les migrations (base DEV)
 pnpm --filter @notre-nid/api run db:seed                # crée les comptes de démonstration
 pnpm dev:api      # démarre l'API sur http://localhost:3000
 pnpm dev:mobile   # démarre Expo (Metro / Expo Dev Tools)
@@ -54,19 +54,53 @@ pnpm dev:mobile   # démarre Expo (Metro / Expo Dev Tools)
 
 Voir [.env.example](.env.example) pour la liste complète et commentée. Points clés :
 
-- `DATABASE_URL` : connexion PostgreSQL (doit correspondre aux identifiants de `docker-compose.yml` en local).
+- `APP_ENV=development|test|production` : environnement applicatif **explicite**, utilisé par les garde-fous des opérations destructives (voir « Environnements » ci-dessous).
+- `DATABASE_URL` : base de **développement** (service `postgres` de `docker-compose.yml`). Jamais l'URL de production.
+- `DATABASE_URL_TEST` : base des tests e2e (service `postgres-test`, port 5433).
+- `PRODUCTION_DATABASE_HOSTS` / `DESTRUCTIVE_DB_ALLOWED_HOSTS` : hôtes (sans identifiants) déclarés production / distants autorisés.
 - `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL` / `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL` : secrets et durées de vie des tokens — secrets de développement uniquement, à régénérer avant toute mise en production.
 - `MOBILE_PUBLIC_API_URL` : seule variable destinée à être embarquée dans le bundle mobile ; ne doit jamais contenir de secret.
 - `STORAGE_DRIVER=local|s3` : stockage local en développement (`apps/api/storage/uploads/`, ignoré par Git) ou S3-compatible en production (AWS S3, Supabase Storage, MinIO, Cloudflare R2) — voir `docs/DEPLOYMENT.md`. En `s3`, `STORAGE_ENDPOINT` (l'endpoint authentifié) et `STORAGE_PUBLIC_URL` (l'URL réellement publique) sont deux notions distinctes — **obligatoire de renseigner `STORAGE_PUBLIC_URL` avec Cloudflare R2**, dont l'endpoint n'est jamais public.
 - `SMTP_HOST` / `SMTP_PORT` : par défaut, Mailpit local (`localhost:1025`) — les emails d'invitation y sont capturés (interface web sur `http://localhost:8025`).
 
+## Environnements
+
+| Environnement | `APP_ENV` | Base | Comment |
+| --- | --- | --- | --- |
+| Développement | `development` | `DATABASE_URL` → PostgreSQL local (`docker compose up -d`, service `postgres`, port 5432) | `.env` racine copié de `.env.example` |
+| Test / E2E | `test` | `DATABASE_URL_TEST` → PostgreSQL local dédié (service `postgres-test`, port 5433, données en mémoire) ; en CI, le service PostgreSQL éphémère du workflow | `pnpm --filter @notre-nid/api run test:e2e` applique les migrations puis lance les tests |
+| Production | `production` | Neon, configurée **uniquement** dans Render (`DATABASE_URL`) | Image Docker (`APP_ENV=production` y est fixé) |
+
+**La production n'est jamais la cible par défaut d'une commande locale.** Le `.env` local ne doit jamais contenir l'URL de la base de production. Pour qu'un oubli soit détecté, déclarez son hôte (sans identifiants) dans `PRODUCTION_DATABASE_HOSTS` : l'API refuse alors de démarrer dessus hors `APP_ENV=production`.
+
+Les tests e2e ne lisent **que** `DATABASE_URL_TEST` (jamais `DATABASE_URL`) et n'utilisent ni le reste du `.env` de dev (stockage R2, clés fournisseurs…) ni de stockage distant : `STORAGE_DRIVER=local` est imposé.
+
+### Commandes destructives
+
+Un garde-fou commun ([apps/api/src/database-safety/database-safety.ts](apps/api/src/database-safety/database-safety.ts)) décide si une base peut subir une opération destructive. Il est conservateur : **le moindre doute → refus**, avec un message qui ne contient jamais d'identifiant.
+
+Autorisé seulement si **tous** ces signaux concordent :
+
+1. `APP_ENV` vaut explicitement `development` ou `test` (absent ou `production` → refus), et `NODE_ENV` ≠ `production` ;
+2. l'hôte de `DATABASE_URL` n'est pas listé dans `PRODUCTION_DATABASE_HOSTS` (pour Neon, l'hôte avec ou sans `-pooler` désigne la même base) ;
+3. l'hôte est local (`localhost`, `127.0.0.1`, services docker `postgres` / `postgres-test`) **ou** explicitement listé dans `DESTRUCTIVE_DB_ALLOWED_HOSTS` (ex. une branche Neon de dev).
+
+Opérations protégées :
+
+- `prisma migrate reset`, `prisma migrate dev`, `prisma db push`, `prisma db execute` — via `apps/api/prisma.config.ts`, chargé par **toute** commande du CLI Prisma : un `prisma migrate reset` tapé à la main est bloqué au même titre que `db:reset` / `db:migrate` ;
+- le seed (`db:seed`) : vérifié avant toute connexion, rien n'est créé sur une base refusée ;
+- les tests e2e (`test:e2e`) et la préparation de leur base (`db:test:reset`) : exigent en plus `APP_ENV=test` et une base distincte de la base de dev.
+
+`db:migrate:deploy` (`prisma migrate deploy`, non destructive) reste volontairement non bloquée : c'est la commande des migrations de production (voir [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+
 ## Base de données
 
-- Schéma complet : [apps/api/prisma/schema.prisma](apps/api/prisma/schema.prisma) (`User`, `Household`, `HouseholdMember`, `HouseholdInvitation`, `Category`, `Item`, `ItemOwner`, `BookMetadata`/`CdMetadata`/`DvdMetadata`, `RefreshSession`, `AuditLog`).
+- Schéma complet : [apps/api/prisma/schema.prisma](apps/api/prisma/schema.prisma) (`User`, `Household`, `HouseholdMember`, `HouseholdInvitation`, `Category`, `Item`, `ItemOwner`, `BookMetadata`/`CdMetadata`/`DvdMetadata`, `RefreshSession`, `AuditLog`, `Upload`).
 - Générer le client Prisma : `pnpm db:generate`.
-- Appliquer les migrations : `pnpm --filter @notre-nid/api exec prisma migrate dev`.
+- Appliquer les migrations (DEV) : `pnpm --filter @notre-nid/api run db:migrate`.
 - Seed (idempotent) : `pnpm --filter @notre-nid/api run db:seed`.
-- Réinitialiser complètement la base locale : `pnpm --filter @notre-nid/api run db:reset` (⚠️ détruit toutes les données locales ; ne jamais utiliser contre une base de production).
+- Réinitialiser complètement la base locale : `pnpm --filter @notre-nid/api run db:reset` (⚠️ détruit toutes les données de la base DEV ; refusé par le garde-fou sur toute base de production ou non vérifiée).
+- Réinitialiser la base de TEST : `pnpm --filter @notre-nid/api run db:test:reset`.
 - Prisma Studio : `pnpm --filter @notre-nid/api exec prisma studio`.
 
 ## Lancement
@@ -76,7 +110,7 @@ docker compose up -d              # PostgreSQL + Mailpit (+ MinIO via --profile 
 pnpm dev:api                      # API NestJS (http://localhost:3000/api/v1/health)
 pnpm dev:mobile                   # Application mobile (Expo)
 pnpm test                         # Tests unitaires (tous les packages qui en définissent)
-pnpm --filter @notre-nid/api run test:e2e   # Tests d'intégration (nécessitent PostgreSQL démarré)
+pnpm --filter @notre-nid/api run test:e2e   # Tests d'intégration (base TEST : service postgres-test démarré)
 ```
 
 ## Comptes de démonstration
@@ -139,7 +173,7 @@ docker-compose.yml  PostgreSQL, Mailpit, MinIO (profil optionnel) — développe
 | `pnpm test` | Tests unitaires (packages qui en définissent) |
 | `pnpm db:generate` | Génère le client Prisma |
 
-Scripts spécifiques à l'API (`pnpm --filter @notre-nid/api run <script>`) : `db:migrate` (développement, interactif), `db:migrate:deploy` (production, non interactif — voir `docs/DEPLOYMENT.md`), `db:seed`, `db:reset`, `test:e2e`, `export:openapi` (régénère `docs/openapi.json` depuis les contrôleurs réels).
+Scripts spécifiques à l'API (`pnpm --filter @notre-nid/api run <script>`) : `db:migrate` (développement, interactif), `db:migrate:deploy` (production, non interactif — voir `docs/DEPLOYMENT.md`), `db:seed`, `db:reset`, `db:test:reset`, `test:e2e`, `export:openapi` (régénère `docs/openapi.json` depuis les contrôleurs réels).
 
 Scripts spécifiques au client API (`pnpm --filter @notre-nid/api-client run <script>`) : `generate:types` (régénère `src/generated/schema.d.ts` depuis `docs/openapi.json` via `openapi-typescript`) — à relancer après `export:openapi` chaque fois qu'une route change ; la CI échoue si l'un des deux fichiers générés n'est pas à jour.
 
@@ -147,7 +181,7 @@ Scripts spécifiques au client API (`pnpm --filter @notre-nid/api-client run <sc
 
 ```bash
 pnpm --filter @notre-nid/api run test         # 46 tests unitaires (Jest)
-pnpm --filter @notre-nid/api run test:e2e     # 14 tests d'intégration (Supertest, PostgreSQL + Mailpit réels requis)
+pnpm --filter @notre-nid/api run test:e2e     # tests d'intégration (Supertest, base TEST PostgreSQL réelle requise)
 pnpm --filter @notre-nid/api-client run test  # 8 tests unitaires (client HTTP : auth, rafraîchissement, erreurs, FormData, texte brut)
 pnpm --filter @notre-nid/mobile run test      # 104 tests (composants, hooks de mutation, schéma du formulaire d'item, écrans)
 ```

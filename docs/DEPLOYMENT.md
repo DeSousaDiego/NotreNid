@@ -77,6 +77,7 @@ pnpm --filter @notre-nid/api run db:migrate:deploy   # = prisma migrate deploy
 ```
 
 - Exécuter cette commande **une seule fois**, depuis un environnement disposant de `DATABASE_URL` pointant vers la base de production (poste de déploiement, job CI dédié, ou cible `migrate` de l'image Docker : `docker run --rm -e DATABASE_URL=... notre-nid-api:migrate`) — **jamais** automatiquement au démarrage de chaque instance de l'API (plusieurs instances migreraient simultanément).
+- Depuis un poste de développement, passer l'URL de production **uniquement pour cette commande**, jamais via le `.env` (qui reste sur la base DEV) : `APP_ENV=production DATABASE_URL='<url de production>' pnpm --filter @notre-nid/api run db:migrate:deploy`. Les variables passées ainsi priment sur le `.env`, et `APP_ENV=production` garantit qu'aucune commande destructive ne pourrait s'exécuter par erreur dans la même session.
 - Toujours **avant** de basculer le trafic vers la nouvelle version de l'API.
 - Toujours précédé d'une sauvegarde récente (`docs/BACKUP_AND_RESTORE.md`) avant une migration jugée risquée (renommage/suppression de colonne, changement de type).
 - Le schéma applique une nouvelle migration à chaque évolution — jamais de modification d'une migration déjà appliquée (`apps/api/prisma/migrations/`), conformément à `CLAUDE.md`.
@@ -88,6 +89,8 @@ Voir [.env.example](../.env.example) pour la liste complète et commentée. Poin
 | Variable | Attention en production |
 | --- | --- |
 | `NODE_ENV` | `production` — désactive Swagger (`/api/v1/docs`), active les logs JSON. |
+| `APP_ENV` | `production` — déjà fixé dans l'image Docker (`infrastructure/docker/api/Dockerfile`, cibles `runtime` et `migrate`). Le renseigner aussi dans Render est sans risque. Toute opération destructive (seed, `migrate reset`, `migrate dev`…) est refusée avec cette valeur — voir README, « Environnements ». |
+| `DATABASE_URL` | Base de production. N'existe **que** dans Render (et, ponctuellement, dans l'environnement qui lance `db:migrate:deploy`) — jamais dans le `.env` d'un poste de développement. |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Générer des valeurs dédiées (`openssl rand -hex 32`), jamais celles de développement ou de CI. |
 | `CORS_ORIGINS` | Restreindre strictement (l'app mobile n'envoie pas d'origine `Origin` de navigateur — cette liste protège une éventuelle future app web, voir `docs/ROADMAP.md`). |
 | `API_PUBLIC_URL` | URL HTTPS publique réelle de l'API (utilisée pour construire les URLs d'images en `STORAGE_DRIVER=local` — à éviter en production, voir ci-dessous). |

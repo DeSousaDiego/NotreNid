@@ -1347,10 +1347,19 @@
     "/households/{householdId}/uploads": {
       "post": {
         "operationId": "UploadsController_upload",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
-            "description": "URL publique de l'image téléversée."
+            "description": "Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image."
           },
           "400": {
             "description": "Les données envoyées sont invalides."
@@ -1381,6 +1390,14 @@
         "operationId": "UploadsController_remove",
         "parameters": [
           {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "uploadId",
             "required": true,
             "in": "path",
@@ -1408,7 +1425,7 @@
             "bearer": []
           }
         ],
-        "summary": "Supprime un fichier précédemment téléversé.",
+        "summary": "Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404.",
         "tags": [
           "uploads"
         ]

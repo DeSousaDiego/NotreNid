@@ -9,7 +9,11 @@ on:
 env:
   HUSKY: '0'
   NODE_ENV: test
+  # Garde-fous des opérations destructives (seed, e2e) : voir README, « Environnements ».
+  APP_ENV: test
   DATABASE_URL: postgresql://notre_nid:notre_nid_ci_password@localhost:5432/notre_nid?schema=public
+  # Les e2e ne lisent QUE cette variable ; en CI, c'est le même service PostgreSQL éphémère.
+  DATABASE_URL_TEST: postgresql://notre_nid:notre_nid_ci_password@localhost:5432/notre_nid?schema=public
   JWT_ACCESS_SECRET: ci_access_secret_not_a_real_secret
   JWT_ACCESS_TTL: 15m
   JWT_REFRESH_SECRET: ci_refresh_secret_not_a_real_secret

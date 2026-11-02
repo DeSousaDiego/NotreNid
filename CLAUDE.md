@@ -16,6 +16,7 @@ Le cahier des charges principal du projet est disponible ici :
 - Ne jamais présenter une fonctionnalité partielle comme terminée.
 - Maintenir la documentation en même temps que le code.
 - Ne pas effectuer d’opération destructive ou de déploiement sans autorisation.
+- Ne jamais pointer le `.env` local vers la base de production ; ne jamais contourner le garde-fou `apps/api/src/database-safety/` (voir README, « Environnements »).
 - Toute évolution du schéma Prisma passe par une nouvelle migration (ne jamais modifier une migration déjà appliquée).
 - Toute modification des permissions, de l’authentification ou de l’isolation des households doit être accompagnée de tests.
 - Ne jamais casser le contrat de l’API sans migration, versionnement et documentation associés.
@@ -42,7 +43,7 @@ pnpm install                     # installation (racine)
 cp .env.example .env             # variables d'environnement locales
 docker compose up -d             # PostgreSQL + Mailpit (+ MinIO via --profile storage)
 pnpm db:generate                 # génère le client Prisma
-pnpm --filter @notre-nid/api exec prisma migrate dev   # applique les migrations
+pnpm --filter @notre-nid/api run db:migrate              # applique les migrations (base DEV)
 pnpm --filter @notre-nid/api run db:seed               # crée les comptes de démonstration
 
 pnpm dev:api                     # API en mode watch
@@ -53,6 +54,7 @@ pnpm format / pnpm format:check  # Prettier
 pnpm typecheck                   # tsc --noEmit sur tout le monorepo
 pnpm test                        # tests (Jest) des packages qui en définissent
 pnpm build                       # build de tous les packages/apps concernés
+pnpm --filter @notre-nid/api run test:e2e   # e2e sur la base TEST (DATABASE_URL_TEST) uniquement
 ```
 
 Voir [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) pour l’ordre des phases et [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) pour l’état courant.

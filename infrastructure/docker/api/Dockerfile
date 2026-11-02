@@ -88,6 +88,8 @@ RUN cd /prod/api && /repo/node_modules/.bin/prisma generate
 FROM build AS migrate
 
 ENV NODE_ENV=production
+# Environnement applicatif explicite (garde-fous base de données, voir README « Environnements »).
+ENV APP_ENV=production
 
 WORKDIR /repo/apps/api
 
@@ -112,6 +114,8 @@ ENTRYPOINT ["pnpm", "exec", "prisma", "migrate", "deploy"]
 FROM node:22-alpine AS runtime
 
 ENV NODE_ENV=production
+# Environnement applicatif explicite (garde-fous base de données, voir README « Environnements »).
+ENV APP_ENV=production
 
 RUN addgroup -S notrenid \
     && adduser -S notrenid -G notrenid

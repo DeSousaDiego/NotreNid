@@ -18,6 +18,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # Base dédiée aux tests e2e (DATABASE_URL_TEST) — jamais la base de dev ci-dessus.
+  # Données en mémoire (tmpfs) : repart à vide à chaque redémarrage du conteneur.
+  postgres-test:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: notre_nid
+      POSTGRES_PASSWORD: notre_nid_test_password
+      POSTGRES_DB: notre_nid_test
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U notre_nid -d notre_nid_test']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped

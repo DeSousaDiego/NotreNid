@@ -13,10 +13,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { MAX_UPLOAD_SIZE_BYTES, UploadsService } from './uploads.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AppException } from '../common/exceptions/app-exception';
 import { HouseholdMembershipGuard } from '../common/guards/household-membership.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ApiStandardErrors } from '../common/swagger/api-standard-errors.decorator';
+import type { AuthenticatedUser } from '../common/types/authenticated-request';
 
 @ApiTags('uploads')
 @ApiBearerAuth()
@@ -32,21 +34,35 @@ export class UploadsController {
     summary:
       'Téléverse une image de couverture (JPEG/PNG/WebP, validé par signature binaire, 10 Mo max).',
   })
-  @ApiResponse({ status: 201, description: "URL publique de l'image téléversée." })
+  @ApiResponse({
+    status: 201,
+    description:
+      "Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image.",
+  })
   @ApiStandardErrors(400, 401, 403, 404)
-  upload(@UploadedFile() file?: Express.Multer.File) {
+  upload(
+    @Param('householdId') householdId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     if (!file) {
       throw new AppException(HttpStatus.BAD_REQUEST, 'VALIDATION_ERROR', 'Aucun fichier reçu.');
     }
-    return this.uploadsService.save(file);
+    return this.uploadsService.createHouseholdUpload(householdId, user.id, file);
   }
 
   @Delete(':uploadId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Supprime un fichier précédemment téléversé.' })
+  @ApiOperation({
+    summary:
+      "Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404.",
+  })
   @ApiResponse({ status: 204, description: 'Fichier supprimé.' })
   @ApiStandardErrors(401, 403, 404)
-  async remove(@Param('uploadId') uploadId: string): Promise<void> {
-    await this.uploadsService.remove(uploadId);
+  async remove(
+    @Param('householdId') householdId: string,
+    @Param('uploadId') uploadId: string,
+  ): Promise<void> {
+    await this.uploadsService.deleteHouseholdUpload(householdId, uploadId);
   }
 }
