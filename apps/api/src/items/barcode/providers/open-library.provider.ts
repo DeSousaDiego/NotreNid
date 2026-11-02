@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { BarcodeProviderError } from './barcode-provider.error';
 import type { BookBarcodeProvider } from './book-provider.interface';
+import { positiveMsOrDefault } from '../barcode-config.util';
 import type { BookProviderLookupResult } from '../types/barcode-result.types';
 
 interface OpenLibraryAuthor {
@@ -96,8 +97,10 @@ export class OpenLibraryProvider implements BookBarcodeProvider {
   constructor(private readonly configService: ConfigService) {}
 
   async lookup(isbn: string): Promise<BookProviderLookupResult | null> {
-    const budgetMs =
-      this.configService.get<number>('OPEN_LIBRARY_TIMEOUT_BUDGET_MS') ?? DEFAULT_TIMEOUT_BUDGET_MS;
+    const budgetMs = positiveMsOrDefault(
+      this.configService.get<string | number>('OPEN_LIBRARY_TIMEOUT_BUDGET_MS'),
+      DEFAULT_TIMEOUT_BUDGET_MS,
+    );
     const bibkey = `ISBN:${isbn}`;
     // `.json` fait partie du CHEMIN, pas seulement du paramètre `format` —
     // confirmé en reproduisant l'appel réel (curl) : `/api/books` (sans

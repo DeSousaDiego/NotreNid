@@ -5,6 +5,7 @@ import {
   evaluateDestructiveDatabaseOperation,
   normalizeDatabaseHost,
   parseDatabaseTarget,
+  toDirectDatabaseUrl,
   type DatabaseSafetyEnv,
 } from './database-safety';
 
@@ -155,6 +156,23 @@ describe('database safety', () => {
         assertDatabaseMatchesAppEnv({ APP_ENV: 'development', DATABASE_URL: NEON_POOLER_URL }),
       ).not.toThrow();
     });
+  });
+
+  describe('toDirectDatabaseUrl', () => {
+    it('targets the direct host of the same Neon endpoint, keeping credentials, database and params', () => {
+      const direct = toDirectDatabaseUrl(`${NEON_POOLER_URL}?sslmode=require`);
+      expect(direct).toBe(
+        'postgresql://owner:super-secret-pw@ep-prod-123.eu-central-1.aws.neon.tech/neondb?sslmode=require',
+      );
+      expect(normalizeDatabaseHost(parseDatabaseTarget(direct)?.host ?? '')).toBe(NEON_DIRECT_HOST);
+    });
+
+    it.each([LOCAL_URL, 'postgresql://u:p@db-pooler.example.com/db', 'not a url', undefined])(
+      'leaves %p untouched',
+      (url) => {
+        expect(toDirectDatabaseUrl(url)).toBe(url);
+      },
+    );
   });
 
   describe('detectDestructivePrismaCommand', () => {

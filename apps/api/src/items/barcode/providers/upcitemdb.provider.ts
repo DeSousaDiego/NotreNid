@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { BarcodeProviderError, type BarcodeProviderErrorKind } from './barcode-provider.error';
 import type { DvdProductLookupOutcome, DvdProductProvider } from './dvd-product-provider.interface';
 import { UpcItemDbRateLimiterService } from './upcitemdb-rate-limiter.service';
+import { positiveMsOrDefault } from '../barcode-config.util';
 import {
   detectEditionHint,
   detectMediaType,
@@ -179,8 +180,10 @@ export class UpcItemDbProvider implements DvdProductProvider {
   ) {}
 
   async lookup(barcode: string): Promise<DvdProductLookupOutcome> {
-    const budgetMs =
-      this.configService.get<number>('UPCITEMDB_TIMEOUT_BUDGET_MS') ?? DEFAULT_TIMEOUT_BUDGET_MS;
+    const budgetMs = positiveMsOrDefault(
+      this.configService.get<string | number>('UPCITEMDB_TIMEOUT_BUDGET_MS'),
+      DEFAULT_TIMEOUT_BUDGET_MS,
+    );
     const userAgent = this.configService.get<string>('UPCITEMDB_USER_AGENT') ?? DEFAULT_USER_AGENT;
     const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`;
 

@@ -2,6 +2,32 @@
 
 ## Phase courante
 
+**Release 0B — Robustesse production (2026-11-02)** : implémenté et validé. Détail des choix dans `docs/DECISIONS.md` (« Release 0B »), procédures dans `docs/OPERATIONS.md`.
+
+- **API**
+  - `trust proxy` via `TRUST_PROXY_HOPS` (défaut 1 en production, jamais `true`).
+  - `/auth/refresh` limité à 30/min (au lieu de 10).
+  - Durées des fournisseurs converties et bornées (`positiveMsOrDefault`).
+  - Validation de l'environnement au démarrage (`src/config/env.validation.ts`).
+  - `LOG_LEVEL` réellement appliqué.
+  - Pagination déterministe (départage par `id`).
+  - Suppression d'un foyer : objets puis foyer en transaction, puis fichiers en best effort.
+  - Avertissement si `API_PUBLIC_URL` manque avec le stockage local.
+- **Mobile / api-client**
+  - Délai central : 25 s pour une requête, 60 s pour un upload, avec `NetworkError` (`reason: 'timeout'`) en cas de dépassement.
+  - Refresh : seuls 400/401/403 terminent la session ; à la restauration, un 5xx ou un 429 donne « Réessayer ».
+  - `/households` en erreur sans données → écran d'erreur, plus jamais « Créez votre nid ».
+  - Filtres Collection propres à chaque foyer.
+  - Dédoublonnage défensif des pages.
+  - Archives : liste contrainte en hauteur, verrou de pagination, spinner.
+  - ErrorBoundary racine.
+- **Build et outillage**
+  - Build API sans incrémental, avec contrôle post-build de `dist/main.js`.
+  - Le CLI Prisma passe par l'hôte direct Neon (hors pooler) : un verrou consultatif de migration resté bloqué derrière PgBouncer a été constaté et levé sur TEST.
+- **À faire dans Render avant le déploiement**
+  - Vérifier que les secrets JWT respectent les règles de production (32 caractères min., différents, sans valeur d'exemple), sinon l'API refusera de démarrer.
+  - Vérifier `TRUST_PROXY_HOPS` avec la procédure de `docs/OPERATIONS.md`.
+
 **Release 0A — Sécurité immédiate (pré-release Play Store, 2026-10-30)** : implémenté et validé (2026-11-02). Validations :
 
 - **DEV** (branche Neon `dev-test`) : `migrate deploy` a appliqué `add_uploads`, et `migrate diff` ne détecte aucune dérive. L'API démarre avec `STORAGE_DRIVER=local`, sans aucun appel R2.

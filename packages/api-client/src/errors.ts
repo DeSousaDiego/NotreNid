@@ -30,8 +30,22 @@ export class NetworkError extends Error {
   constructor(
     message = 'Impossible de joindre le service. Vérifiez votre connexion et réessayez.',
     cause?: unknown,
+    /** `timeout` : aucune réponse dans le délai du client (voir `requestTimeoutMs`). */
+    public readonly reason: 'unreachable' | 'timeout' = 'unreachable',
   ) {
     super(message, cause !== undefined ? { cause } : undefined);
     this.name = 'NetworkError';
   }
+}
+
+/**
+ * Échec probablement passager — réseau, délai dépassé, limite de débit (429) ou panne
+ * serveur (5xx) — par opposition à un refus définitif (identifiants ou session invalides).
+ * Ne doit JAMAIS faire perdre la session : l'appelant affiche une erreur avec « Réessayer ».
+ */
+export function isTransientFailure(error: unknown): boolean {
+  if (error instanceof NetworkError) {
+    return true;
+  }
+  return error instanceof ApiError && (error.statusCode === 429 || error.statusCode >= 500);
 }

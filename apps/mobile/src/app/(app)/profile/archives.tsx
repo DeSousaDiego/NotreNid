@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { FlatList, View } from 'react-native';
+import { useRef } from 'react';
+import { ActivityIndicator, FlatList, View } from 'react-native';
 
 import {
   EmptyState,
@@ -10,6 +11,7 @@ import {
 } from '../../../components';
 import { useItems } from '../../../hooks/useItems';
 import { getErrorMessage } from '../../../lib/errorMessage';
+import { uniqueById } from '../../../lib/uniqueById';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useTheme } from '../../../theme';
 
@@ -19,10 +21,17 @@ export default function ArchivesScreen() {
   const { householdId } = useHousehold();
   const itemsQuery = useItems(householdId, { archived: true, sort: 'updatedAt', order: 'desc' });
 
-  const items = itemsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const items = uniqueById(itemsQuery.data?.pages.map((page) => page.data) ?? []);
+  // Verrou synchrone (même principe que la Collection) : `onEndReached` peut être appelé deux
+  // fois avant que `isFetchingNextPage` ne se reflète au rendu suivant.
+  const isFetchingNextPageRef = useRef(false);
 
   return (
-    <ScreenContainer edges={['left', 'right', 'bottom']}>
+    // `flex: 1` (et non le `flexGrow: 1` par défaut) : sans hauteur contrainte, la FlatList
+    // prenait la hauteur de son contenu et les derniers objets archivés devenaient
+    // inaccessibles — même cause que le bug corrigé sur la Collection. Écran de pile, sans
+    // tab bar : la safe area du bas (`edges`) suffit, aucune compensation à calculer.
+    <ScreenContainer edges={['left', 'right', 'bottom']} contentStyle={{ flex: 1 }}>
       {itemsQuery.isLoading ? (
         <View testID="archives-loading-skeleton" style={{ gap: theme.spacing.sm }}>
           {[0, 1, 2].map((key) => (
@@ -47,6 +56,7 @@ export default function ArchivesScreen() {
           data={items}
           keyExtractor={(item) => item.id}
           testID="archives-item-list"
+          style={{ flex: 1 }}
           // Le padding horizontal vient déjà de `ScreenContainer` (même alignement que
           // la Collection) : ne pas le doubler ici.
           contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
@@ -58,14 +68,25 @@ export default function ArchivesScreen() {
               }
             />
           )}
-          refreshing={itemsQuery.isRefetching}
+          refreshing={itemsQuery.isRefetching && !itemsQuery.isFetchingNextPage}
           onRefresh={() => void itemsQuery.refetch()}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
-            if (itemsQuery.hasNextPage && !itemsQuery.isFetchingNextPage) {
-              void itemsQuery.fetchNextPage();
-            }
+            if (!itemsQuery.hasNextPage || isFetchingNextPageRef.current) return;
+            isFetchingNextPageRef.current = true;
+            void itemsQuery.fetchNextPage().finally(() => {
+              isFetchingNextPageRef.current = false;
+            });
           }}
+          ListFooterComponent={
+            itemsQuery.isFetchingNextPage ? (
+              <ActivityIndicator
+                testID="archives-pagination-spinner"
+                style={{ marginTop: theme.spacing.md }}
+                color={theme.colors.primary}
+              />
+            ) : null
+          }
         />
       )}
     </ScreenContainer>

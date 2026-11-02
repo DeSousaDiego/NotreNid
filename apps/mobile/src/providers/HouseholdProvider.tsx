@@ -15,6 +15,9 @@ interface HouseholdContextValue {
   households: HouseholdWithRole[];
   isLoading: boolean;
   isError: boolean;
+  /** Une réponse de /households a été reçue (éventuellement vide) — voir lib/householdGate. */
+  hasData: boolean;
+  error: unknown;
   selectHousehold: (householdId: string) => void;
   /** Revient à l'écran de sélection (sans effet si un seul household existe). */
   clearSelection: () => void;
@@ -83,6 +86,8 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
       households: households ?? [],
       isLoading: householdsQuery.isLoading,
       isError: householdsQuery.isError,
+      hasData: households !== undefined,
+      error: householdsQuery.error,
       selectHousehold: (id: string) => {
         setManualSelection(id);
       },

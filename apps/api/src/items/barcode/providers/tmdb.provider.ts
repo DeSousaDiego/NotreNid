@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { BarcodeProviderError } from './barcode-provider.error';
 import { TmdbRateLimiterService } from './tmdb-rate-limiter.service';
 import { ISO_COUNTRY_CODES } from '../../iso-country-codes.constant';
+import { positiveMsOrDefault } from '../barcode-config.util';
 import {
   detectEditionHint,
   detectMediaType,
@@ -491,8 +492,10 @@ export class TmdbProvider {
    * `RETRYABLE_HTTP_STATUSES` — aucun quota journalier TMDB à préserver).
    */
   private async fetchWithRetry(url: string): Promise<Response> {
-    const budgetMs =
-      this.configService.get<number>('TMDB_TIMEOUT_BUDGET_MS') ?? DEFAULT_TIMEOUT_BUDGET_MS;
+    const budgetMs = positiveMsOrDefault(
+      this.configService.get<string | number>('TMDB_TIMEOUT_BUDGET_MS'),
+      DEFAULT_TIMEOUT_BUDGET_MS,
+    );
     const token = this.configService.get<string>('TMDB_READ_ACCESS_TOKEN');
     const userAgent = this.configService.get<string>('TMDB_USER_AGENT') ?? DEFAULT_USER_AGENT;
 

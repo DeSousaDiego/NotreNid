@@ -6,6 +6,16 @@ import type { ApiClientConfig, StoredTokens } from './types';
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
+export const DEFAULT_REQUEST_TIMEOUT_MS = 25_000;
+export const DEFAULT_UPLOAD_TIMEOUT_MS = 60_000;
+
+/**
+ * Réponses de /auth/refresh qui signifient « ce refresh token n'est plus accepté » : seules
+ * elles mettent fin à la session. Réseau, délai dépassé, 429 et 5xx sont passagers : la
+ * session est conservée et l'erreur remonte à l'écran, qui propose de réessayer.
+ */
+const SESSION_REJECTED_REFRESH_STATUSES = new Set([400, 401, 403]);
+
 export interface RequestOptions {
   method?: HttpMethod;
   /**
@@ -46,6 +56,18 @@ export function createHttpClient(config: ApiClientConfig) {
       }
     }
 
+    // Délai central (jamais par écran) : couvre l'attente des en-têtes de réponse, la partie
+    // longue d'un réveil serveur ; le corps JSON lu ensuite est petit.
+    const timeoutMs = isFormData
+      ? (config.uploadTimeoutMs ?? DEFAULT_UPLOAD_TIMEOUT_MS)
+      : (config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+
     try {
       return await fetch(url, {
         method: options.method ?? 'GET',
@@ -55,12 +77,16 @@ export function createHttpClient(config: ApiClientConfig) {
           : options.body !== undefined
             ? JSON.stringify(options.body)
             : undefined,
+        signal: controller.signal,
       });
     } catch (error) {
       // `cause` porte l'erreur `fetch` d'origine, jamais affichée par défaut
       // (voir NetworkError) — nécessaire pour diagnostiquer un échec bas
-      // niveau (ex. upload multipart) sans la perdre silencieusement.
-      throw new NetworkError(undefined, error);
+      // niveau (ex. upload multipart) sans la perdre silencieusement. Un délai
+      // dépassé devient une NetworkError ordinaire : jamais d'« AbortError » à l'écran.
+      throw new NetworkError(undefined, error, timedOut ? 'timeout' : 'unreachable');
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -107,8 +133,10 @@ export function createHttpClient(config: ApiClientConfig) {
         });
 
         if (!response.ok) {
-          await config.tokenStorage.clearTokens();
-          config.onSessionExpired?.();
+          if (SESSION_REJECTED_REFRESH_STATUSES.has(response.status)) {
+            await config.tokenStorage.clearTokens();
+            config.onSessionExpired?.();
+          }
           throw new ApiError(await parseErrorBody(response));
         }
 

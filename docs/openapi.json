@@ -575,6 +575,93 @@
         ]
       }
     },
+    "/households/{householdId}/uploads": {
+      "post": {
+        "operationId": "UploadsController_upload",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image."
+          },
+          "400": {
+            "description": "Les données envoyées sont invalides."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Téléverse une image de couverture (JPEG/PNG/WebP, validé par signature binaire, 10 Mo max).",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/households/{householdId}/uploads/{uploadId}": {
+      "delete": {
+        "operationId": "UploadsController_remove",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Fichier supprimé."
+          },
+          "401": {
+            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
+          },
+          "403": {
+            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
+          },
+          "404": {
+            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404.",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
     "/households/{householdId}/invitations": {
       "post": {
         "operationId": "InvitationsController_create",
@@ -1341,93 +1428,6 @@
         "summary": "Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library ; CD : MusicBrainz, avec couverture Cover Art Archive ; DVD : fournisseur produit configuré (Digit-Eyes ou UPCitemdb) pour l'édition physique, enrichi par TMDB pour le film — voir `status: 'partial'` quand seule l'édition physique a pu être identifiée). Ne crée ni ne modifie jamais un item.",
         "tags": [
           "items"
-        ]
-      }
-    },
-    "/households/{householdId}/uploads": {
-      "post": {
-        "operationId": "UploadsController_upload",
-        "parameters": [
-          {
-            "name": "householdId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image."
-          },
-          "400": {
-            "description": "Les données envoyées sont invalides."
-          },
-          "401": {
-            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
-          },
-          "403": {
-            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
-          },
-          "404": {
-            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Téléverse une image de couverture (JPEG/PNG/WebP, validé par signature binaire, 10 Mo max).",
-        "tags": [
-          "uploads"
-        ]
-      }
-    },
-    "/households/{householdId}/uploads/{uploadId}": {
-      "delete": {
-        "operationId": "UploadsController_remove",
-        "parameters": [
-          {
-            "name": "householdId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "uploadId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Fichier supprimé."
-          },
-          "401": {
-            "description": "L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré."
-          },
-          "403": {
-            "description": "L'utilisateur n'a pas les droits nécessaires pour effectuer cette action."
-          },
-          "404": {
-            "description": "La ressource demandée n'existe pas, ou n'appartient pas à ce household."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404.",
-        "tags": [
-          "uploads"
         ]
       }
     },

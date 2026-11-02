@@ -7,6 +7,7 @@ export { CategoryIllustration } from './CategoryIllustration';
 export { CategoryPicker } from './CategoryPicker';
 export { Chip, CHIP_HIT_SLOP } from './Chip';
 export { ConditionBadge } from './ConditionBadge';
+export { AppErrorBoundary } from './AppErrorBoundary';
 export { ConfirmDialog } from './ConfirmDialog';
 export { CountrySelect } from './CountrySelect';
 export { EmptyNest } from './EmptyNest';

@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
+import { resolveHouseholdGate } from '../../../lib/householdGate';
 import { useHousehold } from '../../../providers/HouseholdProvider';
 import { useAddTabPress } from '../../../screens/add-item/useAddTabPress';
+import { HouseholdLoadErrorView } from '../../../screens/HouseholdLoadErrorView';
 import { HouseholdSelectView } from '../../../screens/HouseholdSelectView';
 import { NoHouseholdView } from '../../../screens/NoHouseholdView';
 import { useTheme } from '../../../theme';
@@ -12,14 +14,22 @@ import { useAuth } from '../../../providers/AuthProvider';
 export default function AppLayout() {
   const theme = useTheme();
   const { status } = useAuth();
-  const { householdId, households, isLoading, selectHousehold } = useHousehold();
+  const { householdId, households, hasData, isError, error, refetch, selectHousehold } =
+    useHousehold();
   const handleAddTabPress = useAddTabPress();
 
   if (status !== 'authenticated') {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (isLoading) {
+  const gate = resolveHouseholdGate({
+    hasData,
+    isError,
+    householdCount: households.length,
+    householdId,
+  });
+
+  if (gate === 'loading') {
     return (
       <View
         style={{
@@ -34,11 +44,15 @@ export default function AppLayout() {
     );
   }
 
-  if (households.length === 0) {
+  if (gate === 'error') {
+    return <HouseholdLoadErrorView error={error} onRetry={refetch} />;
+  }
+
+  if (gate === 'empty') {
     return <NoHouseholdView />;
   }
 
-  if (!householdId) {
+  if (gate === 'select' || !householdId) {
     return <HouseholdSelectView households={households} onSelect={selectHousehold} />;
   }
 

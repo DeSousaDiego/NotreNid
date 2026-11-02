@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { BarcodeProviderError } from './barcode-provider.error';
 import type { BookBarcodeProvider } from './book-provider.interface';
+import { positiveMsOrDefault } from '../barcode-config.util';
 import type { BookProviderLookupResult } from '../types/barcode-result.types';
 
 interface GoogleBooksIndustryIdentifier {
@@ -58,8 +59,10 @@ export class GoogleBooksProvider implements BookBarcodeProvider {
 
   async lookup(isbn: string): Promise<BookProviderLookupResult | null> {
     const apiKey = this.configService.get<string>('GOOGLE_BOOKS_API_KEY');
-    const timeoutMs =
-      this.configService.get<number>('BARCODE_PROVIDER_TIMEOUT_MS') ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = positiveMsOrDefault(
+      this.configService.get<string | number>('BARCODE_PROVIDER_TIMEOUT_MS'),
+      DEFAULT_TIMEOUT_MS,
+    );
     const url = new URL('https://www.googleapis.com/books/v1/volumes');
     url.searchParams.set('q', `isbn:${isbn}`);
     if (apiKey) url.searchParams.set('key', apiKey);

@@ -163,3 +163,74 @@ describe('ArchivesScreen', () => {
     expect(contentStyle.paddingBottom).toBe(8);
   });
 });
+
+describe('ArchivesScreen — long lists (Release 0B)', () => {
+  const flat = (style: unknown) => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
+
+  /** Première vue hôte (`View`) au-dessus de la liste : le conteneur de contenu de l'écran. */
+  function hostContainerOf(node: { parent: unknown }) {
+    let current = node.parent as {
+      type: unknown;
+      parent: unknown;
+      props: { style?: unknown };
+    } | null;
+    while (current && current.type !== 'View') {
+      current = current.parent as typeof current;
+    }
+    return current;
+  }
+
+  function pageN(items: ReturnType<typeof mockItem>[], page: number, totalPages: number) {
+    return {
+      data: items,
+      meta: { page, pageSize: items.length, totalItems: totalPages * items.length, totalPages },
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('constrains the list to the visible height so the last archived items stay reachable', async () => {
+    (mockApiClient.items.list as jest.Mock).mockResolvedValue(pageOf([mockItem()]));
+    const view = await renderScreen(<ArchivesScreen />);
+    await waitFor(() => expect(view.getByTestId('archives-item-list')).toBeTruthy());
+
+    const list = view.getByTestId('archives-item-list');
+    expect(flat(list.props.style)).toEqual(expect.objectContaining({ flex: 1 }));
+    expect(flat(hostContainerOf(list)?.props.style)).toEqual(expect.objectContaining({ flex: 1 }));
+  });
+
+  it('fetches the next page only once when onEndReached fires twice in a row', async () => {
+    (mockApiClient.items.list as jest.Mock)
+      .mockResolvedValueOnce(pageN([mockItem({ id: 'a', title: 'A' })], 1, 3))
+      .mockReturnValueOnce(new Promise(() => {}));
+    const view = await renderScreen(<ArchivesScreen />);
+    await waitFor(() => expect(view.getByTestId('archives-item-list')).toBeTruthy());
+
+    const list = view.getByTestId('archives-item-list');
+    list.props.onEndReached();
+    list.props.onEndReached();
+
+    await waitFor(() => expect(mockApiClient.items.list).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(view.getByTestId('archives-pagination-spinner')).toBeTruthy());
+    expect(mockApiClient.items.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('never shows the same archived item twice when it shifts to the next page', async () => {
+    (mockApiClient.items.list as jest.Mock)
+      .mockResolvedValueOnce(
+        pageN([mockItem({ id: 'a', title: 'A' }), mockItem({ id: 'b', title: 'B' })], 1, 2),
+      )
+      .mockResolvedValueOnce(
+        pageN([mockItem({ id: 'b', title: 'B' }), mockItem({ id: 'c', title: 'C' })], 2, 2),
+      );
+    const view = await renderScreen(<ArchivesScreen />);
+    await waitFor(() => expect(view.getByTestId('archives-item-list')).toBeTruthy());
+
+    view.getByTestId('archives-item-list').props.onEndReached();
+
+    await waitFor(() => expect(view.getByText('C')).toBeTruthy());
+    expect(view.getAllByText('B')).toHaveLength(1);
+  });
+});

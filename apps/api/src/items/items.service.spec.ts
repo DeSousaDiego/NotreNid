@@ -944,3 +944,25 @@ describe('ItemsService.update — effacement des champs facultatifs (Lot 2)', ()
     });
   });
 });
+
+describe('ItemsService.findAll — stable pagination (Release 0B)', () => {
+  it.each([
+    [{}, { createdAt: 'desc' }],
+    [{ sort: 'condition', order: 'asc' }, { condition: 'asc' }],
+    [{ sort: 'title', order: 'desc' }, { title: 'desc' }],
+  ])('always breaks ties on id after the requested sort %j', async (query, primary) => {
+    const prisma = {
+      item: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new ItemsService(
+      prisma as unknown as PrismaService,
+      {} as unknown as CategoriesService,
+    );
+
+    await service.findAll('h1', query as never);
+
+    expect(prisma.item.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: [primary, { id: 'asc' }] }),
+    );
+  });
+});

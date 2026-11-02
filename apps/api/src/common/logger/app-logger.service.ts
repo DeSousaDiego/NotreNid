@@ -1,5 +1,7 @@
 import type { LoggerService } from '@nestjs/common';
 
+import { isLevelEnabled, resolveLogThreshold } from './log-level';
+
 interface LogEntry {
   level: string;
   message: string;
@@ -14,9 +16,24 @@ interface LogEntry {
  * Injecté via `app.useLogger()` dans main.ts : toute instance `new Logger(context)`
  * créée ailleurs dans le code (filtres, services, bootstrap Nest) délègue
  * automatiquement à cette implémentation, sans modification de ces call sites.
+ *
+ * Niveau : LOG_LEVEL (voir log-level.ts). Le logger est créé AVANT le chargement du .env par
+ * ConfigModule : le niveau initial vient de process.env, puis main.ts appelle
+ * `setLogLevel()` avec la valeur de ConfigService.
  */
 export class AppLogger implements LoggerService {
-  constructor(private readonly isProduction: boolean) {}
+  private threshold: number;
+
+  constructor(
+    private readonly isProduction: boolean,
+    logLevel: string | undefined = process.env['LOG_LEVEL'],
+  ) {
+    this.threshold = resolveLogThreshold(logLevel, isProduction);
+  }
+
+  setLogLevel(logLevel: string | undefined): void {
+    this.threshold = resolveLogThreshold(logLevel, this.isProduction);
+  }
 
   log(message: unknown, context?: string): void {
     this.write('log', message, context);
@@ -39,6 +56,9 @@ export class AppLogger implements LoggerService {
   }
 
   private write(level: string, message: unknown, context?: string, trace?: string): void {
+    if (!isLevelEnabled(level, this.threshold)) {
+      return;
+    }
     // `Error` (et ses sous-classes) n'ont ni `message` ni `stack` en propriété énumérable :
     // JSON.stringify(error) renvoie systématiquement "{}", masquant silencieusement la cause
     // réelle. Nest lui-même journalise ainsi les erreurs fatales de démarrage (voir

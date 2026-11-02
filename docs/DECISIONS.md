@@ -325,3 +325,23 @@ Les couvertures récupérées par le lookup barcode (comme celles uploadées man
 **Limites connues.**
 - La suppression d'un foyer supprime ses lignes `uploads` en cascade sans supprimer les fichiers R2 (orphelins). C'est un sujet pré-existant, laissé à un lot ultérieur.
 - Un fichier encore référencé par un item peut être supprimé par un membre du foyer : le comportement est le même qu'avant, à l'intérieur du foyer.
+
+## Release 0B — Robustesse réseau et exécution
+
+**`trust proxy` : un nombre de sauts, jamais `true`.** Le rate limiting identifie le client par `req.ip`. Sans `trust proxy`, derrière Render, tous les utilisateurs partagent l'IP du proxy, donc une seule limite de connexion pour toute l'app. Render *ajoute* son entrée à `X-Forwarded-For` sans effacer celle que le client envoie : `true` ferait confiance à l'entrée la plus à gauche, choisie par le client. On fait donc confiance à `TRUST_PROXY_HOPS` entrées depuis la droite (défaut 1 en production). Le nombre exact de sauts chez Render n'étant pas documenté, la valeur reste configurable sans redéploiement de code et se vérifie avec `LOG_LEVEL=debug` (`docs/OPERATIONS.md`). Sous-estimer est sûr ; surestimer rouvre l'usurpation.
+
+**`/auth/refresh` : sa propre limite (30/min).** Il partageait la limite de connexion (10/min), alors que c'est un appel automatique de chaque appareil, souvent depuis une IP partagée (box du foyer). Un 429 y déconnectait l'utilisateur. Une force brute y est sans objet (jeton aléatoire de 256 bits) ; la limite borne seulement l'abus.
+
+**Refresh : seuls 400/401/403 terminent la session.** Réseau, délai dépassé, 429 et 5xx sont passagers. La session est conservée et l'erreur remonte à l'écran, qui propose de réessayer. Même règle à la restauration au lancement : un 5xx ou un 429 donne « Connexion impossible / Réessayer », plus l'écran de connexion. Règle centralisée dans `isTransientFailure` (`packages/api-client`).
+
+**Délai réseau central côté mobile.** `fetch` n'a pas de délai : un serveur qui sort de veille laissait un écran en chargement indéfiniment. Le délai est fixé dans le client HTTP partagé, jamais par écran : 25 s pour une requête JSON (assez pour un réveil), 60 s pour un envoi d'image. Il couvre l'attente des en-têtes de réponse. Un dépassement devient une `NetworkError` ordinaire (`reason: 'timeout'`), affichée avec le message réseau existant, jamais « AbortError ».
+
+**Durées de configuration toujours converties.** Les variables d'environnement sont des chaînes, quel que soit le `get<number>()` : `Date.now() + "8000"` concaténait et chaque tentative expirait en 1 ms. Toutes les durées des fournisseurs passent par `positiveMsOrDefault` : conversion, défaut si la valeur est invalide, plafond de 120 s.
+
+**Validation de l'environnement au démarrage.** Une configuration invalide empêche l'API de démarrer, au lieu d'échouer au premier usage. Les fonctionnalités optionnelles ne sont exigées que si elles sont sélectionnées. Les durées des fournisseurs restent non bloquantes (retour au défaut). Les messages ne citent que des noms de variables.
+
+**Suppression d'un foyer : base d'abord, stockage ensuite, en best effort.** Les clés de stockage sont lues avant la suppression, car la cascade efface les lignes `uploads`. Les objets sont supprimés explicitement avant le foyer, dans la même transaction : `items.categoryId` est en `RESTRICT`, et selon l'ordre interne de la cascade, une catégorie personnalisée encore référencée faisait échouer toute la suppression. Les fichiers viennent ensuite, par lots ; un fichier absent compte comme supprimé, un échec est journalisé comme orphelin sans jamais annuler une suppression déjà effective. L'ordre inverse aurait pu laisser un foyer existant aux couvertures cassées. Il n'y a pas de file de reprise : volume faible, nettoyage manuel documenté.
+
+**Pagination : départage par `id`.** Avec skip/take, des valeurs de tri égales (même état, même titre) laissent PostgreSQL libre de l'ordre d'une page à l'autre, d'où des objets répétés ou sautés. Le mobile dédoublonne en plus par `id` (défense en profondeur : un objet peut changer de page entre deux requêtes), sans masquer le défaut côté serveur.
+
+**Build sans incrémental.** `nest build` vide `dist/` mais conservait `tsconfig.build.tsbuildinfo`, d'après lequel `tsc` n'émettait rien : build vert, `dist/` vide. L'incrémental est désactivé pour le build (gardé pour le typecheck), et `scripts/assert-build-output.js` fait échouer le build si `dist/main.js` manque.

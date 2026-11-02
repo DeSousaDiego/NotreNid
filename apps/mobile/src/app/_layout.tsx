@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { ErrorState, ToastProvider } from '../components';
+import { AppErrorBoundary, ErrorState, ToastProvider } from '../components';
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
 import { HouseholdProvider } from '../providers/HouseholdProvider';
 import { QueryProvider } from '../providers/QueryProvider';
@@ -93,15 +93,18 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider fontsLoaded={fontsLoaded}>
-      <ToastProvider>
-        <QueryProvider>
-          <AuthProvider>
-            <HouseholdProvider>
-              <RootNavigator />
-            </HouseholdProvider>
-          </AuthProvider>
-        </QueryProvider>
-      </ToastProvider>
+      {/* Sous le thème (l'écran de repli l'utilise), au-dessus de tout le reste. */}
+      <AppErrorBoundary>
+        <ToastProvider>
+          <QueryProvider>
+            <AuthProvider>
+              <HouseholdProvider>
+                <RootNavigator />
+              </HouseholdProvider>
+            </AuthProvider>
+          </QueryProvider>
+        </ToastProvider>
+      </AppErrorBoundary>
       <StatusBar style="dark" />
     </ThemeProvider>
   );

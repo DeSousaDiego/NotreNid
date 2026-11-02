@@ -3,10 +3,14 @@ import { HouseholdRole } from '@prisma/client';
 
 import { AppException } from '../common/exceptions/app-exception';
 import { PrismaService } from '../prisma/prisma.service';
+import { UploadsService } from '../uploads/uploads.service';
 
 @Injectable()
 export class HouseholdsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   async listForUser(userId: string) {
     const memberships = await this.prisma.householdMember.findMany({
@@ -37,8 +41,36 @@ export class HouseholdsService {
     return this.prisma.household.update({ where: { id: householdId }, data: { name } });
   }
 
+  /**
+   * Supprime le foyer, puis ses fichiers téléversés (Release 0B, voir docs/DECISIONS.md).
+   *
+   * 1. Base d'abord, en une transaction : les objets explicitement, PUIS le foyer. Les objets
+   *    ne sont pas laissés à la cascade, car `items.categoryId` est en RESTRICT : selon
+   *    l'ordre interne de la cascade, supprimer une catégorie personnalisée encore référencée
+   *    ferait échouer toute la suppression.
+   * 2. Stockage ensuite, en best effort : les clés sont lues AVANT la suppression (la cascade
+   *    efface les lignes `uploads`). Un fichier en échec reste orphelin (journalisé), sans
+   *    jamais faire échouer une suppression déjà effective ; un fichier déjà absent compte
+   *    comme supprimé. L'ordre inverse aurait pu laisser un foyer EXISTANT aux couvertures
+   *    cassées si la base échouait après le stockage.
+   *
+   * Non couvert : les couvertures téléversées avant la table `uploads` (Release 0A), sans
+   * ligne qui les rattache au foyer.
+   */
   async remove(householdId: string): Promise<void> {
-    await this.prisma.household.delete({ where: { id: householdId } });
+    const uploads = await this.prisma.upload.findMany({
+      where: { householdId },
+      select: { storageKey: true },
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.item.deleteMany({ where: { householdId } }),
+      this.prisma.household.delete({ where: { id: householdId } }),
+    ]);
+
+    await this.uploadsService.removeStoredFilesBestEffort(
+      uploads.map((upload) => upload.storageKey),
+    );
   }
 
   async listMembers(householdId: string) {

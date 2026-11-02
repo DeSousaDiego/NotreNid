@@ -36,6 +36,13 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     this.logger.log(
       `${request.method} ${request.originalUrl} ${statusCode} ${durationMs}ms requestId=${request.requestId ?? '-'}`,
     );
+    // Diagnostic de TRUST_PROXY_HOPS, visible seulement avec LOG_LEVEL=debug (jamais par défaut
+    // en production) : `ip` doit être l'IP publique réelle du client, pas celle d'un proxy.
+    const forwardedFor = request.headers['x-forwarded-for'];
+    const forwardedEntries = typeof forwardedFor === 'string' ? forwardedFor.split(',').length : 0;
+    this.logger.debug(
+      `client ip=${request.ip ?? '-'} xForwardedForEntries=${forwardedEntries} requestId=${request.requestId ?? '-'}`,
+    );
   }
 
   private resolveErrorStatus(error: unknown): number {

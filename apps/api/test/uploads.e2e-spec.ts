@@ -148,4 +148,49 @@ describe('Uploads — household isolation (e2e)', () => {
     await expect(prisma.upload.findUnique({ where: { id: body.id } })).resolves.toBeNull();
     await remove(sam.accessToken, householdA, body.id).expect(404);
   });
+
+  it('deleting a household removes its uploaded files, including when it holds custom-category items (Release 0B)', async () => {
+    const alex = await registerUser('upl-delete-household');
+    const householdA = await createHousehold(alex.accessToken, 'Foyer à supprimer');
+    const keptHousehold = await createHousehold(alex.accessToken, 'Foyer conservé');
+
+    // Catégorie personnalisée + objet : items.categoryId est en RESTRICT, cas qui pouvait
+    // faire échouer la cascade avant la suppression explicite des objets.
+    const category = await request(server())
+      .post(`/api/v1/households/${householdA}/categories`)
+      .set('Authorization', `Bearer ${alex.accessToken}`)
+      .send({ name: 'Vinyles' })
+      .expect(201);
+    const { body: cover } = await upload(alex.accessToken, householdA).expect(201);
+    await request(server())
+      .post(`/api/v1/households/${householdA}/items`)
+      .set('Authorization', `Bearer ${alex.accessToken}`)
+      .send({
+        categoryId: category.body.id,
+        title: 'Disque',
+        condition: 'GOOD',
+        ownerIds: [alex.id],
+        coverImageUrl: cover.url,
+      })
+      .expect(201);
+    const { body: keptCover } = await upload(alex.accessToken, keptHousehold).expect(201);
+
+    const { storageKey } = await prisma.upload.findUniqueOrThrow({ where: { id: cover.id } });
+    const { storageKey: keptKey } = await prisma.upload.findUniqueOrThrow({
+      where: { id: keptCover.id },
+    });
+    expect(storedFileExists(storageKey)).toBe(true);
+
+    await request(server())
+      .delete(`/api/v1/households/${householdA}`)
+      .set('Authorization', `Bearer ${alex.accessToken}`)
+      .expect(204);
+
+    await expect(prisma.household.findUnique({ where: { id: householdA } })).resolves.toBeNull();
+    await expect(prisma.item.count({ where: { householdId: householdA } })).resolves.toBe(0);
+    await expect(prisma.upload.findUnique({ where: { id: cover.id } })).resolves.toBeNull();
+    expect(storedFileExists(storageKey)).toBe(false);
+    // Les fichiers d'un autre foyer ne sont jamais touchés.
+    expect(storedFileExists(keptKey)).toBe(true);
+  });
 });

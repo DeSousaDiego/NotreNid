@@ -9,6 +9,7 @@ import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { applyTrustProxy, resolveTrustProxyHops } from './common/http/trust-proxy';
 import { AppLogger } from './common/logger/app-logger.service';
 import { buildOpenApiDocument } from './common/swagger/document';
 
@@ -20,10 +21,19 @@ const JSON_BODY_LIMIT = '1mb';
 
 async function bootstrap(): Promise<void> {
   const isProduction = process.env.NODE_ENV === 'production';
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: new AppLogger(isProduction),
-  });
+  const logger = new AppLogger(isProduction);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger });
   const configService = app.get(ConfigService);
+  logger.setLogLevel(configService.get<string>('LOG_LEVEL'));
+
+  // Avant tout middleware : `req.ip` (clé du rate limiting) doit refléter le client réel
+  // derrière le proxy Render — voir common/http/trust-proxy.ts.
+  const trustProxyHops = resolveTrustProxyHops(
+    configService.get<string>('TRUST_PROXY_HOPS'),
+    configService.get<string>('APP_ENV'),
+  );
+  applyTrustProxy(app, trustProxyHops);
+  logger.log(`trust proxy : ${trustProxyHops} saut(s)`, 'Bootstrap');
 
   app.use(helmet());
   app.useBodyParser('json', { limit: JSON_BODY_LIMIT });

@@ -5,7 +5,7 @@
  */
 
 export { createApiClient, type ApiClient } from './client';
-export { ApiError, NetworkError } from './errors';
+export { ApiError, NetworkError, isTransientFailure } from './errors';
 export type { ApiClientConfig, StoredTokens, TokenStorage } from './types';
 export type { LoginInput, RegisterInput } from './endpoints/auth';
 export type { CreateCategoryInput, UpdateCategoryInput } from './endpoints/categories';

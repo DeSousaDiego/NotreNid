@@ -9,6 +9,7 @@ import { AppException } from '../common/exceptions/app-exception';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10 Mo
+const STORAGE_DELETE_BATCH_SIZE = 8;
 
 // Format exact des noms de fichiers générés par `save()` (UUID v4 + extension connue) :
 // revalidé ici avant toute suppression, indépendamment du driver de stockage utilisé,
@@ -94,6 +95,41 @@ export class UploadsService {
       }
     }
     await this.prisma.upload.deleteMany({ where: { id: upload.id, householdId } });
+  }
+
+  /**
+   * Supprime des objets de stockage dont les lignes `Upload` ont déjà disparu (suppression
+   * d'un foyer). Best effort : n'échoue jamais. Un fichier déjà absent compte comme supprimé ;
+   * un échec est journalisé avec sa clé (nettoyage manuel possible, voir docs/OPERATIONS.md).
+   * Par lots, pour borner la durée de la requête sans saturer le stockage.
+   */
+  async removeStoredFilesBestEffort(
+    storageKeys: readonly string[],
+  ): Promise<{ removed: number; failed: string[] }> {
+    const failed: string[] = [];
+    let removed = 0;
+    for (let start = 0; start < storageKeys.length; start += STORAGE_DELETE_BATCH_SIZE) {
+      const batch = storageKeys.slice(start, start + STORAGE_DELETE_BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((key) => this.remove(key)));
+      results.forEach((result, index) => {
+        const key = batch[index] as string;
+        if (
+          result.status === 'fulfilled' ||
+          (result.reason instanceof AppException &&
+            result.reason.getStatus() === HttpStatus.NOT_FOUND)
+        ) {
+          removed += 1;
+        } else {
+          failed.push(key);
+        }
+      });
+    }
+    if (failed.length > 0) {
+      this.logger.warn(
+        `${failed.length} fichier(s) orphelin(s) après suppression d'un foyer : ${failed.join(', ')}`,
+      );
+    }
+    return { removed, failed };
   }
 
   /**

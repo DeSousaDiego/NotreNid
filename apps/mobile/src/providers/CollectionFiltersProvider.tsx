@@ -39,6 +39,21 @@ export function CollectionFiltersProvider({ children }: { children: ReactNode })
   );
 }
 
+/**
+ * Filtres propres à UN foyer (Release 0B) : une catégorie ou un propriétaire n'existe que
+ * dans son foyer. Le `key` remonte un état vierge à chaque changement de foyer, au lieu de
+ * laisser un filtre de l'ancien foyer vider la Collection du nouveau.
+ */
+export function HouseholdCollectionFiltersProvider({
+  householdId,
+  children,
+}: {
+  householdId: string;
+  children: ReactNode;
+}) {
+  return <CollectionFiltersProvider key={householdId}>{children}</CollectionFiltersProvider>;
+}
+
 export function useCollectionFilters(): CollectionFiltersContextValue {
   const ctx = useContext(CollectionFiltersContext);
   if (!ctx) {

@@ -11,6 +11,52 @@ describe('AppLogger', () => {
     logSpy.mockRestore();
   });
 
+  describe('LOG_LEVEL', () => {
+    const emitAll = (logger: AppLogger) => {
+      logger.error('e');
+      logger.warn('w');
+      logger.log('l');
+      logger.debug('d');
+      logger.verbose('v');
+    };
+    const emittedLevels = () =>
+      logSpy.mock.calls.map((call) => (JSON.parse(call[0] as string) as { level: string }).level);
+
+    it('drops debug and verbose in production when LOG_LEVEL is not set', () => {
+      emitAll(new AppLogger(true, undefined));
+      expect(emittedLevels()).toEqual(['error', 'warn', 'log']);
+    });
+
+    it('allows debug but not verbose in development by default', () => {
+      const logger = new AppLogger(false, undefined);
+      emitAll(logger);
+      expect(logSpy.mock.calls.map((call) => String(call[0]))).toEqual([
+        expect.stringContaining('ERROR'),
+        expect.stringContaining('WARN'),
+        expect.stringContaining('LOG'),
+        expect.stringContaining('DEBUG'),
+      ]);
+    });
+
+    it.each([
+      ['error', ['error']],
+      ['warn', ['error', 'warn']],
+      ['info', ['error', 'warn', 'log']],
+      ['debug', ['error', 'warn', 'log', 'debug']],
+      ['VERBOSE', ['error', 'warn', 'log', 'debug', 'verbose']],
+    ])('honours LOG_LEVEL=%s in production', (level, expected) => {
+      emitAll(new AppLogger(true, level));
+      expect(emittedLevels()).toEqual(expected);
+    });
+
+    it('applies a level set after construction (value read from ConfigService)', () => {
+      const logger = new AppLogger(true, undefined);
+      logger.setLogLevel('warn');
+      emitAll(logger);
+      expect(emittedLevels()).toEqual(['error', 'warn']);
+    });
+  });
+
   describe('logging an Error instance (production, JSON output)', () => {
     it('serializes name+message instead of "{}" — Error has no enumerable own properties', () => {
       const logger = new AppLogger(true);

@@ -20,6 +20,7 @@ import { useCategories } from '../../../../hooks/useCategories';
 import { useDebouncedValue } from '../../../../hooks/useDebouncedValue';
 import { useItems } from '../../../../hooks/useItems';
 import { useMembers } from '../../../../hooks/useMembers';
+import { uniqueById } from '../../../../lib/uniqueById';
 import { getErrorMessage } from '../../../../lib/errorMessage';
 import { useCollectionFilters } from '../../../../providers/CollectionFiltersProvider';
 import { useHousehold } from '../../../../providers/HouseholdProvider';
@@ -52,7 +53,7 @@ export default function CollectionScreen() {
   // principe que le verrou de scan caméra (`scanLockRef`, voir add-item/scan.tsx).
   const isFetchingNextPageRef = useRef(false);
 
-  const items = itemsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const items = uniqueById(itemsQuery.data?.pages.map((page) => page.data) ?? []);
 
   // Filtres choisis dans l'écran Filtres et invisibles autrement : propriétaire,
   // état, et une catégorie absente des chips rapides (catégorie personnalisée).

@@ -86,6 +86,15 @@ pnpm --filter @notre-nid/api run db:migrate:deploy   # = prisma migrate deploy
 
 Voir [.env.example](../.env.example) pour la liste complète et commentée. Points spécifiques à la production :
 
+**Validation au démarrage (Release 0B).** L'API vérifie sa configuration avant d'accepter la moindre requête (`apps/api/src/config/env.validation.ts`) et **refuse de démarrer** si elle est invalide. Le message liste les noms de variables fautives, jamais leurs valeurs. Exigences propres à la production :
+
+- `JWT_ACCESS_SECRET` et `JWT_REFRESH_SECRET` : au moins 32 caractères, différents l'un de l'autre, sans valeur d'exemple (`changeme…`, `…not_a_real_secret`, `…dev_only`) ;
+- `STORAGE_DRIVER=s3` (`local` est refusé), avec `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY` et `STORAGE_SECRET_KEY` ;
+- `DVD_PRODUCT_PROVIDER=digiteyes` impose `DIGITEYES_APP_KEY` et `DIGITEYES_AUTH_KEY` ;
+- `PORT`, `SMTP_PORT`, `TRUST_PROXY_HOPS` et `LOG_LEVEL`, s'ils sont présents, doivent être valides.
+
+Avant de déployer une version qui contient cette validation, vérifier que les secrets JWT configurés dans Render respectent ces règles. Sinon, le déploiement échoue et l'ancienne instance reste en service.
+
 | Variable | Attention en production |
 | --- | --- |
 | `NODE_ENV` | `production` — désactive Swagger (`/api/v1/docs`), active les logs JSON. |
@@ -98,6 +107,8 @@ Voir [.env.example](../.env.example) pour la liste complète et commentée. Poin
 | `STORAGE_ENDPOINT` | L'endpoint S3 **authentifié** (utilisé par le SDK pour l'upload/la suppression) — jamais une URL destinée à être publique. Sur Cloudflare R2, c'est `https://<account-id>.r2.cloudflarestorage.com`, qui **n'est pas** accessible publiquement. |
 | `STORAGE_PUBLIC_URL` | Base d'URL réellement publique utilisée pour afficher une couverture (domaine personnalisé, ou URL `*.r2.dev` pour R2) — **obligatoire avec R2** (sans elle, l'API construirait par erreur des URLs d'image à partir de `STORAGE_ENDPOINT`, inaccessibles). Optionnelle sur AWS S3/MinIO/Supabase Storage classiques, où l'endpoint sert historiquement aussi de base publique. |
 | `SMTP_*` | Service SMTP réel, jamais Mailpit. |
+| `TRUST_PROXY_HOPS` | Nombre de proxys de confiance (rate limiting par client). Défaut `1` en production ; à vérifier une fois avec la procédure de `docs/OPERATIONS.md` (« Vérifier TRUST_PROXY_HOPS »). Jamais `true`. |
+| `LOG_LEVEL` | `log` recommandé en production (défaut si absente) ; `debug` seulement le temps d'un diagnostic. |
 | `SENTRY_DSN` | Optionnel — voir `docs/OPERATIONS.md` pour la configuration du monitoring. |
 
 ## HTTPS et CORS

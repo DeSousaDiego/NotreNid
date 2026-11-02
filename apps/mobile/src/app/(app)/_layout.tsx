@@ -1,8 +1,10 @@
 import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
-import { CollectionFiltersProvider } from '../../providers/CollectionFiltersProvider';
+import { resolveHouseholdGate } from '../../lib/householdGate';
+import { HouseholdCollectionFiltersProvider } from '../../providers/CollectionFiltersProvider';
 import { useHousehold } from '../../providers/HouseholdProvider';
+import { HouseholdLoadErrorView } from '../../screens/HouseholdLoadErrorView';
 import { HouseholdSelectView } from '../../screens/HouseholdSelectView';
 import { NoHouseholdView } from '../../screens/NoHouseholdView';
 import { useTheme } from '../../theme';
@@ -21,13 +23,21 @@ import { useAuth } from '../../providers/AuthProvider';
 export default function AppLayout() {
   const theme = useTheme();
   const { status } = useAuth();
-  const { householdId, households, isLoading, selectHousehold } = useHousehold();
+  const { householdId, households, hasData, isError, error, refetch, selectHousehold } =
+    useHousehold();
 
   if (status !== 'authenticated') {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (isLoading) {
+  const gate = resolveHouseholdGate({
+    hasData,
+    isError,
+    householdCount: households.length,
+    householdId,
+  });
+
+  if (gate === 'loading') {
     return (
       <View
         style={{
@@ -42,16 +52,20 @@ export default function AppLayout() {
     );
   }
 
-  if (households.length === 0) {
+  if (gate === 'error') {
+    return <HouseholdLoadErrorView error={error} onRetry={refetch} />;
+  }
+
+  if (gate === 'empty') {
     return <NoHouseholdView />;
   }
 
-  if (!householdId) {
+  if (gate === 'select' || !householdId) {
     return <HouseholdSelectView households={households} onSelect={selectHousehold} />;
   }
 
   return (
-    <CollectionFiltersProvider>
+    <HouseholdCollectionFiltersProvider householdId={householdId}>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: theme.colors.background },
@@ -72,6 +86,6 @@ export default function AppLayout() {
         <Stack.Screen name="profile/archives" options={{ title: 'Archives' }} />
         <Stack.Screen name="profile/join" options={{ title: 'Rejoindre un foyer' }} />
       </Stack>
-    </CollectionFiltersProvider>
+    </HouseholdCollectionFiltersProvider>
   );
 }

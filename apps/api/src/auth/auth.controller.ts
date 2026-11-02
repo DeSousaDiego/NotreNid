@@ -16,6 +16,14 @@ import type { AuthenticatedUser } from '../common/types/authenticated-request';
 // limite globale par défaut définie dans AppModule.
 const AUTH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
 
+// `/auth/refresh` est appelé AUTOMATIQUEMENT par chaque appareil (expiration de l'access
+// token, reprise de l'app, requêtes parallèles), et plusieurs téléphones d'un même foyer
+// partagent souvent une IP (box). Avec la limite de connexion (10/min), un pic légitime
+// renvoyait 429 — que le mobile traitait comme une session expirée. Une force brute y est
+// sans objet (refresh token aléatoire de 256 bits, vérifié par hash) : la limite ne sert
+// qu'à borner l'abus, d'où un plafond plus large, toujours inférieur à la limite globale.
+const REFRESH_THROTTLE = { default: { limit: 30, ttl: 60_000 } };
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -42,7 +50,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @Throttle(AUTH_THROTTLE)
+  @Throttle(REFRESH_THROTTLE)
   @ApiOperation({
     summary: 'Fait tourner le refresh token et retourne un nouveau couple de tokens.',
   })

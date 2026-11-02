@@ -6,6 +6,7 @@ import type { CdBarcodeProvider } from './cd-provider.interface';
 import { CoverArtArchiveProvider } from './cover-art-archive.provider';
 import { MusicBrainzArtistCacheService } from './musicbrainz-artist-cache.service';
 import { MusicBrainzRateLimiterService } from './musicbrainz-rate-limiter.service';
+import { positiveMsOrDefault } from '../barcode-config.util';
 import type { CdProviderLookupResult } from '../types/barcode-result.types';
 
 interface MusicBrainzArtistCredit {
@@ -235,8 +236,10 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
   ) {}
 
   async lookup(barcode: string): Promise<CdProviderLookupResult | null> {
-    const budgetMs =
-      this.configService.get<number>('MUSICBRAINZ_TIMEOUT_BUDGET_MS') ?? DEFAULT_TIMEOUT_BUDGET_MS;
+    const budgetMs = positiveMsOrDefault(
+      this.configService.get<string | number>('MUSICBRAINZ_TIMEOUT_BUDGET_MS'),
+      DEFAULT_TIMEOUT_BUDGET_MS,
+    );
     const userAgent =
       this.configService.get<string>('MUSICBRAINZ_USER_AGENT') ?? DEFAULT_USER_AGENT;
     // `+` littéral requis par MusicBrainz pour `inc=` — construit à la main
@@ -330,8 +333,10 @@ export class MusicBrainzProvider implements CdBarcodeProvider {
     const cached = this.artistCache.get(artistMbid);
     if (cached !== undefined) return cached;
 
-    const timeoutMs =
-      this.configService.get<number>('MUSICBRAINZ_ARTIST_TIMEOUT_MS') ?? DEFAULT_ARTIST_TIMEOUT_MS;
+    const timeoutMs = positiveMsOrDefault(
+      this.configService.get<string | number>('MUSICBRAINZ_ARTIST_TIMEOUT_MS'),
+      DEFAULT_ARTIST_TIMEOUT_MS,
+    );
     const url = `https://musicbrainz.org/ws/2/artist/${encodeURIComponent(artistMbid)}?fmt=json`;
 
     try {

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { positiveMsOrDefault } from '../barcode-config.util';
+
 interface CoverArtImage {
   image?: string;
   /** `large`/`small` sont dépréciées par Cover Art Archive au profit des clés
@@ -54,8 +56,10 @@ export class CoverArtArchiveProvider {
   constructor(private readonly configService: ConfigService) {}
 
   async fetchFrontCoverUrl(releaseMbid: string): Promise<string | null> {
-    const timeoutMs =
-      this.configService.get<number>('COVER_ART_ARCHIVE_TIMEOUT_MS') ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = positiveMsOrDefault(
+      this.configService.get<string | number>('COVER_ART_ARCHIVE_TIMEOUT_MS'),
+      DEFAULT_TIMEOUT_MS,
+    );
     const url = `https://coverartarchive.org/release/${encodeURIComponent(releaseMbid)}`;
 
     const controller = new AbortController();

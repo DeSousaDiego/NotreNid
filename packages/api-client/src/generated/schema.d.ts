@@ -229,6 +229,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/households/{householdId}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Téléverse une image de couverture (JPEG/PNG/WebP, validé par signature binaire, 10 Mo max). */
+        post: operations["UploadsController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/households/{householdId}/uploads/{uploadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404. */
+        delete: operations["UploadsController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/households/{householdId}/invitations": {
         parameters: {
             query?: never;
@@ -383,40 +417,6 @@ export interface paths {
         /** Résout un code-barres via un fournisseur externe (livre : Google Books puis Open Library ; CD : MusicBrainz, avec couverture Cover Art Archive ; DVD : fournisseur produit configuré (Digit-Eyes ou UPCitemdb) pour l'édition physique, enrichi par TMDB pour le film — voir `status: 'partial'` quand seule l'édition physique a pu être identifiée). Ne crée ni ne modifie jamais un item. */
         post: operations["BarcodeController_resolve"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/households/{householdId}/uploads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Téléverse une image de couverture (JPEG/PNG/WebP, validé par signature binaire, 10 Mo max). */
-        post: operations["UploadsController_upload"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/households/{householdId}/uploads/{uploadId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Supprime une image téléversée dans ce foyer. Un upload d'un autre foyer, inconnu ou antérieur à Release 0A répond 404. */
-        delete: operations["UploadsController_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1343,6 +1343,96 @@ export interface operations {
             };
         };
     };
+    UploadsController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Les données envoyées sont invalides. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description L'utilisateur n'a pas les droits nécessaires pour effectuer cette action. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La ressource demandée n'existe pas, ou n'appartient pas à ce household. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    UploadsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: string;
+                uploadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fichier supprimé. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description L'utilisateur n'a pas les droits nécessaires pour effectuer cette action. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La ressource demandée n'existe pas, ou n'appartient pas à ce household. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     InvitationsController_list: {
         parameters: {
             query?: never;
@@ -2060,96 +2150,6 @@ export interface operations {
             };
             /** @description Trop de requêtes ont été envoyées dans un court instant. */
             429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    UploadsController_upload: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                householdId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Identifiant de l'upload (à utiliser pour le supprimer) et URL publique de l'image. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Les données envoyées sont invalides. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description L'utilisateur n'a pas les droits nécessaires pour effectuer cette action. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description La ressource demandée n'existe pas, ou n'appartient pas à ce household. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    UploadsController_remove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                householdId: string;
-                uploadId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Fichier supprimé. */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description L'utilisateur n'est pas authentifié, ou le token est invalide ou expiré. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description L'utilisateur n'a pas les droits nécessaires pour effectuer cette action. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description La ressource demandée n'existe pas, ou n'appartient pas à ce household. */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };

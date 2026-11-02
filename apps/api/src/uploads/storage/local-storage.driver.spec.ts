@@ -40,6 +40,27 @@ describe('LocalStorageDriver', () => {
     expect(result).toEqual({ id: 'abc.jpg', url: 'http://localhost:3000/uploads/abc.jpg' });
   });
 
+  it('normalizes a trailing slash in API_PUBLIC_URL (no double slash in the image URL)', async () => {
+    const lanDriver = new LocalStorageDriver(
+      new ConfigService({ API_PUBLIC_URL: 'http://192.168.1.10:3000/' }),
+    );
+    const result = await lanDriver.save({
+      buffer: Buffer.from('x'),
+      filename: 'f.png',
+      contentType: 'image/png',
+    });
+    expect(result.url).toBe('http://192.168.1.10:3000/uploads/f.png');
+  });
+
+  it('keeps the historical relative URL when API_PUBLIC_URL is unset (and warns at startup)', async () => {
+    const result = await new LocalStorageDriver(new ConfigService({})).save({
+      buffer: Buffer.from('x'),
+      filename: 'f.png',
+      contentType: 'image/png',
+    });
+    expect(result.url).toBe('/uploads/f.png');
+  });
+
   it('throws NOT_FOUND when removing a file that does not exist on disk', async () => {
     statMock.mockRejectedValue(new Error('ENOENT'));
 

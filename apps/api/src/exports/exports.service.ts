@@ -31,7 +31,7 @@ export class ExportsService {
         cdMetadata: true,
         dvdMetadata: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
   }
 

@@ -1,6 +1,6 @@
 import {
   createApiClient,
-  NetworkError,
+  isTransientFailure,
   type ApiClient,
   type LoginInput,
   type RegisterInput,
@@ -93,7 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (override?.kind === 'authenticated') return 'authenticated';
     if (override?.kind === 'unauthenticated') return 'unauthenticated';
     if (restoreQuery.isError) {
-      return restoreQuery.error instanceof NetworkError ? 'restore-error' : 'unauthenticated';
+      // Réseau, délai dépassé, 429 ou 5xx : la session reste valable, on propose de réessayer
+      // au lieu de renvoyer vers la connexion. Seul un refus réel du serveur déconnecte.
+      return isTransientFailure(restoreQuery.error) ? 'restore-error' : 'unauthenticated';
     }
     if (restoreQuery.isSuccess) {
       return restoreQuery.data ? 'authenticated' : 'unauthenticated';

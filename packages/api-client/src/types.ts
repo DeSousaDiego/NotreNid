@@ -31,4 +31,11 @@ export interface ApiClientConfig {
    * d'une session plus récente.
    */
   getSessionGeneration?: () => number;
+  /**
+   * Délai max (ms) d'attente de la réponse d'une requête JSON. Défaut : 25 s — assez pour
+   * un serveur qui sort de veille, jamais une attente indéfinie (`fetch` n'a pas de délai).
+   */
+  requestTimeoutMs?: number;
+  /** Idem pour un envoi `FormData` (image jusqu'à 10 Mo sur réseau mobile). Défaut : 60 s. */
+  uploadTimeoutMs?: number;
 }

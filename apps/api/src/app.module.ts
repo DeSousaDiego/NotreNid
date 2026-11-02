@@ -11,6 +11,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { CommonModule } from './common/common.module';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { validateEnv } from './config/env.validation';
 import { ExportsModule } from './exports/exports.module';
 import { HealthModule } from './health/health.module';
 import { HouseholdsModule } from './households/households.module';
@@ -35,6 +36,8 @@ import { UsersModule } from './users/users.module';
       // En test, tout l'environnement est fourni explicitement (test/setup-e2e-env.ts, CI) :
       // le .env de dev (sa base, son stockage R2, ses clés fournisseurs) ne doit jamais fuiter.
       ignoreEnvFile: process.env['APP_ENV'] === 'test',
+      // Configuration invalide → refus de démarrer (config/env.validation.ts).
+      validate: validateEnv,
     }),
     // Limite globale par défaut, appliquée à toutes les routes non couvertes par un
     // @Throttle() plus spécifique (voir AuthController pour les limites renforcées).

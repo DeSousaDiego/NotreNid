@@ -6,6 +6,7 @@ import { defineConfig } from 'prisma/config';
 import {
   assertSafeDatabaseForDestructiveOperation,
   detectDestructivePrismaCommand,
+  toDirectDatabaseUrl,
 } from './src/database-safety/database-safety';
 
 // Le monorepo garde un unique .env à la racine (voir README). Résolu depuis __dirname (et
@@ -30,6 +31,8 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    url: process.env['DATABASE_URL'],
+    // Connexion directe (hors pooler Neon) pour le CLI : voir toDirectDatabaseUrl. L'API
+    // (PrismaService) continue d'utiliser DATABASE_URL telle quelle, pooler compris.
+    url: toDirectDatabaseUrl(process.env['DATABASE_URL']),
   },
 });

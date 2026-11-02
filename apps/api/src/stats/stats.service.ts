@@ -19,7 +19,7 @@ export class StatsService {
         }),
         this.prisma.item.findMany({
           where: { householdId, archivedAt: null },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
           take: 5,
           include: { category: true },
         }),

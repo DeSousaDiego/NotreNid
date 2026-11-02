@@ -31,6 +31,31 @@ describe('OpenLibraryProvider', () => {
     jest.restoreAllMocks();
   });
 
+  it('uses a budget read from the environment as a string as a real duration (Release 0B regression)', async () => {
+    // Les variables d'environnement arrivent toujours en chaîne : avant la correction,
+    // `Date.now() + "9000"` concaténait et chaque tentative expirait au bout d'1 ms.
+    // Comme le vrai fetch : répond après 30 ms, sauf si le signal est annulé avant.
+    global.fetch = jest.fn().mockImplementation(
+      (_url, init?: { signal?: AbortSignal }) =>
+        new Promise((resolve, reject) => {
+          const timer = setTimeout(
+            () => resolve(jsonResponse({ 'ISBN:9782070368228': { details: { title: 'Dune' } } })),
+            30,
+          );
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+          });
+        }),
+    );
+
+    const provider = new OpenLibraryProvider(
+      fakeConfigService({ OPEN_LIBRARY_TIMEOUT_BUDGET_MS: '9000' }),
+    );
+
+    await expect(provider.lookup('9782070368228')).resolves.toMatchObject({ title: 'Dune' });
+  });
+
   it('requests the .json path — Open Library returns 404 on /api/books without it, regardless of format=json', async () => {
     global.fetch = jest.fn().mockResolvedValue(jsonResponse({}));
 

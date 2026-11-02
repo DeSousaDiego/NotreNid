@@ -1,4 +1,4 @@
-import { ApiError, NetworkError } from './errors';
+import { ApiError, NetworkError, isTransientFailure } from './errors';
 import { createHttpClient } from './http';
 import type { StoredTokens, TokenStorage } from './types';
 
@@ -143,6 +143,132 @@ describe('createHttpClient', () => {
     });
     expect(onSessionExpired).toHaveBeenCalledTimes(1);
     await expect(tokenStorage.getTokens()).resolves.toBeNull();
+  });
+
+  it.each([400, 403])(
+    'also ends the session when the refresh is rejected with %i',
+    async (status) => {
+      const tokenStorage = createMemoryTokenStorage({ accessToken: 'a', refreshToken: 'r' });
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED' }))
+        .mockResolvedValueOnce(jsonResponse(status, { statusCode: status, code: 'REJECTED' }));
+      const onSessionExpired = jest.fn();
+      const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage, onSessionExpired });
+
+      await expect(http.request('/households')).rejects.toBeInstanceOf(ApiError);
+      expect(onSessionExpired).toHaveBeenCalledTimes(1);
+      await expect(tokenStorage.getTokens()).resolves.toBeNull();
+    },
+  );
+
+  it.each([429, 500, 502, 503])(
+    'keeps the session when the refresh fails transiently with %i (server/rate limit)',
+    async (status) => {
+      const tokens = { accessToken: 'a', refreshToken: 'r' };
+      const tokenStorage = createMemoryTokenStorage(tokens);
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED' }))
+        .mockResolvedValueOnce(jsonResponse(status, { statusCode: status, code: 'TEMPORARY' }));
+      const onSessionExpired = jest.fn();
+      const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage, onSessionExpired });
+
+      const error = await http.request('/households').catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(isTransientFailure(error)).toBe(true);
+      expect(onSessionExpired).not.toHaveBeenCalled();
+      await expect(tokenStorage.getTokens()).resolves.toEqual(tokens);
+    },
+  );
+
+  it('keeps the session when the refresh call cannot reach the server', async () => {
+    const tokens = { accessToken: 'a', refreshToken: 'r' };
+    const tokenStorage = createMemoryTokenStorage(tokens);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401, { statusCode: 401, code: 'UNAUTHORIZED' }))
+      .mockRejectedValueOnce(new TypeError('Network request failed'));
+    const onSessionExpired = jest.fn();
+    const http = createHttpClient({ baseUrl: 'http://api.test', tokenStorage, onSessionExpired });
+
+    await expect(http.request('/households')).rejects.toBeInstanceOf(NetworkError);
+    expect(onSessionExpired).not.toHaveBeenCalled();
+    await expect(tokenStorage.getTokens()).resolves.toEqual(tokens);
+  });
+
+  describe('request timeout', () => {
+    /** Comme un vrai fetch : ne répond jamais, sauf annulation via le signal. */
+    function hangUntilAborted(): jest.Mock {
+      return jest.fn().mockImplementation(
+        (_url: string, init: { signal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => {
+              reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+            });
+          }),
+      );
+    }
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('turns a request that never answers into a NetworkError (reason: timeout), never an AbortError', async () => {
+      jest.useFakeTimers();
+      global.fetch = hangUntilAborted() as unknown as typeof fetch;
+      const http = createHttpClient({
+        baseUrl: 'http://api.test',
+        tokenStorage: createMemoryTokenStorage(),
+      });
+
+      const pending = http
+        .request('/households', { auth: false })
+        .catch((caught: unknown) => caught);
+      await jest.advanceTimersByTimeAsync(25_000);
+      const error = await pending;
+
+      expect(error).toBeInstanceOf(NetworkError);
+      expect((error as NetworkError).reason).toBe('timeout');
+      expect((error as NetworkError).message).not.toMatch(/abort/i);
+      expect(isTransientFailure(error)).toBe(true);
+    });
+
+    it('waits longer for an upload (FormData) than for a JSON request', async () => {
+      jest.useFakeTimers();
+      const hanging = hangUntilAborted();
+      global.fetch = hanging as unknown as typeof fetch;
+      const http = createHttpClient({
+        baseUrl: 'http://api.test',
+        tokenStorage: createMemoryTokenStorage(),
+        requestTimeoutMs: 1_000,
+        uploadTimeoutMs: 5_000,
+      });
+
+      let settled = false;
+      const pending = http
+        .request('/uploads', { method: 'POST', body: new FormData(), auth: false })
+        .catch((caught: unknown) => caught)
+        .finally(() => {
+          settled = true;
+        });
+      await jest.advanceTimersByTimeAsync(1_000);
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(4_000);
+      await expect(pending).resolves.toMatchObject({ name: 'NetworkError', reason: 'timeout' });
+    });
+
+    it('does not abort a request that answers in time', async () => {
+      jest.useFakeTimers();
+      fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }));
+      const http = createHttpClient({
+        baseUrl: 'http://api.test',
+        tokenStorage: createMemoryTokenStorage(),
+      });
+
+      await expect(http.request('/health', { auth: false })).resolves.toEqual({ ok: true });
+      const [, init] = fetchMock.mock.calls[0];
+      expect((init.signal as AbortSignal).aborted).toBe(false);
+      expect(jest.getTimerCount()).toBe(0);
+    });
   });
 
   it('shares a single refresh across concurrent 401s (single-flight)', async () => {

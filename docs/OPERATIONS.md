@@ -17,6 +17,20 @@ curl https://<url-api>/api/v1/health/ready    # readiness — exécute un SELECT
 - **Production** : une ligne JSON structurée par entrée (même logger, basculé automatiquement via `NODE_ENV=production`). Chaque requête HTTP est journalisée avec méthode, chemin, statut, durée et `requestId` (`RequestLoggingInterceptor`).
 - Corréler une erreur signalée par un utilisateur avec les logs serveur via le champ `requestId` de la réponse d'erreur (`docs/API.md`) — rechercher cette valeur dans les logs de la plateforme d'hébergement (Railway/Render/Fly exposent tous une recherche plein texte sur les logs).
 - Aucune donnée sensible (mot de passe, token, secret) n'apparaît dans les logs — vérifié en Phase 4.
+- **Niveau** : `LOG_LEVEL` (`error` | `warn` | `log`/`info` | `debug` | `verbose`, chaque niveau inclut les plus graves). Sans valeur : `debug` en développement, `log` en production. Pour un diagnostic ponctuel en production, passer temporairement `LOG_LEVEL=debug` dans Render, puis revenir à `log` : le niveau `debug` journalise l'IP client vue par l'API.
+
+## Vérifier TRUST_PROXY_HOPS (rate limiting derrière Render)
+
+Le rate limiting identifie chaque client par `req.ip`. Derrière Render, cette adresse dépend de `TRUST_PROXY_HOPS` (défaut `1` en production, valeur affichée au démarrage : `trust proxy : N saut(s)`). Le nombre exact de proxys devant le service n'est pas documenté par Render : à vérifier une fois après chaque changement d'infrastructure.
+
+1. Dans Render, passer `LOG_LEVEL=debug` et redéployer (ou redémarrer).
+2. Depuis un téléphone en 4G (Wi-Fi coupé), ouvrir l'app, puis noter l'IP publique de ce téléphone (ex. un site « what is my IP » dans son navigateur).
+3. Dans les logs Render, chercher la ligne `client ip=… xForwardedForEntries=N` de cette requête :
+   - `ip` = l'IP publique du téléphone → valeur correcte ;
+   - `ip` = une adresse d'infrastructure (Render, Cloudflare) → augmenter `TRUST_PROXY_HOPS` de 1 et recommencer, **sans jamais dépasser** `xForwardedForEntries`.
+4. Remettre `LOG_LEVEL=log`.
+
+Sous-estimer la valeur est sans danger (des clients partagent un compteur) ; la surestimer permettrait à un client de choisir sa propre « IP » et de contourner les limites.
 
 ## Redémarrer l'API
 
@@ -80,6 +94,10 @@ curl -I "<url-retournée-par-l'API-lors-de-l'upload>"   # doit répondre 200
 En cas d'échec d'upload en production avec `STORAGE_DRIVER=s3`, vérifier dans l'ordre : les identifiants (`STORAGE_ACCESS_KEY`/`STORAGE_SECRET_KEY`), l'existence et la politique de lecture publique du bucket (`STORAGE_BUCKET`), puis l'endpoint (`STORAGE_ENDPOINT` — doit rester vide pour AWS S3 réel, renseigné pour Supabase Storage/MinIO/R2).
 
 Si les couvertures s'uploadent avec succès mais **ne s'affichent jamais** dans l'app (image cassée), le problème est presque toujours `STORAGE_PUBLIC_URL` : cette variable (distincte de `STORAGE_ENDPOINT`) doit contenir la base d'URL réellement publique du bucket. Sur Cloudflare R2 en particulier, `STORAGE_ENDPOINT` (`*.r2.cloudflarestorage.com`) n'est **jamais** accessible publiquement — l'oubli de `STORAGE_PUBLIC_URL` (ou son renseignement avec la même valeur que `STORAGE_ENDPOINT`) produit exactement ce symptôme. Vérifier avec `curl -I` directement sur l'URL retournée par l'API lors de l'upload (voir ci-dessus) : `403`/timeout indique un problème de `STORAGE_PUBLIC_URL` ou de politique de lecture publique du bucket.
+
+### Fichiers orphelins après suppression d'un foyer
+
+La suppression d'un foyer efface d'abord la base (objets puis foyer, en une transaction), puis supprime ses fichiers téléversés en best effort. Un échec de stockage ne fait jamais échouer la suppression : il est journalisé (`warn`) avec la liste des clés, par exemple `2 fichier(s) orphelin(s) après suppression d'un foyer : <clé>, <clé>`. Ces clés ne sont plus référencées par aucune ligne : on peut les supprimer manuellement du bucket (console R2). Les couvertures téléversées avant la Release 0A (sans ligne `uploads`) ne sont pas concernées par ce nettoyage.
 
 ## Révoquer des sessions
 

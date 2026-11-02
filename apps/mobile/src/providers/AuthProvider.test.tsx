@@ -1,4 +1,4 @@
-import { NetworkError, type ApiClient } from '@notre-nid/api-client';
+import { ApiError, NetworkError, type ApiClient } from '@notre-nid/api-client';
 import type { PublicUser } from '@notre-nid/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
@@ -156,6 +156,38 @@ describe('AuthProvider', () => {
     const { result } = await renderHook(() => useAuth(), { wrapper });
 
     await waitFor(() => expect(result.current.status).toBe('restore-error'));
+  });
+
+  it.each([429, 500, 503])(
+    'passe en "restore-error" (jamais "unauthenticated") quand le serveur répond %i à la restauration',
+    async (statusCode) => {
+      secureTokenStorage.getTokens.mockResolvedValue({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+      });
+      (mockAuthClient.auth.me as jest.Mock).mockRejectedValue(
+        new ApiError({ statusCode, code: 'TEMPORARY', message: 'x', details: [] }),
+      );
+
+      const { result } = await renderHook(() => useAuth(), { wrapper });
+
+      await waitFor(() => expect(result.current.status).toBe('restore-error'));
+      expect(secureTokenStorage.clearTokens).not.toHaveBeenCalled();
+    },
+  );
+
+  it('passe en "unauthenticated" quand le serveur refuse réellement la session (401)', async () => {
+    secureTokenStorage.getTokens.mockResolvedValue({
+      accessToken: 'access',
+      refreshToken: 'refresh',
+    });
+    (mockAuthClient.auth.me as jest.Mock).mockRejectedValue(
+      new ApiError({ statusCode: 401, code: 'INVALID_REFRESH_TOKEN', message: 'x', details: [] }),
+    );
+
+    const { result } = await renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => expect(result.current.status).toBe('unauthenticated'));
   });
 
   it('passe en "authenticated" après login()', async () => {

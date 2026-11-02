@@ -63,7 +63,10 @@ export class ItemsService {
       this.prisma.item.findMany({
         where,
         include: ITEM_INCLUDE,
-        orderBy: { [query.sort ?? 'createdAt']: query.order ?? 'desc' },
+        // Départage par `id` : sans lui, des valeurs de tri égales (même état, même titre,
+        // même date) laissent PostgreSQL libre de l'ordre d'une page à l'autre, et la
+        // pagination skip/take répète ou saute des objets (Release 0B).
+        orderBy: [{ [query.sort ?? 'createdAt']: query.order ?? 'desc' }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

@@ -203,4 +203,50 @@ describe('UploadsService', () => {
       expect(prisma.upload.deleteMany).toHaveBeenCalled();
     });
   });
+
+  describe('removeStoredFilesBestEffort', () => {
+    const key = (n: number) => `${String(n).padStart(8, '0')}-1111-1111-1111-111111111111.jpg`;
+
+    it('deletes every file and counts an already-missing file as removed', async () => {
+      driver.remove
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(
+          new AppException(HttpStatus.NOT_FOUND, 'NOT_FOUND', "Ce fichier n'existe pas."),
+        );
+
+      await expect(service.removeStoredFilesBestEffort([key(1), key(2)])).resolves.toEqual({
+        removed: 2,
+        failed: [],
+      });
+    });
+
+    it('never throws: a storage failure is reported (and logged) as an orphan, the others still go', async () => {
+      driver.remove
+        .mockRejectedValueOnce(new Error('storage down'))
+        .mockResolvedValueOnce(undefined);
+
+      await expect(service.removeStoredFilesBestEffort([key(1), key(2)])).resolves.toEqual({
+        removed: 1,
+        failed: [key(1)],
+      });
+    });
+
+    it('processes large sets in batches and does nothing for an empty list', async () => {
+      driver.remove.mockResolvedValue(undefined);
+      const keys = Array.from({ length: 20 }, (_, index) => key(index));
+
+      await expect(service.removeStoredFilesBestEffort(keys)).resolves.toEqual({
+        removed: 20,
+        failed: [],
+      });
+      expect(driver.remove).toHaveBeenCalledTimes(20);
+
+      driver.remove.mockClear();
+      await expect(service.removeStoredFilesBestEffort([])).resolves.toEqual({
+        removed: 0,
+        failed: [],
+      });
+      expect(driver.remove).not.toHaveBeenCalled();
+    });
+  });
 });

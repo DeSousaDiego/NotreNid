@@ -1,7 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // Jamais d'incrémental pour le build : `nest build` vide dist/ (deleteOutDir) mais
+    // laisse tsconfig.build.tsbuildinfo, d'après lequel tsc juge tout « à jour » et
+    // n'émet rien — build vert, dist/ vide (constaté en Release 0A).
+    "incremental": false
   },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }

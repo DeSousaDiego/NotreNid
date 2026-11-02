@@ -225,3 +225,32 @@ export function detectDestructivePrismaCommand(argv: readonly string[]): string 
   }
   return null;
 }
+
+/**
+ * URL de connexion DIRECTE pour le CLI Prisma (migrate, db execute, studio).
+ *
+ * Neon expose chaque base via un pooler PgBouncer (`ep-xxx-pooler.…`, mode transaction) et
+ * via un hôte direct (`ep-xxx.…`). `prisma migrate` pose un verrou consultatif de SESSION
+ * (`pg_advisory_lock`) : à travers le pooler, le déverrouillage peut partir sur une autre
+ * connexion serveur, et le verrou reste tenu indéfiniment (constaté en Release 0B : P1002 sur
+ * toutes les migrations suivantes). Même base, même endpoint — seul l'hôte change ; le
+ * garde-fou destructif compare d'ailleurs les hôtes normalisés (`normalizeDatabaseHost`).
+ * Toute autre URL est renvoyée inchangée.
+ */
+export function toDirectDatabaseUrl(url: string | undefined): string | undefined {
+  if (!url) {
+    return url;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  const [first = '', ...rest] = parsed.hostname.split('.');
+  if (!first.endsWith('-pooler') || !parsed.hostname.endsWith('.neon.tech')) {
+    return url;
+  }
+  parsed.hostname = [first.replace(/-pooler$/, ''), ...rest].join('.');
+  return parsed.toString();
+}

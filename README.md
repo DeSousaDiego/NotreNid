@@ -61,6 +61,9 @@ Voir [.env.example](.env.example) pour la liste complète et commentée. Points 
 - `JWT_ACCESS_SECRET` / `JWT_ACCESS_TTL` / `JWT_REFRESH_SECRET` / `JWT_REFRESH_TTL` : secrets et durées de vie des tokens — secrets de développement uniquement, à régénérer avant toute mise en production.
 - `MOBILE_PUBLIC_API_URL` : seule variable destinée à être embarquée dans le bundle mobile ; ne doit jamais contenir de secret.
 - `STORAGE_DRIVER=local|s3` : stockage local en développement (`apps/api/storage/uploads/`, ignoré par Git) ou S3-compatible en production (AWS S3, Supabase Storage, MinIO, Cloudflare R2) — voir `docs/DEPLOYMENT.md`. En `s3`, `STORAGE_ENDPOINT` (l'endpoint authentifié) et `STORAGE_PUBLIC_URL` (l'URL réellement publique) sont deux notions distinctes — **obligatoire de renseigner `STORAGE_PUBLIC_URL` avec Cloudflare R2**, dont l'endpoint n'est jamais public.
+- `API_PUBLIC_URL` : base des URLs d'images avec `STORAGE_DRIVER=local`. Sur téléphone, l'adresse LAN du PC (ex. `http://192.168.1.10:3000`), jamais `localhost`.
+- `TRUST_PROXY_HOPS` / `LOG_LEVEL` : proxys de confiance (rate limiting, défaut 1 en production) et niveau de logs — voir `docs/OPERATIONS.md`.
+- L'API **refuse de démarrer** si une variable indispensable est absente ou invalide (`apps/api/src/config/env.validation.ts`).
 - `SMTP_HOST` / `SMTP_PORT` : par défaut, Mailpit local (`localhost:1025`) — les emails d'invitation y sont capturés (interface web sur `http://localhost:8025`).
 
 ## Environnements
